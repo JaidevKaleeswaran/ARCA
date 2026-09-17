@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, MicOff, Loader2, CheckCircle2, X, Volume2, Send, Sparkles, AlertCircle } from 'lucide-react';
 import { parseSpokenReceipt, createWebSpeechRecognition, speakTransactionDetails } from '../../services/agents/voiceAgent';
-import { GoogleGenAI } from '@google/genai';
+import { env } from '../../config/env';
 
 /**
  * VoiceInputPanel — ARCA Dual Voice & Text Receipt Input Agent
@@ -95,115 +95,50 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
       return;
     }
 
-    let lastErrorMsg = '';
-
     try {
-      // Collect available keys, prioritizing verified working keys
-      const apiKeys = [
-        import.meta.env.VITE_STT_API_KEY,
-        import.meta.env.VITE_RECEIPT_SCANNER_API_KEY,
-        import.meta.env.VITE_MANAGER_API_KEY,
-        import.meta.env.VITE_ASSISTANT_API_KEY,
-      ].filter(Boolean);
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'receipt-recording.webm');
+      formData.append('mode', 'receipt');
 
-      if (apiKeys.length === 0) {
-        throw new Error('No Gemini API key configured for audio transcription');
-      }
-
-      // Convert audio blob to base64 using FileReader
-      const base64Audio = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64 = reader.result.split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(audioBlob);
+      const apiBase = env.apiBaseUrl || '';
+      const response = await fetch(`${apiBase}/api/voice/transcribe`, {
+        method: 'POST',
+        body: formData,
       });
 
-      // Strip codec info from MIME type — Gemini needs 'audio/webm', not 'audio/webm;codecs=opus'
-      const mimeType = (audioBlob.type || 'audio/webm').split(';')[0];
-
-      const prompt = `Listen carefully to this spoken receipt audio recording.
-Extract what the user bought, the total amount spent, and the date of purchase.
-Return ONLY valid JSON (no markdown formatting) in this exact structure:
-{
-  "transcript": "Exact spoken text",
-  "merchant": "Merchant or Store Name or Description",
-  "amount": 0.00,
-  "date": "YYYY-MM-DD"
-}
-
-If the year/date is not mentioned, use today's date (${new Date().toISOString().split('T')[0]}).`;
-
-      const modelsToTry = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.5-flash', 'gemini-2.0-flash'];
-
-      // Try keys and models
-      for (const apiKey of apiKeys) {
-        const ai = new GoogleGenAI({ apiKey });
-        for (const model of modelsToTry) {
-          try {
-            const response = await ai.models.generateContent({
-              model,
-              contents: [
-                {
-                  role: 'user',
-                  parts: [
-                    { text: prompt },
-                    {
-                      inlineData: {
-                        mimeType,
-                        data: base64Audio,
-                      },
-                    },
-                  ],
-                },
-              ],
-            });
-
-            const rawText = (response.text || '').trim();
-            if (!rawText) continue;
-
-            const cleaned = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-            const data = JSON.parse(cleaned);
-
-            const fullTranscript = data.transcript || inputText || 'Spoken Receipt';
-            setInputText(fullTranscript);
-            const merchantVal = data.merchant || 'Spoken Purchase';
-            const amountVal = Number(data.amount) || 0;
-            const dateVal = data.date || new Date().toISOString().split('T')[0];
-            const issues = [];
-            if (!data.merchant || data.merchant === 'Spoken Purchase') issues.push('merchant');
-            if (amountVal === 0) issues.push('amount');
-            if (!data.date) issues.push('date');
-            setParsedData({
-              description: merchantVal,
-              amount: amountVal,
-              date: dateVal,
-              raw_transcript: fullTranscript,
-              _confidenceIssues: issues,
-            });
-            setIsProcessing(false);
-            return true;
-          } catch (modelErr) {
-            console.warn(`[Voice] Key ${apiKey.substring(0, 10)}... Model ${model} failed:`, modelErr.message);
-            lastErrorMsg = modelErr.message || String(modelErr);
-          }
-        }
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.message || `Audio transcription failed (${response.status})`);
       }
 
-      throw new Error(lastErrorMsg || 'All Gemini models failed to transcribe audio');
-    } catch (err) {
-      console.warn('[Voice] Gemini audio transcription failed:', err.message);
-      lastErrorMsg = err.message;
-    }
+      const data = await response.json();
 
-    // Fallback: if WebSpeech captured any text, try parsing that
-    if (inputText) {
-      processText(inputText);
-    } else {
-      setError(lastErrorMsg ? `Transcription error: ${lastErrorMsg}` : 'Could not transcribe audio. Please type your purchase details below.');
+      const fullTranscript = data.transcript || inputText || 'Spoken Receipt';
+      setInputText(fullTranscript);
+      const merchantVal = data.merchant || 'Spoken Purchase';
+      const amountVal = Number(data.amount) || 0;
+      const dateVal = data.date || new Date().toISOString().split('T')[0];
+      const issues = [];
+      if (!data.merchant || data.merchant === 'Spoken Purchase') issues.push('merchant');
+      if (amountVal === 0) issues.push('amount');
+      if (!data.date) issues.push('date');
+      setParsedData({
+        description: merchantVal,
+        amount: amountVal,
+        date: dateVal,
+        raw_transcript: fullTranscript,
+        _confidenceIssues: issues,
+      });
       setIsProcessing(false);
+      return true;
+    } catch (err) {
+      console.warn('[Voice] Audio transcription error:', err);
+      if (inputText && inputText.trim()) {
+        processText(inputText);
+      } else {
+        setError(`Transcription error: ${err.message}. Please type your purchase details below.`);
+        setIsProcessing(false);
+      }
     }
   };
 

@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import receiptsRouter from './routes/receipts.js';
 import voiceRouter from './routes/voice.js';
+import assistantRouter from './routes/assistant.js';
 
 dotenv.config();
 
@@ -25,13 +26,18 @@ app.use('/uploads', express.static(path.join(PROJECT_ROOT, 'uploads')));
 // Routes
 app.use('/api/receipts', receiptsRouter);
 app.use('/api/voice', voiceRouter);
+app.use('/api/assistant', assistantRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`MyVault backend server listening on http://localhost:${PORT}`);
-});
+// Start server (when executed directly, not imported in serverless)
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Backend server listening on http://localhost:${PORT}`);
+  });
+}
+
+export default app;

@@ -147,7 +147,7 @@ async function parseReceiptWithClaude(imagePath) {
 }
 
 async function parseReceiptWithOpenAI(imagePath) {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw Object.assign(new Error('OPENAI_API_KEY environment variable is not set'), {
       code: 'MISSING_API_KEY',
@@ -201,19 +201,14 @@ async function parseReceiptWithOpenAI(imagePath) {
 }
 
 async function parseReceiptWithGemini(imagePath) {
-  // Use dedicated Receipt Scanner API Key first, then fallback to shared keys
+  // Use dedicated Receipt Scanner API Key first, then fallback to shared Gemini key
   const apiKey = process.env.RECEIPT_SCANNER_API_KEY
-    || process.env.GEMINI_API_KEY
-    || process.env.VITE_RECEIPT_SCANNER_API_KEY
-    || process.env.VITE_MANAGER_API_KEY
-    || process.env.VITE_ASSISTANT_API_KEY;
+    || process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw Object.assign(new Error('No Gemini API key configured for receipt scanning. Set RECEIPT_SCANNER_API_KEY in .env'), {
+    throw Object.assign(new Error('No Gemini API key configured for receipt scanning. Set GEMINI_API_KEY in environment variables.'), {
       code: 'MISSING_API_KEY',
     });
   }
-
-  console.log('[Receipt Scanner] Using API key prefix:', apiKey.substring(0, 15) + '...');
 
 
   const ai = new GoogleGenAI({ apiKey });

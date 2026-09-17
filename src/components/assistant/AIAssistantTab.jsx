@@ -4,7 +4,7 @@ import {
   RefreshCw, Mic, MicOff, Camera, X,
   Brain, Zap, ChevronDown, ChevronUp, Bot, User, Volume2, ShieldCheck
 } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
+import { env } from '../../config/env';
 import { answerQuery, clearConversationHistory } from '../../services/agents/assistantAgent';
 import { buildFinancialSnapshot, processTransaction } from '../../services/agents/managerAgent';
 import { createWebSpeechRecognition } from '../../services/agents/voiceAgent';
@@ -230,54 +230,24 @@ export default function AIAssistantTab() {
     if (audioBlob && audioBlob.size > 100) {
       setIsTranscribingPrompt(true);
       try {
-        const apiKeys = [
-          import.meta.env.VITE_STT_API_KEY,
-          import.meta.env.VITE_ASSISTANT_API_KEY,
-          import.meta.env.VITE_MANAGER_API_KEY,
-          import.meta.env.VITE_RECEIPT_SCANNER_API_KEY,
-          import.meta.env.VITE_GEMINI_API_KEY,
-        ].filter(Boolean);
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'prompt-recording.webm');
+        formData.append('mode', 'prompt');
 
-        if (apiKeys.length > 0) {
-          const base64Audio = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(',')[1]);
-            reader.onerror = reject;
-            reader.readAsDataURL(audioBlob);
-          });
+        const apiBase = env.apiBaseUrl || '';
+        const response = await fetch(`${apiBase}/api/voice/transcribe`, {
+          method: 'POST',
+          body: formData,
+        });
 
-          const mimeType = (audioBlob.type || 'audio/webm').split(';')[0];
-          const prompt = "Transcribe this spoken question into plain text. Return ONLY the transcribed text, with no JSON, commentary, quotes, or markdown formatting.";
-
-          for (const apiKey of apiKeys) {
-            const ai = new GoogleGenAI({ apiKey });
-            for (const model of ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.5-flash', 'gemini-2.0-flash']) {
-              try {
-                const response = await ai.models.generateContent({
-                  model,
-                  contents: [{
-                    role: 'user',
-                    parts: [
-                      { text: prompt },
-                      { inlineData: { mimeType, data: base64Audio } },
-                    ],
-                  }],
-                });
-                const resText = (response.text || '').trim();
-                if (resText) {
-                  capturedText = resText;
-                  break;
-                }
-              } catch (mErr) {
-                console.warn(`[Voice Prompt] Gemini model ${model} error:`, mErr.message);
-              }
-            }
-            if (capturedText) break;
+        if (response.ok) {
+          const data = await response.json();
+          if (data.transcript) {
+            capturedText = data.transcript;
           }
         }
       } catch (err) {
         console.warn('[Voice Prompt] Audio transcription error:', err);
-        console.warn('[AI Prompt Voice] Audio transcription error:', err);
       } finally {
         setIsTranscribingPrompt(false);
       }

@@ -155,11 +155,8 @@ router.post('/transcribe', uploadMemory.single('audio'), async (req, res) => {
       return res.status(400).json({ error: 'No audio file provided' });
     }
 
-    const apiKey = process.env.RECEIPT_SCANNER_API_KEY
-      || process.env.GEMINI_API_KEY
-      || process.env.VITE_RECEIPT_SCANNER_API_KEY
-      || process.env.VITE_MANAGER_API_KEY
-      || process.env.VITE_ASSISTANT_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY
+      || process.env.RECEIPT_SCANNER_API_KEY;
 
     if (!apiKey) {
       return res.status(500).json({ error: 'No Gemini API key configured for audio transcription' });
@@ -169,7 +166,12 @@ router.post('/transcribe', uploadMemory.single('audio'), async (req, res) => {
     const base64Audio = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype || 'audio/webm';
 
-    const prompt = `Listen carefully to this spoken receipt audio recording.
+    const mode = req.body.mode || 'receipt';
+    const isPromptMode = mode === 'prompt';
+
+    const prompt = isPromptMode
+      ? 'Transcribe this spoken question into plain text. Return ONLY the transcribed text, with no JSON, commentary, quotes, or markdown formatting.'
+      : `Listen carefully to this spoken receipt audio recording.
 Extract what the user bought, the total amount spent, and the date of purchase.
 Return ONLY valid JSON (no markdown formatting) in this exact structure:
 {
@@ -200,8 +202,21 @@ If the year/date is not mentioned, use today's date (${new Date().toISOString().
     });
 
     const rawText = response.text?.trim() || '';
+
+    if (isPromptMode) {
+      return res.json({
+        success: true,
+        transcript: rawText.replace(/^["']|["']$/g, ''),
+      });
+    }
+
     const cleaned = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-    const data = JSON.parse(cleaned);
+    let data = {};
+    try {
+      data = JSON.parse(cleaned);
+    } catch {
+      data = { transcript: rawText };
+    }
 
     return res.json({
       success: true,

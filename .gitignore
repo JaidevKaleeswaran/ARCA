@@ -24,12 +24,24 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment
+# Environment variables (First Line of Defense)
 .env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+.env.*
+!.env.example
+*.env
+vercel.env
 
 # Uploaded receipts (local dev storage)
 uploads/
 
-# Environment and AWS outputs
-vercel.env
+# AWS outputs
 aws/aws-outputs.json
+aws/aws-outputs.*.json
+aws/__pycache__/

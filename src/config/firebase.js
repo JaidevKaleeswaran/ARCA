@@ -5,16 +5,14 @@ import { getAnalytics, isSupported } from 'firebase/analytics';
 import { env } from './env';
 
 const firebaseConfig = {
-  apiKey: env.firebase.apiKey || 'AIzaSyByjWIGx6KvOUQHbW5w3jxkwL9sMP1B9_0',
+  apiKey: env.firebase.apiKey || '',
   authDomain: env.firebase.authDomain || 'arca-budgeting.firebaseapp.com',
   projectId: env.firebase.projectId || 'arca-budgeting',
   storageBucket: env.firebase.storageBucket || 'arca-budgeting.firebasestorage.app',
-  messagingSenderId: env.firebase.messagingSenderId || '127464127687',
-  appId: env.firebase.appId || '1:127464127687:web:99d6d733675c3d410f92e2',
-  measurementId: env.firebase.measurementId || 'G-1KDBCK65VF'
+  messagingSenderId: env.firebase.messagingSenderId || '',
+  appId: env.firebase.appId || '',
+  measurementId: env.firebase.measurementId || ''
 };
-
-console.log("Firebase config loaded:", firebaseConfig);
 
 // Initialize Firebase
 let app = null;

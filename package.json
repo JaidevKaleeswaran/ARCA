@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "server": "node server/index.js"
+    "server": "node server/index.js",
+    "lint:secrets": "node scripts/scan-secrets.js --all"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.60.0",

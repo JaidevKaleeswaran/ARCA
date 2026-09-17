@@ -6,7 +6,7 @@
  * for the Manager Agent to process.
  */
 
-const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
+import { env } from '../../config/env';
 
 // ── Agent Configuration ──────────────────────────────────────────────────────
 
@@ -148,18 +148,18 @@ export function parseSpokenReceipt(text) {
 }
 
 /**
- * Check if ElevenLabs is configured
+ * Check if voice output is supported (browser speechSynthesis or backend voice endpoint)
  */
 export function isVoiceEnabled() {
-  return !!ELEVENLABS_API_KEY;
+  return typeof window !== 'undefined' && 'speechSynthesis' in window;
 }
 
 /**
- * Get the ElevenLabs API key for widget initialization
+ * Get the ElevenLabs widget config
  */
 export function getElevenLabsConfig() {
   return {
-    apiKey: ELEVENLABS_API_KEY,
+    agentId: env.elevenLabs?.agentId || '',
     agentPrompt: VOICE_AGENT_PROMPT,
   };
 }
@@ -254,41 +254,19 @@ export async function speakTextWithElevenLabs(text, options = {}) {
     let response;
 
     try {
-      const apiBase = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:5000' : '');
+      const apiBase = env.apiBaseUrl || '';
       response = await fetch(`${apiBase}/api/voice/speak`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, voiceId }),
       });
     } catch {
-
-      // Backend unavailable, try direct ElevenLabs API if client key exists
       response = null;
     }
 
     if (response && response.ok) {
       const blob = await response.blob();
       audioUrl = URL.createObjectURL(blob);
-    } else if (ELEVENLABS_API_KEY) {
-      // Direct call to ElevenLabs API from client
-      const directRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': ELEVENLABS_API_KEY,
-        },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-        }),
-      });
-
-      if (directRes.ok) {
-        const blob = await directRes.blob();
-        audioUrl = URL.createObjectURL(blob);
-      }
     }
 
     // 2. Play ElevenLabs Audio if URL was created successfully

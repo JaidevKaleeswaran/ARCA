@@ -8,25 +8,7 @@
  * 4. Builds complete financial snapshots for the AI Assistant Agent
  */
 
-import { GoogleGenAI } from '@google/genai';
-
-let aiInstance = null;
-
-function getAI() {
-  const apiKey = import.meta.env.VITE_MANAGER_API_KEY
-    || import.meta.env.VITE_ASSISTANT_API_KEY
-    || import.meta.env.VITE_GEMINI_API_KEY
-    || import.meta.env.GEMINI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('No Gemini API key configured. Set VITE_MANAGER_API_KEY, VITE_ASSISTANT_API_KEY, or VITE_GEMINI_API_KEY in .env');
-  }
-
-  if (!aiInstance) {
-    aiInstance = new GoogleGenAI({ apiKey });
-  }
-  return aiInstance;
-}
+import { env } from '../../config/env';
 
 // ── Category matching ────────────────────────────────────────────────────────
 
@@ -143,26 +125,25 @@ function matchToUserCategory(suggestedCategory, userCategories) {
 
 async function aiCategorize(description, amount, userCategoryNames) {
   try {
-    const ai = getAI();
-    const prompt = `You are a financial transaction categorizer. Given this transaction, return ONLY the category name that best fits.
-
-Available categories: ${userCategoryNames.join(', ')}
-
-Transaction: "${description}" for $${amount}
-
-Rules:
-- Return ONLY the category name, nothing else
-- Choose the most specific matching category from the available list
-- If no good match, return the closest one`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    const apiBase = env.apiBaseUrl || '';
+    const res = await fetch(`${apiBase}/api/assistant/categorize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description,
+        amount,
+        categories: userCategoryNames,
+      }),
     });
 
-    return (response.text || '').trim();
+    if (!res.ok) {
+      return null;
+    }
+
+    const data = await res.json();
+    return data.category || null;
   } catch (err) {
-    console.warn('AI categorization failed, using fallback:', err.message);
+    console.warn('AI categorization backend failed, using fallback:', err.message);
     return null;
   }
 }
