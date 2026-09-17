@@ -1,5 +1,6 @@
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
+import { sanitizeError } from '../utils/sanitize.js';
 
 const router = express.Router();
 
@@ -143,7 +144,7 @@ router.post('/chat', async (req, res) => {
     console.error('Assistant chat error:', err);
     return res.status(500).json({
       error: 'Failed to generate assistant response',
-      message: err.message,
+      message: sanitizeError(err),
     });
   }
 });
@@ -193,7 +194,7 @@ Rules:
     return res.json({ category: category || null });
   } catch (err) {
     console.error('Assistant categorize error:', err);
-    return res.status(500).json({ error: 'Categorization error', message: err.message });
+    return res.status(500).json({ error: 'Categorization error', message: sanitizeError(err) });
   }
 });
 
@@ -252,7 +253,7 @@ Respond in 2 sentences max. Start with either "Looks normal:" or "Suspicious:" a
     });
   } catch (err) {
     console.error('Assistant review error:', err);
-    return res.status(500).json({ error: 'Review error', message: err.message });
+    return res.status(500).json({ error: 'Review error', message: sanitizeError(err) });
   }
 });
 

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { sanitizeError } from '../utils/sanitize.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -419,8 +420,8 @@ router.post('/scan', (req, res, next) => {
 
       return res.status(502).json({
         error: 'Receipt parsing failed',
-        message: userFriendlyMessage,
-        details: apiErr.message,
+        message: sanitizeError(userFriendlyMessage),
+        details: sanitizeError(apiErr.message),
       });
     }
   });

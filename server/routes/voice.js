@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { GoogleGenAI } from '@google/genai';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
+import { sanitizeError } from '../utils/sanitize.js';
 
 const uploadMemory = multer({ limits: { fileSize: 25 * 1024 * 1024 } });
 
@@ -72,7 +73,7 @@ router.post('/create-agent', async (req, res) => {
     console.error('ElevenLabs agent creation error:', err);
     return res.status(502).json({
       error: 'Failed to create voice agent',
-      message: err.message,
+      message: sanitizeError(err),
     });
   }
 });
@@ -140,7 +141,7 @@ router.post('/speak', async (req, res) => {
     console.error('ElevenLabs TTS error:', err);
     return res.status(502).json({
       error: 'Failed to generate speech audio',
-      message: err.message,
+      message: sanitizeError(err),
     });
   }
 });
@@ -229,7 +230,7 @@ If the year/date is not mentioned, use today's date (${new Date().toISOString().
     console.error('Audio transcription error:', err);
     return res.status(502).json({
       error: 'Failed to transcribe audio',
-      message: err.message,
+      message: sanitizeError(err),
     });
   }
 });
