@@ -7,10 +7,18 @@ import { GoogleGenAI } from '@google/genai';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { sanitizeError } from '../utils/sanitize.js';
+import { createRateLimiter } from '../middleware/security.js';
 
 const execFileAsync = promisify(execFile);
 
 const router = express.Router();
+
+// Rate limiter for receipt scanning (15 scans per minute per IP)
+const scanLimiter = createRateLimiter({
+  windowMs: 60000,
+  max: 15,
+  message: 'Too many receipt scans. Please wait a moment before trying again.',
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -297,7 +305,7 @@ function validateParsedReceipt(data) {
 // ---------------------------------------------------------------------------
 // POST /api/receipts/scan
 // ---------------------------------------------------------------------------
-router.post('/scan', (req, res, next) => {
+router.post('/scan', scanLimiter, (req, res, next) => {
   upload.single('receipt')(req, res, async (err) => {
     // ── Multer errors ──────────────────────────────────────────────────
     if (err) {
@@ -421,7 +429,6 @@ router.post('/scan', (req, res, next) => {
       return res.status(502).json({
         error: 'Receipt parsing failed',
         message: sanitizeError(userFriendlyMessage),
-        details: sanitizeError(apiErr.message),
       });
     }
   });

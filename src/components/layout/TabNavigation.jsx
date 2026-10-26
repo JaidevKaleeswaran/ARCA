@@ -10,7 +10,7 @@ export default function TabNavigation({ activeTab, setActiveTab }) {
   ];
 
   return (
-    <nav className="border-b border-border bg-primary sticky top-0 z-10 pt-2 sm:pt-4">
+    <nav data-tutorial="tab-nav" className="border-b border-border bg-primary sticky top-0 z-10 pt-2 sm:pt-4">
       <div className="flex justify-center max-w-6xl mx-auto px-2 sm:px-4">
         <div className="flex space-x-2 sm:space-x-8 overflow-x-auto no-scrollbar whitespace-nowrap text-xs sm:text-sm px-1 py-0.5">
           {tabs.map((tab) => (

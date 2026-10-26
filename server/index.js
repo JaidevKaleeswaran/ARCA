@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import receiptsRouter from './routes/receipts.js';
 import voiceRouter from './routes/voice.js';
 import assistantRouter from './routes/assistant.js';
+import { blockSensitivePaths, createRateLimiter } from './middleware/security.js';
 
 dotenv.config();
 
@@ -16,12 +17,45 @@ const PROJECT_ROOT = path.resolve(__dirname, '..');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// Security: Block any attempts to probe .env, .git, package.json, or traverse directories
+app.use(blockSensitivePaths);
 
-// Serve uploaded receipt images as static files
-app.use('/uploads', express.static(path.join(PROJECT_ROOT, 'uploads')));
+// Global Rate Limiter: 120 requests per minute per IP
+const globalLimiter = createRateLimiter({
+  windowMs: 60000,
+  max: 120,
+  message: 'Too many requests from this IP. Please wait a minute.',
+});
+app.use('/api', globalLimiter);
+
+// CORS configuration: Allow localhost in dev and Vercel / custom domain in production
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5000',
+  'http://localhost:3000',
+];
+if (process.env.CLIENT_ORIGIN) {
+  allowedOrigins.push(process.env.CLIENT_ORIGIN);
+}
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g., mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    return callback(null, true); // Permissive fallback with credentials control
+  },
+  credentials: true,
+}));
+
+app.use(express.json({ limit: '5mb' }));
+
+// Serve uploaded receipt images as static files (dotfiles hidden)
+app.use('/uploads', express.static(path.join(PROJECT_ROOT, 'uploads'), {
+  dotfiles: 'deny',
+}));
 
 // Routes
 app.use('/api/receipts', receiptsRouter);

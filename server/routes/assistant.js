@@ -1,8 +1,14 @@
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
 import { sanitizeError } from '../utils/sanitize.js';
+import { createRateLimiter, validateChatInput, validateCategorizeInput } from '../middleware/security.js';
 
 const router = express.Router();
+
+// Rate limiters for assistant endpoints
+const chatLimiter = createRateLimiter({ windowMs: 60000, max: 30, message: 'Too many assistant queries. Please wait a moment.' });
+const categorizeLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 'Too many categorization requests.' });
+const reviewLimiter = createRateLimiter({ windowMs: 60000, max: 30, message: 'Too many review requests.' });
 
 function getAI() {
   const apiKey = process.env.GEMINI_API_KEY 
@@ -88,13 +94,9 @@ ${(snapshot?.recentTransactions || []).length > 0
  * POST /api/assistant/chat
  * Answers user financial queries safely via server-side Gemini
  */
-router.post('/chat', async (req, res) => {
+router.post('/chat', chatLimiter, validateChatInput, async (req, res) => {
   const startTime = Date.now();
   const { question, snapshot, history = [] } = req.body;
-
-  if (!question || typeof question !== 'string') {
-    return res.status(400).json({ error: 'Missing question parameter' });
-  }
 
   try {
     const ai = getAI();
@@ -153,12 +155,8 @@ router.post('/chat', async (req, res) => {
  * POST /api/assistant/categorize
  * Uses Gemini to classify a transaction description into existing categories
  */
-router.post('/categorize', async (req, res) => {
+router.post('/categorize', categorizeLimiter, validateCategorizeInput, async (req, res) => {
   const { description, amount = 0, categories = [] } = req.body;
-
-  if (!description || typeof description !== 'string') {
-    return res.status(400).json({ error: 'Missing description parameter' });
-  }
 
   try {
     const ai = getAI();
@@ -202,7 +200,7 @@ Rules:
  * POST /api/assistant/review
  * Analyzes transaction for anomalies/suspicious patterns
  */
-router.post('/review', async (req, res) => {
+router.post('/review', reviewLimiter, async (req, res) => {
   const startTime = Date.now();
   const { transaction, currentSpending = 0, monthlyBudget = 0, similarTxs = [] } = req.body;
 

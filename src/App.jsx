@@ -1,4 +1,4 @@
-import React, { useState, Suspense } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import TabNavigation from './components/layout/TabNavigation';
 import HomeTab from './components/home/HomeTab';
@@ -11,18 +11,30 @@ import { useCycleCheck } from './hooks/useCycleCheck';
 import { useFirebaseSync } from './hooks/useFirebaseSync';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LogOut } from 'lucide-react';
-
-
 import Logo from './components/ui/Logo';
+import { TutorialProvider, useTutorial } from './components/tutorial/TutorialContext';
+import TutorialOverlay from './components/tutorial/TutorialOverlay';
 
 function MainApp() {
   useCycleCheck();
   useFirebaseSync();
   const { user, logout } = useAuth();
+  const { startTutorial } = useTutorial();
   const [activeTab, setActiveTab] = useState('home');
+
+  // Trigger per-tab tutorial whenever active tab changes (or on initial login)
+  useEffect(() => {
+    if (user && (user.emailVerified || user.isGuest)) {
+      const timer = setTimeout(() => {
+        startTutorial(activeTab);
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [user, activeTab, startTutorial]);
 
   return (
     <>
+      <TutorialOverlay />
 
       {/* ── All page content sits above the Beams ── */}
       <div style={{ position: 'relative', zIndex: 2 }} className="min-h-screen text-text font-sans selection:bg-accent selection:text-primary">
@@ -82,7 +94,7 @@ function MainApp() {
 
 export default function App() {
   return (
-    <>
+    <TutorialProvider>
       <Toaster
         position="bottom-right"
         toastOptions={{
@@ -100,6 +112,6 @@ export default function App() {
         }}
       />
       <MainApp />
-    </>
+    </TutorialProvider>
   );
 }

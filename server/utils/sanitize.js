@@ -29,6 +29,8 @@ export function sanitizeError(err) {
   // Regex sanitization for common API key signatures & query params
   return msg
     .replace(/AIzaSy[A-Za-z0-9_-]{20,}/g, '[REDACTED_API_KEY]')
-    .replace(/sk-(?:proj-)?[A-Za-z0-9_-]{16,}/g, '[REDACTED_API_KEY]')
-    .replace(/(?:key|apiKey|api_key|token|xi-api-key)=[^&\s]+/gi, 'key=[REDACTED]');
+    .replace(/sk-ant-[A-Za-z0-9_-]{16,}/g, '[REDACTED_API_KEY]')
+    .replace(/sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{16,}/g, '[REDACTED_API_KEY]')
+    .replace(/Bearer\s+[A-Za-z0-9_.-]{16,}/gi, 'Bearer [REDACTED_TOKEN]')
+    .replace(/(?:key|apiKey|api_key|token|xi-api-key)=[^&\s"']+/gi, 'key=[REDACTED]');
 }

@@ -153,6 +153,8 @@ export default function TransactionsTab() {
         />
         <div className="flex items-center space-x-2">
           <button
+            type="button"
+            data-tutorial="expense-speak-btn"
             onClick={() => setShowVoicePanel(!showVoicePanel)}
             className="flex items-center space-x-1.5 text-sm bg-accent/15 text-accent border border-accent/30 px-3 py-1.5 rounded-lg hover:bg-accent/25 transition-colors font-medium"
           >
@@ -160,6 +162,8 @@ export default function TransactionsTab() {
             <span>Speak Receipt</span>
           </button>
           <button
+            type="button"
+            data-tutorial="expense-scan-btn"
             onClick={() => setIsScannerOpen(true)}
             className="flex items-center space-x-1.5 text-sm bg-[#8c6d37]/20 text-[#a48246] border border-[#8c6d37]/40 px-3 py-1.5 rounded-lg hover:bg-[#8c6d37]/30 transition-colors font-medium"
           >
@@ -167,6 +171,8 @@ export default function TransactionsTab() {
             <span>Scan Receipt</span>
           </button>
           <button
+            type="button"
+            data-tutorial="expense-add-btn"
             onClick={handleAddClick}
             className="flex items-center space-x-1 text-sm bg-accent text-primary px-3 py-1.5 rounded-lg hover:bg-accent-hover transition-colors font-medium"
           >
@@ -183,7 +189,7 @@ export default function TransactionsTab() {
         />
       )}
 
-      <div className="overflow-x-auto">
+      <div data-tutorial="expense-table" className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="text-text-muted border-b border-zinc-800">
             <tr>

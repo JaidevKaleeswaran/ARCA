@@ -143,7 +143,7 @@ export default function CategoryGrid() {
 
 
   return (
-    <div className="space-y-4">
+    <div data-tutorial="category-section" className="space-y-4">
       <div className="flex items-center justify-between">
         <MaskedHeading
           text="Category Expenditure"
@@ -157,6 +157,8 @@ export default function CategoryGrid() {
         <div className="flex space-x-2 relative">
           <div className="relative">
             <button
+              type="button"
+              data-tutorial="quick-fill"
               onClick={() => setIsQuickFillOpen(!isQuickFillOpen)}
               className="flex items-center space-x-1 text-sm bg-zinc-800 text-text px-3 py-1.5 rounded-lg hover:bg-zinc-700 transition-colors font-medium border border-zinc-700"
             >
@@ -181,6 +183,8 @@ export default function CategoryGrid() {
           </div>
           
           <button
+            type="button"
+            data-tutorial="category-add"
             onClick={handleAddClick}
             className="flex items-center space-x-1 text-sm bg-accent text-primary px-3 py-1.5 rounded-lg hover:bg-accent-hover transition-colors font-medium"
           >

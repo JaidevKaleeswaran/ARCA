@@ -51,7 +51,7 @@ export default function IncomeSettings() {
   return (
     <div className="space-y-6">
       {/* ── Income Sources Widget ── */}
-      <Card>
+      <Card data-tutorial="income-card">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
           <div>
             <h2 className="text-xl font-semibold text-text">Income Sources</h2>
@@ -59,6 +59,7 @@ export default function IncomeSettings() {
           </div>
           <button
             type="button"
+            data-tutorial="income-source-add"
             onClick={handleAddClick}
             className="flex items-center space-x-1 text-xs bg-accent text-primary px-3 py-1.5 rounded-lg hover:bg-accent-hover transition-colors font-semibold"
           >
@@ -70,7 +71,7 @@ export default function IncomeSettings() {
         {/* Primary Salary Row / Highlight */}
         <div className="space-y-3">
           {primarySalary ? (
-            <div className="bg-[#2e5b45]/15 border border-[#2e5b45]/30 rounded-xl p-3.5 flex items-center justify-between">
+            <div data-tutorial="salary-set" className="bg-[#2e5b45]/15 border border-[#2e5b45]/30 rounded-xl p-3.5 flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-[#2e5b45]/25 text-[#3a7056] rounded-lg shrink-0">
                   <Briefcase size={18} />
@@ -98,7 +99,7 @@ export default function IncomeSettings() {
               </button>
             </div>
           ) : (
-            <div className="p-4 border border-dashed border-[#2e5b45]/40 bg-[#2e5b45]/10 rounded-xl text-center space-y-2">
+            <div data-tutorial="salary-set" className="p-4 border border-dashed border-[#2e5b45]/40 bg-[#2e5b45]/10 rounded-xl text-center space-y-2">
               <p className="text-xs text-text-muted">No primary base salary configured yet.</p>
               <button
                 type="button"
@@ -148,7 +149,7 @@ export default function IncomeSettings() {
       <Card>
         <h2 className="text-xl font-semibold text-text mb-4">Cycle Configuration</h2>
         <div className="space-y-4">
-          <div>
+          <div data-tutorial="cycle-frequency">
             <label className="block text-sm text-text-muted mb-1">Master Cycle Frequency</label>
             <select
               name="frequency"

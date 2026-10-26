@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+:root {
+  --color-primary: #161614;
+  --color-card: #22201d;
+  --color-accent: #e7b956;
+  --color-accent-hover: #f3cb6d;
+  --color-border: #38342e;
+  --color-text: #faf4e8;
+  --color-text-muted: #a19e95;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-primary);
+  color: var(--color-text);
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom glow effects */
+.gold-glow {
+  box-shadow: 0 0 50px -10px rgba(231, 185, 86, 0.25);
+}
+
+.gold-glow-subtle {
+  box-shadow: 0 0 30px -5px rgba(231, 185, 86, 0.12);
+}
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, #faf4e8 30%, #e7b956 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-pill-gradient {
+  background: linear-gradient(180deg, #e7b956 0%, #8c6d37 100%);
+}

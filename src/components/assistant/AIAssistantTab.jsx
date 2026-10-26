@@ -450,7 +450,7 @@ export default function AIAssistantTab() {
 
       {/* Action Header & Tools Bar */}
       <Reveal delay={0.1} y={24}>
-        <div className="bg-card border border-border rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-md">
+        <div data-tutorial="ai-header-tools" className="bg-card border border-border rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-md">
           <div className="flex items-center space-x-3">
             <div className="p-2.5 bg-accent/10 rounded-lg text-accent">
               <Sparkles size={20} />
@@ -593,22 +593,20 @@ export default function AIAssistantTab() {
         </div>
 
         {/* Quick Questions */}
-        {messages.length <= 1 && (
-          <div className="mt-4 pt-3 border-t border-border transition-all duration-500 delay-300 ease-out animate-in fade-in">
-            <p className="text-[10px] text-text-muted uppercase tracking-wider font-medium mb-2">Quick Questions</p>
-            <div className="flex flex-wrap gap-2">
-              {QUICK_QUESTIONS.map((q, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSendQuery(q.text)}
-                  className="px-3 py-1.5 text-xs bg-primary hover:bg-[#2b2924] text-zinc-300 hover:text-text rounded-lg border border-border transition-all duration-200 hover:scale-102"
-                >
-                  <span>{q.text}</span>
-                </button>
-              ))}
-            </div>
+        <div data-tutorial="ai-quick-questions" className="mt-4 pt-3 border-t border-border transition-all duration-500 delay-300 ease-out animate-in fade-in">
+          <p className="text-[10px] text-text-muted uppercase tracking-wider font-medium mb-2">Quick Questions</p>
+          <div className="flex flex-wrap gap-2">
+            {QUICK_QUESTIONS.map((q, i) => (
+              <button
+                key={i}
+                onClick={() => handleSendQuery(q.text)}
+                className="px-3 py-1.5 text-xs bg-primary hover:bg-[#2b2924] text-zinc-300 hover:text-text rounded-lg border border-border transition-all duration-200 hover:scale-102"
+              >
+                <span>{q.text}</span>
+              </button>
+            ))}
           </div>
-        )}
+        </div>
 
         {/* Voice Prompt Recording Status Banner */}
         {isVoicePrompting && (
@@ -634,10 +632,11 @@ export default function AIAssistantTab() {
         )}
 
         {/* Input Bar */}
-        <div className="mt-4 pt-3 border-t border-border flex items-center space-x-2 transition-all duration-500 delay-300 ease-out animate-in fade-in">
+        <div data-tutorial="ai-input-bar" className="mt-4 pt-3 border-t border-border flex items-center space-x-2 transition-all duration-500 delay-300 ease-out animate-in fade-in">
           {/* Voice prompt mic button */}
           <button
             type="button"
+            data-tutorial="ai-voice-mic"
             onClick={isVoicePrompting ? handleStopPromptVoice : handleStartPromptVoice}
             disabled={isProcessing || isTranscribingPrompt}
             className={`p-3 rounded-xl transition-all border ${

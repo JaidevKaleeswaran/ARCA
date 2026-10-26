@@ -29,24 +29,32 @@ export default function SummaryTab() {
 
       {/* Top Financial Health Scorecard (Net Worth, Cash Flow, Savings Rate, Subscriptions) */}
       <Reveal delay={0.05}>
-        <FinancialHealthCards />
+        <div data-tutorial="summary-health-cards">
+          <FinancialHealthCards />
+        </div>
       </Reveal>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left column: Main Balance Pie Chart */}
         <Reveal delay={0.15} as="div">
-          <MainBalanceChart />
+          <div data-tutorial="summary-balance-chart">
+            <MainBalanceChart />
+          </div>
         </Reveal>
 
         {/* Right column: Multiple smaller pie charts */}
         <Reveal delay={0.2} as="div">
-          <CategoryCharts />
+          <div data-tutorial="summary-category-charts">
+            <CategoryCharts />
+          </div>
         </Reveal>
       </div>
 
       {/* Bottom section: Notification Hub */}
       <Reveal delay={0.28}>
-        <NotificationHub />
+        <div data-tutorial="summary-notifications">
+          <NotificationHub />
+        </div>
       </Reveal>
     </div>
   );

@@ -1,12 +1,22 @@
 import React from 'react';
 import { useBudget } from '../../contexts/BudgetContext';
 import { formatCurrency } from '../../utils/formatCurrency';
-import { CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
 
 export default function LeftToBudgetBanner() {
   const { totalIncome, leftToBudget } = useBudget();
 
-  if (totalIncome === 0) return null;
+  if (totalIncome === 0) {
+    return (
+      <div
+        data-tutorial="budget-banner"
+        className="w-full rounded-xl border border-zinc-800 bg-[#1c1a17] p-3.5 flex items-center justify-center space-x-2.5 shadow-sm mb-6 text-zinc-400"
+      >
+        <Sparkles size={17} className="text-accent shrink-0" />
+        <span className="font-medium text-xs sm:text-sm">Set your income sources to calculate your Zero-Based Budget</span>
+      </div>
+    );
+  }
 
   let bgColor = '';
   let textColor = '';
@@ -35,7 +45,10 @@ export default function LeftToBudgetBanner() {
   }
 
   return (
-    <div className={`w-full rounded-xl border p-4 flex items-center justify-center space-x-3 shadow-sm mb-6 ${bgColor} ${borderColor} ${textColor}`}>
+    <div
+      data-tutorial="budget-banner"
+      className={`w-full rounded-xl border p-4 flex items-center justify-center space-x-3 shadow-sm mb-6 ${bgColor} ${borderColor} ${textColor}`}
+    >
       {IconComponent && <IconComponent size={22} className="shrink-0" />}
       <span className="font-semibold text-lg">{message}</span>
     </div>

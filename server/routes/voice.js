@@ -3,12 +3,18 @@ import multer from 'multer';
 import { GoogleGenAI } from '@google/genai';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { sanitizeError } from '../utils/sanitize.js';
+import { createRateLimiter, validateSpeakInput } from '../middleware/security.js';
 
-const uploadMemory = multer({ limits: { fileSize: 25 * 1024 * 1024 } });
+const uploadMemory = multer({ limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router = express.Router();
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+
+// Rate limiters for voice endpoints to prevent cost exhaustion
+const speakLimiter = createRateLimiter({ windowMs: 60000, max: 20, message: 'Too many speech requests. Please wait a moment.' });
+const transcribeLimiter = createRateLimiter({ windowMs: 60000, max: 15, message: 'Too many transcription requests. Please wait a moment.' });
+const createAgentLimiter = createRateLimiter({ windowMs: 60000, max: 5, message: 'Too many agent creation requests.' });
 
 // Cache the agent ID so we don't recreate it every time
 let cachedAgentId = null;
@@ -36,7 +42,7 @@ Be natural and helpful. If the user wants to add multiple purchases, handle them
  * POST /api/voice/create-agent
  * Creates (or returns cached) an ElevenLabs Conversational AI agent
  */
-router.post('/create-agent', async (req, res) => {
+router.post('/create-agent', createAgentLimiter, async (req, res) => {
   if (!ELEVENLABS_API_KEY) {
     return res.status(500).json({
       error: 'Server configuration error',
@@ -93,7 +99,7 @@ router.get('/agent-id', (req, res) => {
  * POST /api/voice/speak
  * Converts text to spoken audio using ElevenLabs Text-to-Speech API
  */
-router.post('/speak', async (req, res) => {
+router.post('/speak', speakLimiter, validateSpeakInput, async (req, res) => {
   const { text, voiceId = '21m00Tcm4TlvDq8ikWAM' } = req.body;
   const apiKey = process.env.ELEVENLABS_API_KEY;
 
@@ -102,10 +108,6 @@ router.post('/speak', async (req, res) => {
       error: 'Server configuration error',
       message: 'ELEVENLABS_API_KEY is not configured on backend.',
     });
-  }
-
-  if (!text || typeof text !== 'string') {
-    return res.status(400).json({ error: 'Missing text parameter' });
   }
 
   try {
@@ -150,7 +152,7 @@ router.post('/speak', async (req, res) => {
  * POST /api/voice/transcribe
  * Transcribes recorded microphone audio using Gemini 2.5 Flash AI
  */
-router.post('/transcribe', uploadMemory.single('audio'), async (req, res) => {
+router.post('/transcribe', transcribeLimiter, uploadMemory.single('audio'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No audio file provided' });
