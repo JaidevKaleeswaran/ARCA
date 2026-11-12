@@ -321,7 +321,7 @@ export default function HomePage({ navigate, appUrl }) {
         <div className="bg-[#1c1a17] border border-[#38342e] rounded-3xl p-8 sm:p-10 flex flex-col justify-between space-y-6">
           <div className="space-y-4">
             <span className="text-xs font-bold text-[#3a7056] uppercase tracking-wider">Mission</span>
-            <h3 className="text-2xl font-bold text-white">About ARCA Budgeting</h3>
+            <h3 className="text-2xl font-bold text-white">About ARCA</h3>
             <p className="text-sm text-zinc-300 leading-relaxed">
               We are a dedicated team committed to financial empowerment and uncompromising privacy. We never sell your data to financial advertisers or flood your feed with high-interest loans.
             </p>

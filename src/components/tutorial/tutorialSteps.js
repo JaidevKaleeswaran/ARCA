@@ -74,6 +74,39 @@ export const TUTORIAL_STEPS = {
     },
   ],
 
+  markets: [
+    {
+      id: 'market-header-status',
+      targetSelector: '[data-tutorial="market-header-status"]',
+      title: 'Market Status & Overview',
+      description: 'Check whether regular trading sessions are active, view timestamped updates, and refresh rates with a single click.',
+    },
+    {
+      id: 'market-indices-grid',
+      targetSelector: '[data-tutorial="market-indices-grid"]',
+      title: 'Major Indices & Stock Movers',
+      description: 'Track broad market performance across the S&P 500, Nasdaq, Dow Jones, and top mega-cap equities.',
+    },
+    {
+      id: 'market-rates-panel',
+      targetSelector: '[data-tutorial="market-rates-panel"]',
+      title: 'Borrowing Rates & HYSA Yields',
+      description: 'Monitor Federal Reserve benchmark rates, 30-year mortgage rates, and high-yield savings APYs directly impacting your budget.',
+    },
+    {
+      id: 'market-ai-digest',
+      targetSelector: '[data-tutorial="market-ai-digest"]',
+      title: 'AI Macroeconomic Briefing',
+      description: 'Synthesize real-time monetary policy, labor reports, and CPI inflation trends with Gemini AI.',
+    },
+    {
+      id: 'market-budget-impact',
+      targetSelector: '[data-tutorial="market-budget-impact"]',
+      title: 'Actionable Budget Playbook',
+      description: 'Direct zero-based recommendations on how current market conditions should adjust your debt repayment and cash buffers.',
+    },
+  ],
+
   summary: [
     {
       id: 'summary-health-cards',

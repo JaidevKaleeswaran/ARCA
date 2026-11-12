@@ -289,7 +289,7 @@ export function AuthProvider({ children }) {
   const loginAsGuest = () => {
     const guestUser = {
       uid: 'guest_' + Date.now(),
-      email: 'guest@myvault.app',
+      email: 'guest@arca.app',
       displayName: 'Guest User',
       photoURL: null,
       emailVerified: true,

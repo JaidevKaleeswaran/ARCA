@@ -109,7 +109,7 @@ export default function Footer({ navigate, appUrl }) {
                 </button>
               </li>
               <li className="pt-2 text-xs text-zinc-500">
-                Operated by <span className="text-zinc-300 font-semibold">ARCA Budgeting</span>
+                Operated by <span className="text-zinc-300 font-semibold">ARCA-budgetting</span>
               </li>
             </ul>
           </div>
@@ -120,12 +120,12 @@ export default function Footer({ navigate, appUrl }) {
           <div className="bg-[#181816] p-4 rounded-xl border border-[#262420]">
             <p className="font-semibold text-zinc-400 mb-1">Financial & Legal Disclaimer</p>
             <p>
-              Educational and Informational Purposes Only. ARCA is designed solely to assist you in tracking your personal finances, budgeting, and organizing expenses. ARCA Budgeting is not a financial advisor, broker, or certified public accountant (CPA). The application does not provide professional financial, investment, tax, or legal advice. Any financial decisions you make based on data or insights from this app are strictly your own responsibility.
+              Educational and Informational Purposes Only. ARCA is designed solely to assist you in tracking your personal finances, budgeting, and organizing expenses. ARCA-budgetting is not a financial advisor, broker, or certified public accountant (CPA). The application does not provide professional financial, investment, tax, or legal advice. Any financial decisions you make based on data or insights from this app are strictly your own responsibility.
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-zinc-500 pt-2">
-            <p>© {new Date().getFullYear()} ARCA Budgeting. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} ARCA-budgetting. All rights reserved.</p>
             <div className="flex items-center space-x-6 text-xs">
               <button onClick={() => handleNav('/privacy')} className="hover:text-zinc-300 underline cursor-pointer">
                 Privacy

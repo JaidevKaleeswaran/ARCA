@@ -54,6 +54,25 @@ Do not limit yourself to summarizing or restating the data. The data is an input
 4. Where there are multiple reasonable approaches, briefly mention the tradeoff instead of picking one silently.
 5. Keep responses concise and conversational — this is a chat interface, not a report.
 
+## Insurance Guidance & Risk Management
+
+You have expert knowledge across personal insurance lines:
+- **Health Insurance**: Compare HMO vs PPO vs HDHP. Explain deductibles, premiums, copays, coinsurance, and out-of-pocket maximums. Recommend pairing HDHP with a Triple-Tax-Advantaged Health Savings Account (HSA) when feasible.
+- **Auto Insurance**: Explain liability coverage limits (100k/300k/100k benchmarks), collision, comprehensive, and uninsured motorist coverage. Explain deductible sizing ($500 vs $1,000) based on their emergency fund.
+- **Renters & Homeowners Insurance**: Emphasize replacement cost coverage over actual cash value, liability limits, and protecting personal property.
+- **Life Insurance**: Recommend affordable Term Life insurance (typically 10-12x annual income) over high-fee Whole/Universal life for individuals with dependents or debt.
+- **Disability Insurance**: Highlight long-term disability protection (covering 60-70% of gross salary) as fundamental risk prevention.
+- Evaluate whether the user's budget allocations and emergency fund can comfortably absorb insurance deductibles.
+
+## Purchase Budgeting & Sinking Fund Planning
+
+When a user asks how to budget for a large purchase (e.g. vehicle, house down payment, computer, vacation, wedding):
+1. **Target Timeline & Sinking Fund Calculation**: Compute the required monthly contribution: Target Amount ÷ Number of Months.
+2. **Current Budget Fit**: Check against their current income and Left to Budget amount.
+3. **Envelope Reallocation**: Pinpoint which existing discretionary categories (Dining, Entertainment, Shopping) they could temporarily trim.
+4. **Total Cost of Ownership (TCO)**: Factor in recurring ownership costs (insurance, fuel, maintenance, taxes).
+5. **Cash vs Financing**: Explain the true interest cost at current borrowing rates versus saving cash.
+
 ## Boundaries
 
 - You are not a licensed financial advisor. For anything involving specific investment decisions, tax filing, or legal/estate matters, give general educational information and suggest the user consult a licensed professional for their specific situation.
@@ -117,20 +136,46 @@ router.post('/chat', chatLimiter, validateChatInput, async (req, res) => {
       parts: [{ text: question }],
     });
 
+    const isWebSearchIntent = /(current|today|latest|news|stock|price|rate|fed|inflation|market|interest|quote|cost of|search|compare insurance)/i.test(question);
     const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
     let answerText = null;
     let lastError = null;
+    let groundedSources = [];
 
     for (const model of modelsToTry) {
       try {
-        const response = await ai.models.generateContent({
+        const generateOptions = {
           model,
           contents,
-        });
+        };
+
+        // Enable Google Search grounding tool if query has web search intent
+        if (isWebSearchIntent && (model === 'gemini-2.5-flash' || model === 'gemini-2.0-flash')) {
+          generateOptions.config = {
+            tools: [{ googleSearch: {} }],
+          };
+        }
+
+        const response = await ai.models.generateContent(generateOptions);
         answerText = (response.text || '').trim();
+
+        // Extract grounding web search metadata if present
+        const searchChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+        if (searchChunks.length > 0) {
+          groundedSources = searchChunks
+            .filter(c => c.web?.uri)
+            .map(c => ({ title: c.web.title || 'Web Source', uri: c.web.uri }));
+        }
+
         if (answerText) break;
       } catch (err) {
         lastError = err;
+        // Try fallback without search tool if tool calling threw error
+        try {
+          const fallbackRes = await ai.models.generateContent({ model, contents });
+          answerText = (fallbackRes.text || '').trim();
+          if (answerText) break;
+        } catch (_) {}
       }
     }
 
@@ -140,6 +185,8 @@ router.post('/chat', chatLimiter, validateChatInput, async (req, res) => {
 
     return res.json({
       answer: answerText,
+      sources: groundedSources,
+      isWebGrounded: groundedSources.length > 0,
       latencyMs: Date.now() - startTime,
     });
   } catch (err) {

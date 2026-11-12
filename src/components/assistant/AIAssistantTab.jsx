@@ -104,6 +104,11 @@ function AgentPipelineBadge({ source, metrics }) {
         <div className="flex items-center space-x-2 text-zinc-400">
           <Icon size={12} className={`text-${config.color}-400`} />
           <span className={`font-medium text-${config.color}-400`}>{config.label}</span>
+          {metrics?.isWebGrounded && (
+            <span className="text-[10px] bg-sky-500/15 text-sky-400 border border-sky-500/30 px-1.5 py-0.5 rounded flex items-center gap-1 font-medium">
+              Web Grounded
+            </span>
+          )}
           {metrics?.latencyMs && (
             <span className="flex items-center space-x-1 text-zinc-500">
               <Zap size={10} />
@@ -119,6 +124,22 @@ function AgentPipelineBadge({ source, metrics }) {
           {metrics.dataPointsUsed !== undefined && <span className="block">Data points: {metrics.dataPointsUsed}</span>}
           {metrics.categoriesAnalyzed !== undefined && <span className="block">Categories analyzed: {metrics.categoriesAnalyzed}</span>}
           {metrics.latencyMs && <span className="block">Response time: {metrics.latencyMs}ms</span>}
+          {metrics.sources && metrics.sources.length > 0 && (
+            <div className="pt-1 border-t border-zinc-800/40">
+              <span className="block text-zinc-400 font-semibold mb-0.5">Web Citations:</span>
+              {metrics.sources.slice(0, 3).map((s, i) => (
+                <a
+                  key={i}
+                  href={s.uri}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-sky-400 hover:underline truncate"
+                >
+                  • {s.title}
+                </a>
+              ))}
+            </div>
+          )}
           {metrics.fallback && <span className="block text-amber-400"><Zap size={10} className="inline mr-1 text-amber-400" />Fallback mode (offline)</span>}
         </div>
       )}
@@ -133,6 +154,10 @@ const QUICK_QUESTIONS = [
   { text: 'What are my top spending categories?' },
   { text: 'Am I over budget anywhere?' },
   { text: 'What is my net balance?' },
+  { text: 'What insurance coverage do I need for my budget?' },
+  { text: 'Help me budget for a new car' },
+  { text: 'How should I compare HDHP vs PPO health plans?' },
+  { text: 'Create a savings plan for a vacation' },
 ];
 
 // ── Main Component ──────────────────────────────────────────────────────────

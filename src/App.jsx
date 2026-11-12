@@ -5,12 +5,13 @@ import HomeTab from './components/home/HomeTab';
 import SummaryTab from './components/summary/SummaryTab';
 import TransactionsTab from './components/transactions/TransactionsTab';
 import AIAssistantTab from './components/assistant/AIAssistantTab';
+import MarketTrackerTab from './components/markets/MarketTrackerTab';
 import LoginPage from './components/auth/LoginPage';
 import VerifyEmailPage from './components/auth/VerifyEmailPage';
 import { useCycleCheck } from './hooks/useCycleCheck';
 import { useFirebaseSync } from './hooks/useFirebaseSync';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { LogOut } from 'lucide-react';
+import { LogOut, HelpCircle } from 'lucide-react';
 import Logo from './components/ui/Logo';
 import { TutorialProvider, useTutorial } from './components/tutorial/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
@@ -66,6 +67,15 @@ function MainApp() {
 
                 <button
                   type="button"
+                  onClick={() => startTutorial(activeTab, true)}
+                  title="Page Tutorial & Guide"
+                  className="p-1.5 sm:p-2 text-zinc-400 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors border border-transparent hover:border-accent/20 shrink-0"
+                >
+                  <HelpCircle size={16} />
+                </button>
+
+                <button
+                  type="button"
                   onClick={logout}
                   title="Log Out"
                   className="p-1.5 sm:p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20 shrink-0"
@@ -81,6 +91,7 @@ function MainApp() {
               <div className="animate-in fade-in duration-300">
                 {activeTab === 'home' && <HomeTab />}
                 {activeTab === 'assistant' && <AIAssistantTab />}
+                {activeTab === 'markets' && <MarketTrackerTab />}
                 {activeTab === 'summary' && <SummaryTab />}
                 {activeTab === 'transactions' && <TransactionsTab />}
               </div>

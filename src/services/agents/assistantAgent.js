@@ -70,6 +70,8 @@ export async function answerQuery(question, financialSnapshot) {
         model: 'gemini-server',
         dataPointsUsed: financialSnapshot?.summary?.transactionCount || 0,
         categoriesAnalyzed: financialSnapshot?.categoryBreakdown?.length || 0,
+        sources: data.sources || [],
+        isWebGrounded: Boolean(data.isWebGrounded),
       },
     };
   } catch (err) {
@@ -116,6 +118,15 @@ function tryFallbackAnswer(question, snapshot) {
     return `**Budget Status:**\n${snapshot.categoryBreakdown.map(c =>
       `• ${c.name}: $${c.spent.toFixed(2)} / $${c.budgetLimit} (${c.status})`
     ).join('\n')}`;
+  }
+
+  if (q.includes('insurance') || q.includes('deductible') || q.includes('policy')) {
+    return `### Insurance Guidance for Your Budget\n\n• **Health Insurance:** If you rarely visit doctors, a High-Deductible Health Plan (HDHP) with a Health Savings Account (HSA) often yields the lowest total annual cost. If you manage recurring prescriptions or treatments, a PPO or Gold plan with lower deductibles protects cash flow.\n• **Auto Insurance:** Recommend at least **100k/300k/100k** liability coverage. Align your collision deductible ($500 vs $1,000) with your Emergency Fund buffer.\n• **Renters/Homeowners:** Essential protection. Renters insurance typically costs just $12–$20/month and covers full replacement cost of electronics and furniture.\n• **Term Life:** Recommend 20–30 year Level Term Life for 10–12× your annual income ($${(snapshot.summary.totalIncome * 12 * 10).toLocaleString()}) to protect dependents cheaply.\n\n*Review your Bills category to verify monthly premium allocations.*`;
+  }
+
+  if (q.includes('buy') || q.includes('purchase') || q.includes('car') || q.includes('vacation')) {
+    const leftToBudget = snapshot.summary.leftToBudget || 0;
+    return `### Purchase Budgeting & Sinking Fund Blueprint\n\n1. **Define Target & Deadline:** Divide the estimated purchase price by the number of months until you need it to determine your monthly savings target.\n2. **Current Cash Margin:** You currently have **$${leftToBudget.toFixed(2)}** unallocated (Left to Budget) in this cycle.\n3. **Category Trimming:** Look at discretionary categories like *Dining Out* or *Entertainment* to reallocate an extra $100–$250/mo.\n4. **Factor Total Cost of Ownership:** Remember secondary ongoing expenses like insurance, taxes, fuel, or upkeep.\n5. **Sinking Fund Envelope:** Create a dedicated ARCA category envelope with rollover enabled so your monthly savings automatically accumulate.`;
   }
 
   return null;

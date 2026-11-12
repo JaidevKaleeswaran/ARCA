@@ -23,7 +23,7 @@ export default function AboutPage({ navigate, appUrl }) {
           <span>Co-Founders & Mission</span>
         </div>
         <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
-          About <span className="gold-gradient-text">ARCA Budgeting</span>
+          About <span className="gold-gradient-text">ARCA</span>
         </h1>
         <p className="text-base sm:text-lg text-zinc-300 leading-relaxed">
           We are building the future of zero-based financial clarity.
@@ -35,7 +35,7 @@ export default function AboutPage({ navigate, appUrl }) {
         <div className="bg-[#1c1a17] border border-[#38342e] rounded-2xl p-6 sm:p-8 space-y-4 shadow-lg">
           <h2 className="text-xl font-bold text-white">Who We Are</h2>
           <p className="text-sm text-zinc-300 leading-relaxed">
-            <strong className="text-white">ARCA Budgeting</strong> is the team and co-founding organization behind the <strong className="text-[#e7b956]">ARCA</strong> personal finance web application.
+            <strong className="text-white">ARCA-budgetting</strong> is the co-founding team behind the <strong className="text-[#e7b956]">ARCA</strong> personal finance web application.
           </p>
           <p className="text-sm text-zinc-300 leading-relaxed">
             We started ARCA out of a frustration with complicated personal finance tools that treated budgeting as a punishment rather than an empowering roadmap. Our mission is to make intentional, zero-based budgeting accessible to everyone—from college students and freelancers to growing families and aggressive wealth-builders.
@@ -82,7 +82,7 @@ export default function AboutPage({ navigate, appUrl }) {
             "When we first designed ARCA, our goal was simple: if we can give every single dollar a job on payday, we never have to worry about whether there will be enough left over at the end of the month. We hope ARCA brings that same clarity and confidence to your financial life."
           </p>
           <p className="text-xs font-semibold text-[#e7b956] pt-1">
-            — The ARCA Budgeting Team
+            — The ARCA-budgetting Co-Founding Team
           </p>
         </div>
       </div>

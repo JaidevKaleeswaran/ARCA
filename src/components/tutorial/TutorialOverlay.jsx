@@ -5,6 +5,7 @@ import { ChevronRight, ChevronLeft, Check, Sparkles } from 'lucide-react';
 const TAB_NAMES = {
   home: 'Home Page',
   assistant: 'AI Assistant',
+  markets: 'Market Tracker',
   summary: 'Financial Summary',
   transactions: 'Expenses',
 };

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import receiptsRouter from './routes/receipts.js';
 import voiceRouter from './routes/voice.js';
 import assistantRouter from './routes/assistant.js';
+import marketsRouter from './routes/markets.js';
 import { blockSensitivePaths, createRateLimiter } from './middleware/security.js';
 
 dotenv.config();
@@ -61,6 +62,7 @@ app.use('/uploads', express.static(path.join(PROJECT_ROOT, 'uploads'), {
 app.use('/api/receipts', receiptsRouter);
 app.use('/api/voice', voiceRouter);
 app.use('/api/assistant', assistantRouter);
+app.use('/api/markets', marketsRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
