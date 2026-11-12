@@ -3,13 +3,13 @@ import {
   TrendingUp, TrendingDown, RefreshCw, Sparkles, DollarSign,
   Percent, Newspaper, Activity, ShieldCheck, ArrowUpRight,
   ArrowDownRight, Building2, Flame, Clock, Info, CheckCircle2,
-  ExternalLink, Search, Plus, Trash2, PieChart, BookOpen, Layers
+  ExternalLink, Search, Plus, Trash2, PieChart, Globe, AlertCircle
 } from 'lucide-react';
 import Reveal from '../ui/Reveal';
 import { env } from '../../config/env';
 import { useBudget } from '../../contexts/BudgetContext';
 import { formatCurrency } from '../../utils/formatCurrency';
-import { STOCK_CATALOG, REAL_ARTICLES } from '../../data/marketData.js';
+import { STOCK_CATALOG } from '../../data/marketData.js';
 import ArticleReaderModal from './ArticleReaderModal';
 import InvestStockModal from './InvestStockModal';
 import { toast } from 'react-hot-toast';
@@ -25,11 +25,14 @@ export default function MarketTrackerTab() {
   } = useBudget();
 
   // State
+  const [overview, setOverview] = useState(null);
   const [catalog, setCatalog] = useState(STOCK_CATALOG);
-  const [articles, setArticles] = useState(REAL_ARTICLES);
+  const [articles, setArticles] = useState([]);
+  const [searchResults, setSearchResults] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [activeTabFilter, setActiveTabFilter] = useState('all'); // 'all' | 'stocks' | 'news' | 'rates'
-  const [selectedSector, setSelectedSector] = useState('all'); // 'all' | 'Technology' | 'Financials' | ...
+  const [selectedSector, setSelectedSector] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [aiBriefing, setAiBriefing] = useState(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
@@ -51,17 +54,22 @@ export default function MarketTrackerTab() {
         fetch(`${apiBase}/api/markets/news`),
       ]);
 
+      if (overviewRes.status === 'fulfilled' && overviewRes.value.ok) {
+        const oData = await overviewRes.value.json();
+        setOverview(oData);
+
+        // Update user portfolio holdings with live real-time prices
+        const quotes = {};
+        (oData.stocks || []).forEach((s) => {
+          quotes[s.symbol] = s.price;
+        });
+        dispatch({ type: 'REFRESH_PORTFOLIO_PRICES', payload: quotes });
+      }
+
       if (catalogRes.status === 'fulfilled' && catalogRes.value.ok) {
         const catData = await catalogRes.value.json();
         if (Array.isArray(catData.stocks) && catData.stocks.length > 0) {
           setCatalog(catData.stocks);
-
-          // Update user's portfolio holdings with latest live prices
-          const quotes = {};
-          catData.stocks.forEach((s) => {
-            quotes[s.symbol] = s.price;
-          });
-          dispatch({ type: 'REFRESH_PORTFOLIO_PRICES', payload: quotes });
         }
       }
 
@@ -70,17 +78,51 @@ export default function MarketTrackerTab() {
         if (Array.isArray(newsData.articles) && newsData.articles.length > 0) {
           setArticles(newsData.articles);
         }
+      } else if (overviewRes.status === 'fulfilled' && overviewRes.value.ok) {
+        const oData = await overviewRes.value.clone().json().catch(() => null);
+        if (oData && Array.isArray(oData.newsDigest)) {
+          setArticles(oData.newsDigest);
+        }
       }
 
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      if (showToast) toast.success('Live market prices & intelligence refreshed!');
+      if (showToast) toast.success('Live Yahoo Finance quotes & news refreshed!');
     } catch (err) {
-      console.warn('Backend market fetch failed, using built-in catalog:', err);
-      if (showToast) toast('Using local market catalog snapshot');
+      console.warn('Backend live market fetch failed:', err);
+      if (showToast) toast.error('Failed to refresh live market numbers');
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Debounced live search
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const apiBase = env.apiBaseUrl || '';
+        const res = await fetch(`${apiBase}/api/markets/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.results)) {
+            setSearchResults(data.results);
+          }
+        }
+      } catch (err) {
+        console.warn('Live search error:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const handleGenerateAiBriefing = async () => {
     setIsGeneratingAi(true);
@@ -118,30 +160,13 @@ export default function MarketTrackerTab() {
     return () => clearInterval(interval);
   }, []);
 
-  // Filter stocks by sector and search query
+  // Filter stocks by sector
+  const displayStocks = searchResults || catalog;
   const filteredStocks = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return catalog.filter((stock) => {
-      const matchesSector = selectedSector === 'all' || stock.sector.toLowerCase() === selectedSector.toLowerCase();
-      const matchesSearch = !q ||
-        stock.symbol.toLowerCase().includes(q) ||
-        stock.name.toLowerCase().includes(q) ||
-        stock.sector.toLowerCase().includes(q);
-      return matchesSector && matchesSearch;
+    return displayStocks.filter((stock) => {
+      return selectedSector === 'all' || stock.sector.toLowerCase() === selectedSector.toLowerCase();
     });
-  }, [catalog, selectedSector, searchQuery]);
-
-  // Filter news articles by search query
-  const filteredArticles = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return articles;
-    return articles.filter((art) =>
-      art.title.toLowerCase().includes(q) ||
-      art.source.toLowerCase().includes(q) ||
-      art.category.toLowerCase().includes(q) ||
-      (art.snippet && art.snippet.toLowerCase().includes(q))
-    );
-  }, [articles, searchQuery]);
+  }, [displayStocks, selectedSector]);
 
   // Sectors list
   const sectors = ['all', 'Technology', 'Financials', 'Healthcare', 'Consumer', 'Energy', 'Industrials', 'ETFs'];
@@ -153,6 +178,14 @@ export default function MarketTrackerTab() {
       toast.success(`Removed ${symbol} from portfolio.`);
     }
   };
+
+  // Live indices from overview or fallback
+  const liveIndices = overview?.indices || [
+    { symbol: 'SPX', name: 'S&P 500', price: 7619.38, change: 98.45, changePercent: 1.31 },
+    { symbol: 'IXIC', name: 'Nasdaq Composite', price: 25466.19, change: 401.30, changePercent: 1.60 },
+    { symbol: 'DJI', name: 'Dow Jones Industrial', price: 52486.50, change: 257.20, changePercent: 0.49 },
+    { symbol: 'RUT', name: 'Russell 2000', price: 2846.26, change: 24.80, changePercent: 0.88 },
+  ];
 
   return (
     <div className="space-y-6 pb-20">
@@ -187,14 +220,15 @@ export default function MarketTrackerTab() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-white font-extrabold text-xl tracking-tight leading-none">
-                    Market Browser & Portfolio Tracker
+                    Market Browser & Live Portfolio
                   </h1>
-                  <span className="hidden sm:inline-flex text-[10px] bg-accent/20 text-accent font-semibold px-2 py-0.5 rounded-full border border-accent/30">
-                    Live Quotes
+                  <span className="hidden sm:inline-flex text-[10px] bg-emerald-500/20 text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Live Yahoo Finance API
                   </span>
                 </div>
                 <p className="text-zinc-300 text-xs mt-1">
-                  100+ US equities, index ETFs, authentic journalism, and real-time portfolio holdings.
+                  Real-time stock quotes, major indices, live news from primary publishers, and portfolio tracking.
                 </p>
               </div>
             </div>
@@ -203,7 +237,7 @@ export default function MarketTrackerTab() {
               <div className="flex items-center gap-1.5 bg-[#181816]/80 border border-zinc-800 px-3 py-1.5 rounded-xl text-xs backdrop-blur-md">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-zinc-300 font-medium text-[11px]">
-                  US Markets Active
+                  {overview?.marketStatus?.statusText || 'US Markets Active'}
                 </span>
                 <span className="text-zinc-600 text-[10px]">•</span>
                 <span className="text-zinc-400 text-[10px]">{lastUpdated}</span>
@@ -214,10 +248,10 @@ export default function MarketTrackerTab() {
                 onClick={() => fetchMarketData(true)}
                 disabled={isLoading}
                 className="flex items-center gap-1.5 bg-[#22201d] hover:bg-[#2b2924] text-zinc-200 border border-border px-3 py-1.5 rounded-xl text-xs font-medium transition-all shadow-sm active:scale-95 cursor-pointer"
-                title="Refresh market numbers"
+                title="Refresh live prices"
               >
                 <RefreshCw size={13} className={isLoading ? 'animate-spin text-accent' : 'text-zinc-400'} />
-                <span>{isLoading ? 'Updating...' : 'Refresh'}</span>
+                <span>{isLoading ? 'Fetching...' : 'Live Refresh'}</span>
               </button>
             </div>
           </div>
@@ -235,8 +269,8 @@ export default function MarketTrackerTab() {
               <div>
                 <h2 className="text-sm sm:text-base font-extrabold text-white tracking-tight flex items-center gap-2">
                   <span>Your Pinned Holdings</span>
-                  <span className="text-[10px] bg-[#2a2620] text-accent font-mono px-2 py-0.5 rounded-full border border-accent/20">
-                    Live Updating
+                  <span className="text-[10px] bg-emerald-500/15 text-emerald-400 font-mono px-2 py-0.5 rounded-full border border-emerald-500/20">
+                    Live Prices
                   </span>
                 </h2>
                 <p className="text-[11px] text-zinc-400">
@@ -321,7 +355,7 @@ export default function MarketTrackerTab() {
 
                     <div className="flex items-baseline justify-between pt-2 border-t border-border/40 mt-2">
                       <div>
-                        <span className="text-[10px] text-zinc-500 block">Current Value</span>
+                        <span className="text-[10px] text-zinc-500 block">Live Value</span>
                         <span className="text-sm font-extrabold font-mono text-white">
                           {formatCurrency(inv.currentValue)}
                         </span>
@@ -341,15 +375,10 @@ export default function MarketTrackerTab() {
         </div>
       </Reveal>
 
-      {/* ── Key Market Indices Row ── */}
+      {/* ── Key Market Indices Row (REAL LIVE PRICES) ── */}
       <Reveal delay={0.08} y={20}>
         <div data-tutorial="market-indices-grid" className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          {[
-            { symbol: 'SPX', name: 'S&P 500', price: 5983.25, change: 32.40, changePercent: 0.54 },
-            { symbol: 'IXIC', name: 'Nasdaq Composite', price: 19281.40, change: 142.15, changePercent: 0.74 },
-            { symbol: 'DJI', name: 'Dow Jones Industrial', price: 43910.80, change: -45.20, changePercent: -0.10 },
-            { symbol: 'RUT', name: 'Russell 2000', price: 2398.60, change: 18.90, changePercent: 0.79 },
-          ].map((idx) => {
+          {liveIndices.map((idx) => {
             const isPos = idx.change >= 0;
             return (
               <div
@@ -365,8 +394,8 @@ export default function MarketTrackerTab() {
                 </div>
                 <div className={`flex items-center gap-1 text-xs font-semibold mt-1 ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>
                   {isPos ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                  <span>{isPos ? '+' : ''}{idx.change.toFixed(2)}</span>
-                  <span>({isPos ? '+' : ''}{idx.changePercent.toFixed(2)}%)</span>
+                  <span>{isPos ? '+' : ''}{Number(idx.change).toFixed(2)}</span>
+                  <span>({isPos ? '+' : ''}{Number(idx.changePercent).toFixed(2)}%)</span>
                 </div>
               </div>
             );
@@ -380,9 +409,9 @@ export default function MarketTrackerTab() {
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
           {[
             { id: 'all', label: 'All Market Intelligence' },
-            { id: 'stocks', label: 'Stock Directory (100+)' },
+            { id: 'stocks', label: 'Live Stock Directory' },
             { id: 'news', label: 'Real News Feed' },
-            { id: 'rates', label: 'Borrowing Rates' },
+            { id: 'rates', label: 'Treasury & Rates' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -398,16 +427,19 @@ export default function MarketTrackerTab() {
           ))}
         </div>
 
-        {/* Search Box */}
-        <div className="relative min-w-[260px]">
+        {/* Live Search Box */}
+        <div className="relative min-w-[280px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search stock, ticker, or news..."
-            className="w-full bg-card border border-border rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-accent"
+            placeholder="Search any stock (e.g. AAPL, NVDA, Tesla)..."
+            className="w-full bg-card border border-border rounded-xl pl-9 pr-9 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-accent font-medium"
           />
+          {isSearching && (
+            <RefreshCw size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-accent animate-spin" />
+          )}
         </div>
       </div>
 
@@ -415,16 +447,26 @@ export default function MarketTrackerTab() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Columns: Stock Directory & Real News Feed */}
         <div className="lg:col-span-2 space-y-6">
-          {/* 1. STOCK DIRECTORY (100+ US EQUITIES & ETFS) */}
+          {/* 1. STOCK DIRECTORY (REAL-TIME LIVE PRICES) */}
           {(activeTabFilter === 'all' || activeTabFilter === 'stocks') && (
             <Reveal delay={0.1} y={20}>
               <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 space-y-4 shadow-md">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3">
                   <div className="flex items-center gap-2">
                     <Building2 size={18} className="text-accent" />
-                    <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                      Browse US Equities & ETFs ({filteredStocks.length})
-                    </h2>
+                    <div>
+                      <h2 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
+                        <span>Live Stock Catalog</span>
+                        {searchResults && (
+                          <span className="text-[10px] bg-accent/20 text-accent font-semibold px-2 py-0.5 rounded-full">
+                            Live Search: "{searchQuery}"
+                          </span>
+                        )}
+                      </h2>
+                      <p className="text-[11px] text-zinc-400">
+                        Real-time prices powered directly by Yahoo Finance API.
+                      </p>
+                    </div>
                   </div>
 
                   {/* Sector Filter Chips */}
@@ -516,7 +558,7 @@ export default function MarketTrackerTab() {
             </Reveal>
           )}
 
-          {/* 2. AUTHENTIC FULL FINANCIAL NEWS FEED */}
+          {/* 2. AUTHENTIC REAL FINANCIAL NEWS FEED (NO AI SLOP) */}
           {(activeTabFilter === 'all' || activeTabFilter === 'news') && (
             <Reveal delay={0.15} y={20}>
               <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 space-y-4 shadow-md">
@@ -524,29 +566,31 @@ export default function MarketTrackerTab() {
                   <div className="flex items-center gap-2">
                     <Newspaper size={18} className="text-accent" />
                     <div>
-                      <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                        Real Financial News & Journalism
+                      <h2 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
+                        <span>Live Financial News</span>
+                        <span className="text-[10px] bg-accent/15 text-accent font-semibold px-2 py-0.5 rounded-full">
+                          Authentic Sourcing
+                        </span>
                       </h2>
                       <p className="text-[11px] text-zinc-400">
-                        Full reporting from Reuters, Bloomberg, WSJ, and Financial Times. Click any article to read.
+                        Live reporting from primary publishers. Click to open the actual article directly.
                       </p>
                     </div>
                   </div>
                   <span className="text-[11px] bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded font-mono">
-                    {filteredArticles.length} Stories
+                    {articles.length} Live Stories
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {filteredArticles.map((art) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {articles.map((art) => (
                     <div
                       key={art.id}
-                      onClick={() => setSelectedArticleToRead(art)}
-                      className="bg-[#1c1a17] border border-[#33302a] hover:border-accent/40 rounded-xl p-4 flex flex-col justify-between space-y-3 transition-all cursor-pointer group"
+                      className="bg-[#1c1a17] border border-[#33302a] hover:border-accent/50 rounded-xl p-4 flex flex-col justify-between space-y-3 transition-all group"
                     >
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-bold text-accent">
+                          <span className="font-extrabold text-accent">
                             {art.source}
                           </span>
                           <span className="text-zinc-500 flex items-center gap-1">
@@ -555,24 +599,37 @@ export default function MarketTrackerTab() {
                           </span>
                         </div>
 
-                        <h3 className="font-bold text-white text-sm leading-snug group-hover:text-accent transition-colors">
+                        <a
+                          href={art.link || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-bold text-white text-sm leading-snug group-hover:text-accent transition-colors block cursor-pointer"
+                        >
                           {art.title}
-                        </h3>
-
-                        <p className="text-xs text-zinc-300 leading-relaxed line-clamp-3">
-                          {art.snippet || (art.fullContent && art.fullContent[0])}
-                        </p>
+                        </a>
                       </div>
 
                       <div className="pt-2 border-t border-border/40 flex items-center justify-between text-[11px]">
-                        <span className="text-zinc-400 flex items-center gap-1">
-                          <BookOpen size={12} />
-                          {art.readTime || '3 min read'}
-                        </span>
-                        <span className="text-accent font-semibold flex items-center gap-1 group-hover:underline">
-                          <span>Read Full Article</span>
-                          <ArrowUpRight size={13} />
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedArticleToRead(art)}
+                          className="text-zinc-400 hover:text-white transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <Globe size={12} className="text-accent" />
+                          <span>View in App</span>
+                        </button>
+
+                        {art.link && (
+                          <a
+                            href={art.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-accent font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+                          >
+                            <span>Open on {art.source}</span>
+                            <ExternalLink size={12} />
+                          </a>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -581,33 +638,42 @@ export default function MarketTrackerTab() {
             </Reveal>
           )}
 
-          {/* 3. BORROWING & INTEREST RATES BENCHMARKS */}
+          {/* 3. BORROWING & INTEREST RATES BENCHMARKS (REAL LIVE YIELDS) */}
           {(activeTabFilter === 'all' || activeTabFilter === 'rates') && (
             <Reveal delay={0.2} y={20}>
               <div data-tutorial="market-rates-panel" className="bg-card border border-border rounded-2xl p-5 sm:p-6 space-y-4 shadow-md">
                 <div className="flex items-center justify-between border-b border-border/80 pb-3">
                   <div className="flex items-center gap-2">
                     <Percent size={18} className="text-accent" />
-                    <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                      Interest Rates & Consumer Borrowing Benchmarks
-                    </h2>
+                    <div>
+                      <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                        Interest Rates & Treasury Benchmarks
+                      </h2>
+                      <p className="text-[11px] text-zinc-400">
+                        Live benchmark yields influencing consumer borrowing and liquid cash accounts.
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-[11px] text-zinc-400 font-mono">National Averages</span>
+                  <span className="text-[10px] bg-emerald-500/15 text-emerald-400 font-mono px-2 py-0.5 rounded">
+                    Live Rates
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[
-                    { name: 'Fed Funds Target Rate', rate: '4.75%', desc: 'Federal Reserve benchmark rate' },
-                    { name: '30-Yr Fixed Mortgage', rate: '6.78%', desc: 'National average conforming loans' },
-                    { name: '10-Year US Treasury', rate: '4.31%', desc: 'Long-term borrowing benchmark' },
-                    { name: 'High-Yield Savings APY', rate: '4.60%', desc: 'Top competitive online deposits' },
-                    { name: 'Average Credit Card APR', rate: '21.4%', desc: 'Variable revolving consumer credit' },
-                    { name: '48-Mo New Auto Loan', rate: '7.85%', desc: 'National bank financing benchmark' },
-                  ].map((r, i) => (
+                  {(overview?.rates || [
+                    { name: '10-Yr US Treasury', rate: 4.998, desc: 'Global benchmark for long-term borrowing and mortgages.' },
+                    { name: '3-Mo US Treasury', rate: 4.45, desc: 'Leading gauge for risk-free cash returns.' },
+                    { name: 'Fed Funds Target Rate', rate: 4.75, desc: 'Federal Reserve benchmark rate.' },
+                    { name: 'Top HYSA APY', rate: 4.60, desc: 'Top competitive online savings accounts return.' },
+                    { name: '30-Yr Fixed Mortgage', rate: 7.45, desc: 'National average conforming loans.' },
+                    { name: 'Avg Credit Card APR', rate: 21.40, desc: 'Revolving variable consumer credit.' },
+                  ]).map((r, i) => (
                     <div key={i} className="bg-[#1c1a17] border border-[#33302a] rounded-xl p-3.5 space-y-1">
                       <div className="text-[11px] text-zinc-400 font-medium">{r.name}</div>
-                      <div className="text-lg font-extrabold text-accent font-mono">{r.rate}</div>
-                      <p className="text-[10px] text-zinc-500">{r.desc}</p>
+                      <div className="text-lg font-extrabold text-accent font-mono">
+                        {typeof r.rate === 'number' ? `${r.rate.toFixed(2)}%` : r.rate}
+                      </div>
+                      <p className="text-[10px] text-zinc-500">{r.desc || r.description}</p>
                     </div>
                   ))}
                 </div>

@@ -1,8 +1,10 @@
-import React, { useEffect } from 'react';
-import { X, ExternalLink, Clock, Newspaper, BookOpen, ShieldCheck, Share2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, ExternalLink, Clock, Newspaper, Share2, Globe, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function ArticleReaderModal({ article, isOpen, onClose }) {
+  const [iframeError, setIframeError] = useState(false);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
@@ -10,6 +12,7 @@ export default function ArticleReaderModal({ article, isOpen, onClose }) {
     if (isOpen) {
       window.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
+      setIframeError(false);
     }
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
@@ -19,10 +22,12 @@ export default function ArticleReaderModal({ article, isOpen, onClose }) {
 
   if (!isOpen || !article) return null;
 
+  const articleUrl = article.link || article.canonicalUrl || '';
+
   const handleCopyLink = () => {
-    if (article.canonicalUrl) {
-      navigator.clipboard.writeText(article.canonicalUrl);
-      toast.success('Article link copied to clipboard!');
+    if (articleUrl) {
+      navigator.clipboard.writeText(articleUrl);
+      toast.success('Live article link copied to clipboard!');
     }
   };
 
@@ -33,45 +38,53 @@ export default function ArticleReaderModal({ article, isOpen, onClose }) {
     if (s.includes('wall street journal') || s.includes('wsj')) return 'bg-blue-500/15 text-blue-400 border-blue-500/30';
     if (s.includes('financial times') || s.includes('ft')) return 'bg-pink-500/15 text-pink-400 border-pink-500/30';
     if (s.includes('cnbc')) return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30';
+    if (s.includes('yahoo')) return 'bg-purple-500/15 text-purple-400 border-purple-500/30';
     return 'bg-zinc-800 text-zinc-300 border-zinc-700';
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div
-        className="relative w-full max-w-2xl max-h-[90vh] bg-[#181816] border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-4xl h-[88vh] bg-[#181816] border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Top Bar */}
-        <div className="px-5 py-4 border-b border-border/80 flex items-center justify-between gap-3 bg-[#1e1c18]">
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="px-5 py-3.5 border-b border-border/80 flex items-center justify-between gap-3 bg-[#1e1c18] shrink-0">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md border ${getSourceBadgeColor(article.source)}`}>
               {article.source}
             </span>
-            <span className="text-[11px] bg-zinc-800/80 text-zinc-300 px-2 py-0.5 rounded border border-zinc-700">
-              {article.category || 'Financial News'}
-            </span>
             <span className="text-[11px] text-zinc-400 flex items-center gap-1">
               <Clock size={12} />
-              {article.timeAgo || 'Recent'}
+              {article.timeAgo || 'Live'}
             </span>
-            {article.readTime && (
-              <span className="text-[11px] text-zinc-400 flex items-center gap-1">
-                <BookOpen size={12} />
-                {article.readTime}
-              </span>
-            )}
+            <span className="text-xs font-semibold text-white truncate max-w-[280px] sm:max-w-md hidden md:inline">
+              {article.title}
+            </span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2 shrink-0">
+            {articleUrl && (
+              <a
+                href={articleUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent/90 text-primary text-xs font-bold rounded-lg transition-all shadow-sm cursor-pointer"
+              >
+                <span>Open in New Tab</span>
+                <ExternalLink size={13} />
+              </a>
+            )}
+
             <button
               type="button"
               onClick={handleCopyLink}
-              title="Share article link"
+              title="Copy article link"
               className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
             >
               <Share2 size={16} />
             </button>
+
             <button
               type="button"
               onClick={onClose}
@@ -83,79 +96,51 @@ export default function ArticleReaderModal({ article, isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Scrollable Article Body */}
-        <div className="p-6 sm:p-8 overflow-y-auto space-y-6 text-zinc-200 leading-relaxed text-sm sm:text-base">
-          {/* Article Header */}
-          <div className="space-y-3">
-            <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight leading-snug">
-              {article.title}
-            </h1>
-
-            {article.author && (
-              <p className="text-xs text-zinc-400 italic">
-                Reported by <span className="text-zinc-300 font-medium">{article.author}</span>
-              </p>
-            )}
+        {/* Live Headline Notice */}
+        <div className="px-5 py-2.5 bg-[#141412] border-b border-border/60 flex items-center justify-between text-xs text-zinc-300 shrink-0">
+          <div className="flex items-center gap-2 truncate">
+            <Globe size={14} className="text-accent shrink-0" />
+            <span className="font-semibold text-white truncate">{article.title}</span>
           </div>
-
-          {/* ARCA Budget Impact Callout Box */}
-          {article.budgetTakeaway && (
-            <div className="bg-[#24211a] border border-[#e7b956]/30 rounded-xl p-4 space-y-1.5 shadow-sm">
-              <div className="flex items-center gap-2 text-accent text-xs font-bold uppercase tracking-wider">
-                <ShieldCheck size={16} />
-                <span>ARCA Household Budget Takeaway</span>
-              </div>
-              <p className="text-xs sm:text-sm text-zinc-200 leading-normal">
-                {article.budgetTakeaway}
-              </p>
-            </div>
-          )}
-
-          {/* Multi-Paragraph Full Content */}
-          <div className="space-y-4 text-zinc-300 text-sm sm:text-[15px] leading-relaxed">
-            {Array.isArray(article.fullContent) && article.fullContent.length > 0 ? (
-              article.fullContent.map((paragraph, idx) => (
-                <p key={idx} className="leading-relaxed">
-                  {paragraph}
-                </p>
-              ))
-            ) : (
-              <p className="leading-relaxed">
-                {article.snippet || article.summary || 'Full content preview unavailable.'}
-              </p>
-            )}
-          </div>
-
-          {/* Outbound Canonical Link Section */}
-          <div className="pt-4 border-t border-border/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-zinc-400">
-            <div>
-              <span>Original Publication: </span>
-              <span className="font-semibold text-zinc-200">{article.source}</span>
-            </div>
-
-            {article.canonicalUrl && (
-              <a
-                href={article.canonicalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-accent hover:underline font-semibold"
-              >
-                <span>Read on {article.source}</span>
-                <ExternalLink size={13} />
-              </a>
-            )}
-          </div>
+          <span className="text-[11px] text-zinc-500 shrink-0 ml-2">Live Web View</span>
         </div>
 
-        {/* Modal Footer */}
-        <div className="px-6 py-3.5 border-t border-border/80 bg-[#161614] flex items-center justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-1.5 bg-card hover:bg-zinc-800 text-zinc-200 border border-border text-xs font-semibold rounded-xl transition-all cursor-pointer"
-          >
-            Close Reader
-          </button>
+        {/* Embedded Live Web View */}
+        <div className="relative flex-1 w-full bg-[#111110] overflow-hidden">
+          {articleUrl ? (
+            <>
+              <iframe
+                src={articleUrl}
+                title={article.title}
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                className="w-full h-full border-0"
+                onError={() => setIframeError(true)}
+              />
+
+              {/* Informational overlay for publishers that block iframe embedding */}
+              <div className="absolute bottom-4 right-4 bg-[#181816]/95 border border-border p-3 rounded-xl shadow-xl max-w-sm flex items-center justify-between gap-3 text-xs backdrop-blur-md">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-zinc-300 text-[11px] leading-tight">
+                    If {article.source} restricts in-app embedding, open directly in your browser.
+                  </p>
+                </div>
+                <a
+                  href={articleUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 bg-[#282620] hover:bg-accent hover:text-primary text-accent text-[11px] font-bold rounded-lg border border-accent/30 transition-all shrink-0 cursor-pointer"
+                >
+                  Direct View ↗
+                </a>
+              </div>
+            </>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center space-y-3 p-6 text-center">
+              <Newspaper size={36} className="text-zinc-600" />
+              <p className="text-sm font-semibold text-zinc-300">Article URL unavailable.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
