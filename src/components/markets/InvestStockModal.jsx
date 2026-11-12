@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, DollarSign, TrendingUp, ArrowUpRight, ArrowDownRight, CheckCircle2, PieChart, Sparkles } from 'lucide-react';
+import { X, DollarSign, TrendingUp, ArrowUpRight, ArrowDownRight, CheckCircle2, PieChart, Sparkles, RefreshCw } from 'lucide-react';
 import { useBudget } from '../../contexts/BudgetContext';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { env } from '../../config/env';
 import { toast } from 'react-hot-toast';
 
 export default function InvestStockModal({ stock, isOpen, onClose }) {
@@ -11,11 +12,48 @@ export default function InvestStockModal({ stock, isOpen, onClose }) {
   const [dollarAmount, setDollarAmount] = useState('');
   const [shareCount, setShareCount] = useState('');
   const [notes, setNotes] = useState('');
+  const [livePrice, setLivePrice] = useState(Number(stock?.price) || 1);
+  const [liveChange, setLiveChange] = useState(Number(stock?.change) || 0);
+  const [liveChangePercent, setLiveChangePercent] = useState(Number(stock?.changePercent) || 0);
+  const [isFetchingQuote, setIsFetchingQuote] = useState(false);
 
   // Find existing holding if already owned
   const existingHolding = (investments || []).find(
     (inv) => inv.symbol.toUpperCase() === (stock?.symbol || '').toUpperCase()
   );
+
+  // Fetch real-time live quote on modal open to guarantee 100% accurate price
+  useEffect(() => {
+    if (!isOpen || !stock?.symbol) return;
+
+    setLivePrice(Number(stock.price) || 1);
+    setLiveChange(Number(stock.change) || 0);
+    setLiveChangePercent(Number(stock.changePercent) || 0);
+
+    let isMounted = true;
+    const fetchFreshQuote = async () => {
+      setIsFetchingQuote(true);
+      try {
+        const apiBase = env.apiBaseUrl || '';
+        const res = await fetch(`${apiBase}/api/markets/quote/${encodeURIComponent(stock.symbol)}`);
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          if (data && typeof data.price === 'number' && data.price > 0) {
+            setLivePrice(data.price);
+            if (typeof data.change === 'number') setLiveChange(data.change);
+            if (typeof data.changePercent === 'number') setLiveChangePercent(data.changePercent);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch live quote in InvestStockModal:', err);
+      } finally {
+        if (isMounted) setIsFetchingQuote(false);
+      }
+    };
+
+    fetchFreshQuote();
+    return () => { isMounted = false; };
+  }, [isOpen, stock?.symbol]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -37,8 +75,8 @@ export default function InvestStockModal({ stock, isOpen, onClose }) {
 
   if (!isOpen || !stock) return null;
 
-  const currentPrice = Number(stock.price) || 1;
-  const isPos = (stock.change || 0) >= 0;
+  const currentPrice = livePrice || Number(stock.price) || 1;
+  const isPos = liveChange >= 0;
 
   // Real-time calculation helpers
   const calculatedShares = inputMode === 'dollars'
@@ -139,17 +177,21 @@ export default function InvestStockModal({ stock, isOpen, onClose }) {
 
         {/* Live Price Bar */}
         <div className="px-5 py-3 bg-[#131311] border-b border-border/60 flex items-center justify-between text-xs">
-          <div>
+          <div className="flex items-center gap-2">
             <span className="text-zinc-400">Current Market Price: </span>
             <span className="font-mono font-extrabold text-white text-sm">
               ${currentPrice.toFixed(2)}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded font-mono">
+              <span className={`w-1.5 h-1.5 rounded-full ${isFetchingQuote ? 'bg-amber-400 animate-spin' : 'bg-emerald-400 animate-pulse'}`} />
+              {isFetchingQuote ? 'Syncing...' : 'Live Quote'}
             </span>
           </div>
 
           <div className={`flex items-center gap-1 font-semibold font-mono ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>
             {isPos ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-            <span>{isPos ? '+' : ''}{Number(stock.change || 0).toFixed(2)}</span>
-            <span>({isPos ? '+' : ''}{Number(stock.changePercent || 0).toFixed(2)}%)</span>
+            <span>{isPos ? '+' : ''}{Number(liveChange || 0).toFixed(2)}</span>
+            <span>({isPos ? '+' : ''}{Number(liveChangePercent || 0).toFixed(2)}%)</span>
           </div>
         </div>
 

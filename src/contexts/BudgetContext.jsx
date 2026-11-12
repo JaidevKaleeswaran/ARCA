@@ -1,6 +1,7 @@
 import React, { createContext, useReducer, useContext, useEffect } from 'react';
 import { normalizeToMasterCycle, getCycleWindow, isWithinCycle } from '../utils/cycleUtils';
 import { useAuth } from './AuthContext';
+import { env } from '../config/env';
 
 const STORAGE_KEY = 'arca_budget_state';
 const LEGACY_STORAGE_KEY = 'stacked_budget_state';
@@ -467,6 +468,43 @@ export function BudgetProvider({ children }) {
       console.warn('Failed to save budget state to localStorage:', e);
     }
   }, [state, user]);
+
+  // Continuously refresh user stock holdings with accurate live market prices
+  useEffect(() => {
+    const symbols = (state.investments || []).map((i) => i.symbol).filter(Boolean);
+    if (symbols.length === 0) return;
+
+    let isMounted = true;
+    const fetchLiveQuotes = async () => {
+      try {
+        const apiBase = env.apiBaseUrl || '';
+        const res = await fetch(`${apiBase}/api/markets/quotes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbols }),
+        });
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          if (data.quotes && Object.keys(data.quotes).length > 0) {
+            const liveMap = {};
+            Object.values(data.quotes).forEach((q) => {
+              liveMap[q.symbol] = q.price;
+            });
+            dispatch({ type: 'REFRESH_PORTFOLIO_PRICES', payload: liveMap });
+          }
+        }
+      } catch (err) {
+        console.warn('BudgetContext failed to refresh holding quotes:', err);
+      }
+    };
+
+    fetchLiveQuotes();
+    const interval = setInterval(fetchLiveQuotes, 60000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [state.investments?.length]);
 
   // Calculate normalized total income
   const totalIncome = state.incomeSources.reduce((sum, source) => {

@@ -28,6 +28,9 @@ export default function MarketTrackerTab() {
   const [overview, setOverview] = useState(null);
   const [catalog, setCatalog] = useState(STOCK_CATALOG);
   const [articles, setArticles] = useState([]);
+  const [newsPage, setNewsPage] = useState(1);
+  const [isLoadingMoreNews, setIsLoadingMoreNews] = useState(false);
+  const [selectedNewsTopic, setSelectedNewsTopic] = useState('all');
   const [searchResults, setSearchResults] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -37,7 +40,7 @@ export default function MarketTrackerTab() {
   const [aiBriefing, setAiBriefing] = useState(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-  const [catalogDisplayLimit, setCatalogDisplayLimit] = useState(24);
+  const [catalogDisplayLimit, setCatalogDisplayLimit] = useState(36);
 
   // Modals
   const [selectedStockToInvest, setSelectedStockToInvest] = useState(null);
@@ -50,13 +53,18 @@ export default function MarketTrackerTab() {
       const apiBase = env.apiBaseUrl || '';
       const [overviewRes, catalogRes, newsRes] = await Promise.allSettled([
         fetch(`${apiBase}/api/markets/overview`),
-        fetch(`${apiBase}/api/markets/catalog?limit=200`),
+        fetch(`${apiBase}/api/markets/catalog?limit=250`),
         fetch(`${apiBase}/api/markets/news`),
       ]);
 
       if (overviewRes.status === 'fulfilled' && overviewRes.value.ok) {
         const oData = await overviewRes.value.json();
         setOverview(oData);
+
+        // Update all 112 stock catalog with live prices
+        if (Array.isArray(oData.stocks) && oData.stocks.length > 0) {
+          setCatalog(oData.stocks);
+        }
 
         // Update user portfolio holdings with live real-time prices
         const quotes = {};
@@ -85,11 +93,92 @@ export default function MarketTrackerTab() {
         }
       }
 
+      // Also refresh any custom stock holdings outside default universe
+      if (investments.length > 0) {
+        try {
+          const symbols = investments.map((i) => i.symbol);
+          const bRes = await fetch(`${apiBase}/api/markets/quotes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbols }),
+          });
+          if (bRes.ok) {
+            const bData = await bRes.json();
+            if (bData.quotes) {
+              const liveMap = {};
+              Object.values(bData.quotes).forEach((q) => {
+                liveMap[q.symbol] = q.price;
+              });
+              dispatch({ type: 'REFRESH_PORTFOLIO_PRICES', payload: liveMap });
+            }
+          }
+        } catch (hErr) {
+          console.warn('Could not batch refresh custom holdings:', hErr);
+        }
+      }
+
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       if (showToast) toast.success('Live Yahoo Finance quotes & news refreshed!');
     } catch (err) {
       console.warn('Backend live market fetch failed:', err);
       if (showToast) toast.error('Failed to refresh live market numbers');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Generate More Articles on Demand
+  const handleGenerateMoreArticles = async () => {
+    setIsLoadingMoreNews(true);
+    try {
+      const apiBase = env.apiBaseUrl || '';
+      const nextPage = newsPage + 1;
+      const topicParam = selectedNewsTopic !== 'all' ? `&topic=${selectedNewsTopic}` : '';
+      const res = await fetch(`${apiBase}/api/markets/news/generate-more?page=${nextPage}${topicParam}`);
+
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.articles) && data.articles.length > 0) {
+          setArticles((prev) => {
+            const seen = new Set(prev.map((a) => a.link || a.id || a.title));
+            const fresh = data.articles.filter((a) => !seen.has(a.link || a.id || a.title));
+            return [...prev, ...fresh];
+          });
+          setNewsPage(nextPage);
+          toast.success(`Generated ${data.added || data.articles.length} more authentic articles!`);
+        } else {
+          toast.info('All latest market articles are up to date.');
+        }
+      } else {
+        throw new Error('Server returned non-200');
+      }
+    } catch (err) {
+      console.warn('Failed to generate more articles:', err);
+      toast.error('Could not fetch additional articles. Try again in a moment.');
+    } finally {
+      setIsLoadingMoreNews(false);
+    }
+  };
+
+  // Switch News Topic Feed
+  const handleSelectNewsTopic = async (topic) => {
+    setSelectedNewsTopic(topic);
+    setIsLoading(true);
+    try {
+      const apiBase = env.apiBaseUrl || '';
+      const url = topic === 'all'
+        ? `${apiBase}/api/markets/news?page=1`
+        : `${apiBase}/api/markets/news?topic=${topic}&page=1`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.articles)) {
+          setArticles(data.articles);
+          setNewsPage(1);
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching topic news:', err);
     } finally {
       setIsLoading(false);
     }
@@ -562,7 +651,7 @@ export default function MarketTrackerTab() {
           {(activeTabFilter === 'all' || activeTabFilter === 'news') && (
             <Reveal delay={0.15} y={20}>
               <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 space-y-4 shadow-md">
-                <div className="flex items-center justify-between border-b border-border/80 pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3">
                   <div className="flex items-center gap-2">
                     <Newspaper size={18} className="text-accent" />
                     <div>
@@ -577,11 +666,51 @@ export default function MarketTrackerTab() {
                       </p>
                     </div>
                   </div>
-                  <span className="text-[11px] bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded font-mono">
-                    {articles.length} Live Stories
-                  </span>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] bg-zinc-800 text-zinc-300 px-2.5 py-1 rounded-lg font-mono">
+                      {articles.length} Live Stories
+                    </span>
+
+                    {/* Quick Generate More Button in Header */}
+                    <button
+                      type="button"
+                      onClick={handleGenerateMoreArticles}
+                      disabled={isLoadingMoreNews}
+                      className="flex items-center gap-1.5 px-3 py-1 bg-accent/15 hover:bg-accent text-accent hover:text-primary border border-accent/30 text-xs font-bold rounded-lg transition-all active:scale-95 cursor-pointer"
+                      title="Fetch more authentic articles from primary financial publishers"
+                    >
+                      <Plus size={13} className={isLoadingMoreNews ? 'animate-spin' : ''} />
+                      <span>{isLoadingMoreNews ? 'Generating...' : 'Generate More +'}</span>
+                    </button>
+                  </div>
                 </div>
 
+                {/* News Topic Filters */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
+                  {[
+                    { id: 'all', label: 'All Top News' },
+                    { id: 'tech', label: 'Tech & AI Markets' },
+                    { id: 'investing', label: 'Wall St & Equities' },
+                    { id: 'economy', label: 'Fed & Macro Rates' },
+                    { id: 'retail', label: 'Consumer & Retail' },
+                    { id: 'crypto', label: 'Digital Assets' },
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => handleSelectNewsTopic(t.id)}
+                      className={`px-2.5 py-1 rounded-md font-medium whitespace-nowrap transition-all cursor-pointer text-[11px] ${
+                        selectedNewsTopic === t.id
+                          ? 'bg-accent/20 text-accent border border-accent/40 font-bold'
+                          : 'bg-[#181816] text-zinc-400 hover:text-zinc-200 border border-border/60'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Articles Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   {articles.map((art) => (
                     <div
@@ -633,6 +762,28 @@ export default function MarketTrackerTab() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Prominent Generate More Articles Button & Status */}
+                <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="text-center sm:text-left">
+                    <span className="text-xs text-zinc-300 font-semibold block">
+                      Looking for more real-time market stories?
+                    </span>
+                    <span className="text-[11px] text-zinc-500">
+                      Showing {articles.length} authentic reports from Bloomberg, WSJ, Reuters, CNBC & Financial Times.
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateMoreArticles}
+                    disabled={isLoadingMoreNews}
+                    className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-accent/20 via-accent/30 to-accent/20 hover:from-accent hover:to-accent text-accent hover:text-primary border border-accent/40 font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Newspaper size={14} className={isLoadingMoreNews ? 'animate-spin text-accent' : 'text-accent'} />
+                    <span>{isLoadingMoreNews ? 'Generating More Articles...' : 'Generate More Articles'}</span>
+                  </button>
                 </div>
               </div>
             </Reveal>
