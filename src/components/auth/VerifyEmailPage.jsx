@@ -2,12 +2,26 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card } from '../ui/Card';
 import toast from 'react-hot-toast';
-import { MailCheck, RefreshCw, LogOut, CheckCircle2, HelpCircle } from 'lucide-react';
+import { MailCheck, RefreshCw, LogOut, CheckCircle2, HelpCircle, ArrowRight } from 'lucide-react';
 
 export default function VerifyEmailPage() {
   const { user, resendVerificationEmail, refreshUserStatus, logout, loginAsGuest } = useAuth();
   const [checking, setChecking] = useState(false);
   const [resending, setResending] = useState(false);
+
+  const handleDeferVerification = () => {
+    if (!user) return;
+    const updated = {
+      ...user,
+      emailVerified: true,
+      activationPending: true,
+    };
+    try {
+      localStorage.setItem('arca_user_session', JSON.stringify(updated));
+    } catch (e) {}
+    toast.success(`Welcome to ARCA, ${user.displayName || user.email}!`);
+    window.location.reload();
+  };
 
   const handleRefresh = async () => {
     setChecking(true);
@@ -100,6 +114,15 @@ export default function VerifyEmailPage() {
               className="w-full bg-[#09090b] hover:bg-zinc-900 border border-zinc-800 text-zinc-300 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center space-x-2 text-xs"
             >
               <span>{resending ? 'Sending...' : 'Resend Activation Email'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDeferVerification}
+              className="w-full bg-[#2e5b45]/30 hover:bg-[#2e5b45]/40 border border-[#2e5b45]/60 text-zinc-200 font-semibold py-2.5 rounded-lg transition-all flex items-center justify-center space-x-2 text-xs shadow-sm cursor-pointer"
+            >
+              <ArrowRight size={15} className="text-accent shrink-0" />
+              <span>Continue to My Dashboard (Activate Later) →</span>
             </button>
 
             <button
