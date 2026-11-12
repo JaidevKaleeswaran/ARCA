@@ -45,3 +45,5 @@ uploads/
 aws/aws-outputs.json
 aws/aws-outputs.*.json
 aws/__pycache__/
+.vercel
+.env*
