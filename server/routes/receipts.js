@@ -23,11 +23,17 @@ const scanLimiter = createRateLimiter({
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
-const UPLOADS_DIR = path.join(PROJECT_ROOT, 'uploads');
+const UPLOADS_DIR = (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NODE_ENV === 'production')
+  ? path.join('/tmp', 'uploads')
+  : path.join(PROJECT_ROOT, 'uploads');
 
-// Ensure uploads directory exists
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// Ensure uploads directory exists safely without crashing serverless read-only filesystems
+try {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+} catch (err) {
+  console.warn('Could not create UPLOADS_DIR:', err.message);
 }
 
 // ---------------------------------------------------------------------------

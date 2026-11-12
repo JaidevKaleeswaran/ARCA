@@ -54,20 +54,31 @@ app.use(cors({
 app.use(express.json({ limit: '5mb' }));
 
 // Serve uploaded receipt images as static files (dotfiles hidden)
-app.use('/uploads', express.static(path.join(PROJECT_ROOT, 'uploads'), {
+const UPLOADS_DIR = (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NODE_ENV === 'production')
+  ? path.join('/tmp', 'uploads')
+  : path.join(PROJECT_ROOT, 'uploads');
+
+app.use('/uploads', express.static(UPLOADS_DIR, {
   dotfiles: 'deny',
 }));
 
-// Routes
+// Routes — mounted on both /api/* and root /* to support both local dev proxy and Vercel serverless rewrites
 app.use('/api/receipts', receiptsRouter);
 app.use('/api/voice', voiceRouter);
 app.use('/api/assistant', assistantRouter);
 app.use('/api/markets', marketsRouter);
 
+app.use('/receipts', receiptsRouter);
+app.use('/voice', voiceRouter);
+app.use('/assistant', assistantRouter);
+app.use('/markets', marketsRouter);
+
 // Health check
-app.get('/api/health', (_req, res) => {
+const healthCheck = (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+};
+app.get('/api/health', healthCheck);
+app.get('/health', healthCheck);
 
 // Start server (when executed directly, not imported in serverless)
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
