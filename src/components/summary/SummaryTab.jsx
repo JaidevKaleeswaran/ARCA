@@ -3,10 +3,11 @@ import FinancialHealthCards from './FinancialHealthCards';
 import MainBalanceChart from './MainBalanceChart';
 import CategoryCharts from './CategoryCharts';
 import NotificationHub from './NotificationHub';
+import StocksWidget from '../widgets/StocksWidget';
 import MaskedHeading from '../ui/MaskedHeading';
 import Reveal from '../ui/Reveal';
 
-export default function SummaryTab() {
+export default function SummaryTab({ onNavigateToMarkets }) {
   return (
     <div className="flex flex-col space-y-6">
       {/* Header */}
@@ -22,12 +23,12 @@ export default function SummaryTab() {
         />
         <Reveal delay={0.15}>
           <p className="text-sm text-text-muted mt-2">
-            Real-time overview of your income, spending, and financial health.
+            Real-time overview of your income, spending, investments, and net worth.
           </p>
         </Reveal>
       </div>
 
-      {/* Top Financial Health Scorecard (Net Worth, Cash Flow, Savings Rate, Subscriptions) */}
+      {/* Top Financial Health Scorecard (Income, Cash Flow, Stock Portfolio, Net Worth, Subscriptions) */}
       <Reveal delay={0.05}>
         <div data-tutorial="summary-health-cards">
           <FinancialHealthCards />
@@ -50,10 +51,15 @@ export default function SummaryTab() {
         </Reveal>
       </div>
 
-      {/* Bottom section: Notification Hub */}
+      {/* Bottom section: Stocks Widget & Notification Hub */}
       <Reveal delay={0.28}>
-        <div data-tutorial="summary-notifications">
-          <NotificationHub />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-1">
+            <StocksWidget onNavigateToMarkets={onNavigateToMarkets} />
+          </div>
+          <div className="lg:col-span-2" data-tutorial="summary-notifications">
+            <NotificationHub />
+          </div>
         </div>
       </Reveal>
     </div>

@@ -11,6 +11,7 @@ export function useFirebaseSync() {
     transactions,
     categories,
     incomeSources,
+    investments,
     cycleStartDate,
     cycleFrequency,
     voiceLogs,
@@ -28,6 +29,7 @@ export function useFirebaseSync() {
     transactions,
     categories,
     incomeSources,
+    investments: investments || [],
     cycleStartDate,
     cycleFrequency,
     voiceLogs: voiceLogs || [],
@@ -44,7 +46,7 @@ export function useFirebaseSync() {
         localStorage.setItem(userStorageKey, JSON.stringify(stateRef.current));
       } catch (e) { }
     }
-  }, [user?.uid, transactions, categories, incomeSources, cycleStartDate, cycleFrequency, voiceLogs, chatMessages]);
+  }, [user?.uid, transactions, categories, incomeSources, investments, cycleStartDate, cycleFrequency, voiceLogs, chatMessages]);
 
   // 1. Realtime Firestore listener: Sync data from Firestore to local state across all devices
   useEffect(() => {
@@ -131,6 +133,7 @@ export function useFirebaseSync() {
     transactions,
     categories,
     incomeSources,
+    investments,
     cycleStartDate,
     cycleFrequency,
     voiceLogs,

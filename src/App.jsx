@@ -90,10 +90,10 @@ function MainApp() {
 
             <main className="max-w-6xl mx-auto p-3 sm:p-6 lg:p-8">
               <div className="animate-in fade-in duration-300">
-                {activeTab === 'home' && <HomeTab />}
+                {activeTab === 'home' && <HomeTab onNavigateToMarkets={() => setActiveTab('markets')} />}
                 {activeTab === 'assistant' && <AIAssistantTab />}
                 {activeTab === 'markets' && <MarketTrackerTab />}
-                {activeTab === 'summary' && <SummaryTab />}
+                {activeTab === 'summary' && <SummaryTab onNavigateToMarkets={() => setActiveTab('markets')} />}
                 {activeTab === 'transactions' && <TransactionsTab />}
               </div>
             </main>

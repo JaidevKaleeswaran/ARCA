@@ -16,6 +16,7 @@ const defaultState = {
     { id: '3', name: 'Entertainment', limit: 200, color: '#8c6d37', endOfCycleAction: 'none' },
   ],
   transactions: [],
+  investments: [], // User stock portfolio holdings
   voiceLogs: [],
   chatMessages: [],
 };
@@ -76,6 +77,7 @@ function sanitizeState(state) {
     ...state,
     categories: cleanedCategories,
     transactions: cleanedTransactions,
+    investments: Array.isArray(state.investments) ? state.investments : [],
     chatMessages: cleanedMessages,
   };
 }
@@ -221,6 +223,131 @@ function budgetReducer(state, action) {
         ...state,
         chatMessages: [],
       };
+
+    case 'ADD_INVESTMENT': {
+      const { symbol, name, shares, investedAmount, currentPrice, notes } = action.payload || {};
+      const numShares = Math.max(0, Number(shares) || 0);
+      const numInvested = Math.max(0, Number(investedAmount) || 0);
+      const numPrice = Math.max(0, Number(currentPrice) || (numShares > 0 ? numInvested / numShares : 0));
+      const upperSym = (symbol || '').toUpperCase().trim();
+
+      const existingIndex = (state.investments || []).findIndex(
+        (inv) => inv.symbol.toUpperCase() === upperSym
+      );
+
+      let updatedInvestments = [...(state.investments || [])];
+
+      if (existingIndex >= 0) {
+        const existing = updatedInvestments[existingIndex];
+        const combinedShares = Number((existing.shares + numShares).toFixed(4));
+        const combinedInvested = Number((existing.investedAmount + numInvested).toFixed(2));
+        const effectivePrice = numPrice || existing.currentPrice || (combinedShares > 0 ? combinedInvested / combinedShares : 0);
+        const currentValue = Number((combinedShares * effectivePrice).toFixed(2));
+        const unrealizedGain = Number((currentValue - combinedInvested).toFixed(2));
+        const unrealizedGainPercent = combinedInvested > 0 ? Number(((unrealizedGain / combinedInvested) * 100).toFixed(2)) : 0;
+
+        updatedInvestments[existingIndex] = {
+          ...existing,
+          shares: combinedShares,
+          investedAmount: combinedInvested,
+          avgCostPerShare: combinedShares > 0 ? Number((combinedInvested / combinedShares).toFixed(2)) : 0,
+          currentPrice: effectivePrice,
+          currentValue,
+          unrealizedGain,
+          unrealizedGainPercent,
+          lastUpdated: new Date().toISOString(),
+        };
+      } else {
+        const currentValue = Number((numShares * numPrice).toFixed(2));
+        const unrealizedGain = Number((currentValue - numInvested).toFixed(2));
+        const unrealizedGainPercent = numInvested > 0 ? Number(((unrealizedGain / numInvested) * 100).toFixed(2)) : 0;
+
+        const newHolding = {
+          id: action.payload?.id || `inv_${upperSym.toLowerCase()}_${Date.now()}`,
+          symbol: upperSym,
+          name: name || upperSym,
+          shares: Number(numShares.toFixed(4)),
+          investedAmount: Number(numInvested.toFixed(2)),
+          avgCostPerShare: numShares > 0 ? Number((numInvested / numShares).toFixed(2)) : numPrice,
+          currentPrice: numPrice,
+          currentValue,
+          unrealizedGain,
+          unrealizedGainPercent,
+          notes: notes || '',
+          dateAdded: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+        };
+        updatedInvestments.unshift(newHolding);
+      }
+
+      return {
+        ...state,
+        investments: updatedInvestments,
+      };
+    }
+
+    case 'UPDATE_INVESTMENT': {
+      const { id, shares, investedAmount, currentPrice, notes } = action.payload || {};
+      return {
+        ...state,
+        investments: (state.investments || []).map((inv) => {
+          if (inv.id !== id) return inv;
+          const newShares = shares !== undefined ? Math.max(0, Number(shares)) : inv.shares;
+          const newInvested = investedAmount !== undefined ? Math.max(0, Number(investedAmount)) : inv.investedAmount;
+          const newPrice = currentPrice !== undefined ? Math.max(0, Number(currentPrice)) : inv.currentPrice;
+          const currentValue = Number((newShares * newPrice).toFixed(2));
+          const unrealizedGain = Number((currentValue - newInvested).toFixed(2));
+          const unrealizedGainPercent = newInvested > 0 ? Number(((unrealizedGain / newInvested) * 100).toFixed(2)) : 0;
+
+          return {
+            ...inv,
+            shares: Number(newShares.toFixed(4)),
+            investedAmount: Number(newInvested.toFixed(2)),
+            avgCostPerShare: newShares > 0 ? Number((newInvested / newShares).toFixed(2)) : inv.avgCostPerShare,
+            currentPrice: newPrice,
+            currentValue,
+            unrealizedGain,
+            unrealizedGainPercent,
+            notes: notes !== undefined ? notes : inv.notes,
+            lastUpdated: new Date().toISOString(),
+          };
+        }),
+      };
+    }
+
+    case 'DELETE_INVESTMENT': {
+      const targetId = action.payload?.id || action.payload;
+      return {
+        ...state,
+        investments: (state.investments || []).filter((inv) => inv.id !== targetId),
+      };
+    }
+
+    case 'REFRESH_PORTFOLIO_PRICES': {
+      const quotes = action.payload || {};
+      if (Object.keys(quotes).length === 0) return state;
+
+      return {
+        ...state,
+        investments: (state.investments || []).map((inv) => {
+          const latestPrice = quotes[inv.symbol] || quotes[inv.symbol.toUpperCase()];
+          if (!latestPrice || typeof latestPrice !== 'number') return inv;
+
+          const currentValue = Number((inv.shares * latestPrice).toFixed(2));
+          const unrealizedGain = Number((currentValue - inv.investedAmount).toFixed(2));
+          const unrealizedGainPercent = inv.investedAmount > 0 ? Number(((unrealizedGain / inv.investedAmount) * 100).toFixed(2)) : 0;
+
+          return {
+            ...inv,
+            currentPrice: latestPrice,
+            currentValue,
+            unrealizedGain,
+            unrealizedGainPercent,
+            lastUpdated: new Date().toISOString(),
+          };
+        }),
+      };
+    }
     case 'SET_FULL_STATE': {
       const incoming = action.payload || {};
 
@@ -276,6 +403,15 @@ function budgetReducer(state, action) {
         if (msg?.id) msgMap.set(msg.id, msg);
       });
 
+      // Merge investments by symbol
+      const invMap = new Map();
+      (state?.investments || []).forEach((inv) => {
+        if (inv?.symbol) invMap.set(inv.symbol.toUpperCase(), inv);
+      });
+      (incoming.investments || []).forEach((inv) => {
+        if (inv?.symbol) invMap.set(inv.symbol.toUpperCase(), inv);
+      });
+
       return sanitizeState({
         ...defaultState,
         ...state,
@@ -283,6 +419,7 @@ function budgetReducer(state, action) {
         categories: Array.from(catMap.values()),
         transactions: Array.from(txMap.values()),
         incomeSources: Array.from(sourceMap.values()),
+        investments: Array.from(invMap.values()),
         voiceLogs: Array.from(logMap.values()),
         chatMessages: Array.from(msgMap.values()),
       });
@@ -360,6 +497,20 @@ export function BudgetProvider({ children }) {
     (s) => s.isSalary || s.id === 'salary_source' || s.name?.toLowerCase() === 'primary salary' || s.name?.toLowerCase() === 'salary'
   ) || null;
 
+  // Calculate portfolio totals
+  const portfolioTotalInvested = (state.investments || []).reduce(
+    (sum, inv) => sum + (Number(inv.investedAmount) || 0),
+    0
+  );
+  const portfolioCurrentValue = (state.investments || []).reduce(
+    (sum, inv) => sum + (Number(inv.currentValue) || 0),
+    0
+  );
+  const portfolioTotalGain = portfolioCurrentValue - portfolioTotalInvested;
+  const portfolioTotalGainPercent = portfolioTotalInvested > 0
+    ? (portfolioTotalGain / portfolioTotalInvested) * 100
+    : 0;
+
   const value = {
     ...state,
     dispatch,
@@ -370,6 +521,10 @@ export function BudgetProvider({ children }) {
     leftToBudget,
     categorySpending,
     currentCycleWindow: cycleWindow,
+    portfolioTotalInvested: Number(portfolioTotalInvested.toFixed(2)),
+    portfolioCurrentValue: Number(portfolioCurrentValue.toFixed(2)),
+    portfolioTotalGain: Number(portfolioTotalGain.toFixed(2)),
+    portfolioTotalGainPercent: Number(portfolioTotalGainPercent.toFixed(2)),
   };
 
 

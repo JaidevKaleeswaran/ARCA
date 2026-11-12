@@ -1,0 +1,310 @@
+import React, { useState, useEffect } from 'react';
+import { X, DollarSign, TrendingUp, ArrowUpRight, ArrowDownRight, CheckCircle2, PieChart, Sparkles } from 'lucide-react';
+import { useBudget } from '../../contexts/BudgetContext';
+import { formatCurrency } from '../../utils/formatCurrency';
+import { toast } from 'react-hot-toast';
+
+export default function InvestStockModal({ stock, isOpen, onClose }) {
+  const { investments, dispatch } = useBudget();
+
+  const [inputMode, setInputMode] = useState('dollars'); // 'dollars' | 'shares'
+  const [dollarAmount, setDollarAmount] = useState('');
+  const [shareCount, setShareCount] = useState('');
+  const [notes, setNotes] = useState('');
+
+  // Find existing holding if already owned
+  const existingHolding = (investments || []).find(
+    (inv) => inv.symbol.toUpperCase() === (stock?.symbol || '').toUpperCase()
+  );
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+      // Default to sensible starting value
+      setDollarAmount('');
+      setShareCount('');
+      setNotes('');
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !stock) return null;
+
+  const currentPrice = Number(stock.price) || 1;
+  const isPos = (stock.change || 0) >= 0;
+
+  // Real-time calculation helpers
+  const calculatedShares = inputMode === 'dollars'
+    ? (Number(dollarAmount) > 0 ? (Number(dollarAmount) / currentPrice) : 0)
+    : Number(shareCount) || 0;
+
+  const calculatedDollars = inputMode === 'shares'
+    ? (Number(shareCount) > 0 ? (Number(shareCount) * currentPrice) : 0)
+    : Number(dollarAmount) || 0;
+
+  const handleDollarChange = (val) => {
+    setDollarAmount(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > 0) {
+      setShareCount((num / currentPrice).toFixed(4));
+    } else {
+      setShareCount('');
+    }
+  };
+
+  const handleShareChange = (val) => {
+    setShareCount(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > 0) {
+      setDollarAmount((num * currentPrice).toFixed(2));
+    } else {
+      setDollarAmount('');
+    }
+  };
+
+  const handleQuickAdd = (amount) => {
+    setInputMode('dollars');
+    const newTotal = (Number(dollarAmount) || 0) + amount;
+    handleDollarChange(newTotal.toFixed(2));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const finalAmount = Number(calculatedDollars);
+    const finalShares = Number(calculatedShares);
+
+    if (!finalAmount || finalAmount <= 0 || !finalShares || finalShares <= 0) {
+      toast.error('Please enter a valid investment amount greater than zero.');
+      return;
+    }
+
+    dispatch({
+      type: 'ADD_INVESTMENT',
+      payload: {
+        symbol: stock.symbol,
+        name: stock.name,
+        shares: finalShares,
+        investedAmount: finalAmount,
+        currentPrice: currentPrice,
+        notes: notes.trim(),
+      },
+    });
+
+    toast.success(`Invested ${formatCurrency(finalAmount)} in ${stock.symbol} (${stock.name})!`);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div
+        className="relative w-full max-w-lg bg-[#181816] border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div className="px-5 py-4 border-b border-border/80 flex items-center justify-between bg-[#1e1c18]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-accent/15 border border-accent/30 text-accent font-black flex items-center justify-center text-sm">
+              {stock.symbol.slice(0, 4)}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-extrabold text-white tracking-tight">
+                  {stock.symbol}
+                </h2>
+                <span className="text-[11px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded font-medium">
+                  {stock.sector || 'Stock'}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 truncate max-w-[240px]">
+                {stock.name}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Live Price Bar */}
+        <div className="px-5 py-3 bg-[#131311] border-b border-border/60 flex items-center justify-between text-xs">
+          <div>
+            <span className="text-zinc-400">Current Market Price: </span>
+            <span className="font-mono font-extrabold text-white text-sm">
+              ${currentPrice.toFixed(2)}
+            </span>
+          </div>
+
+          <div className={`flex items-center gap-1 font-semibold font-mono ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>
+            {isPos ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+            <span>{isPos ? '+' : ''}{Number(stock.change || 0).toFixed(2)}</span>
+            <span>({isPos ? '+' : ''}{Number(stock.changePercent || 0).toFixed(2)}%)</span>
+          </div>
+        </div>
+
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-5">
+          {/* Existing Position Callout if owned */}
+          {existingHolding && (
+            <div className="bg-[#211f1a] border border-[#e7b956]/30 rounded-xl p-3 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <PieChart size={16} className="text-accent shrink-0" />
+                <div>
+                  <span className="text-zinc-300 font-semibold">Currently in Portfolio: </span>
+                  <span className="text-accent font-bold font-mono">
+                    {existingHolding.shares} shares ({formatCurrency(existingHolding.currentValue)})
+                  </span>
+                </div>
+              </div>
+              <span className="text-[10px] bg-accent/15 text-accent font-bold px-2 py-0.5 rounded">
+                Adding to Position
+              </span>
+            </div>
+          )}
+
+          {/* Mode Switcher: Dollars vs Shares */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-zinc-300">
+                Investment Method
+              </label>
+              <div className="flex items-center bg-[#131311] border border-border rounded-lg p-0.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setInputMode('dollars')}
+                  className={`px-2.5 py-1 rounded font-medium transition-all cursor-pointer ${
+                    inputMode === 'dollars' ? 'bg-accent text-primary font-bold shadow-sm' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Dollar Amount ($)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputMode('shares')}
+                  className={`px-2.5 py-1 rounded font-medium transition-all cursor-pointer ${
+                    inputMode === 'shares' ? 'bg-accent text-primary font-bold shadow-sm' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Number of Shares
+                </button>
+              </div>
+            </div>
+
+            {/* Input Field */}
+            {inputMode === 'dollars' ? (
+              <div className="relative">
+                <DollarSign size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-accent" />
+                <input
+                  type="number"
+                  step="any"
+                  min="0.01"
+                  autoFocus
+                  value={dollarAmount}
+                  onChange={(e) => handleDollarChange(e.target.value)}
+                  placeholder="e.g. 500.00"
+                  className="w-full bg-[#131311] border border-border focus:border-accent text-white font-mono text-base font-bold rounded-xl pl-9 pr-3 py-2.5 outline-none transition-all placeholder:text-zinc-600"
+                />
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="number"
+                  step="any"
+                  min="0.0001"
+                  autoFocus
+                  value={shareCount}
+                  onChange={(e) => handleShareChange(e.target.value)}
+                  placeholder="e.g. 5.0"
+                  className="w-full bg-[#131311] border border-border focus:border-accent text-white font-mono text-base font-bold rounded-xl px-3.5 py-2.5 outline-none transition-all placeholder:text-zinc-600"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Quick Increment Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto text-xs pb-1">
+            <span className="text-[11px] text-zinc-500 mr-1">Quick add:</span>
+            {[50, 100, 250, 500, 1000].map((amt) => (
+              <button
+                key={amt}
+                type="button"
+                onClick={() => handleQuickAdd(amt)}
+                className="px-2.5 py-1 rounded-lg bg-[#22201d] hover:bg-[#2b2924] border border-border text-zinc-300 font-mono text-[11px] transition-all cursor-pointer"
+              >
+                +${amt}
+              </button>
+            ))}
+          </div>
+
+          {/* Real-time Conversion Summary Card */}
+          <div className="bg-[#141412] border border-border/80 rounded-xl p-3.5 space-y-2 text-xs">
+            <div className="flex items-center justify-between text-zinc-400">
+              <span>Shares to be Acquired:</span>
+              <span className="font-mono font-bold text-white">
+                {calculatedShares > 0 ? calculatedShares.toFixed(4) : '0.0000'} shares
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-zinc-400">
+              <span>Total Investment Cost Basis:</span>
+              <span className="font-mono font-extrabold text-accent text-sm">
+                {formatCurrency(calculatedDollars)}
+              </span>
+            </div>
+            {existingHolding && calculatedDollars > 0 && (
+              <div className="pt-2 border-t border-border/50 flex items-center justify-between text-[11px] text-zinc-400">
+                <span>New Total Position:</span>
+                <span className="text-zinc-200 font-semibold font-mono">
+                  {(existingHolding.shares + calculatedShares).toFixed(4)} shares ({formatCurrency(existingHolding.currentValue + calculatedDollars)})
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Optional Investment Note */}
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 mb-1 block">
+              Investment Notes (Optional)
+            </label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Monthly DCA, Roth IRA contribution"
+              className="w-full bg-[#131311] border border-border focus:border-accent text-xs text-white rounded-xl px-3 py-2 outline-none transition-all placeholder:text-zinc-600"
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="pt-2 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-card hover:bg-zinc-800 text-zinc-300 border border-border text-xs font-semibold rounded-xl transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={calculatedDollars <= 0}
+              className="flex items-center gap-1.5 px-5 py-2 bg-accent hover:bg-accent/90 disabled:opacity-40 disabled:hover:bg-accent text-primary text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
+            >
+              <CheckCircle2 size={15} />
+              <span>Confirm & Add to Portfolio</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

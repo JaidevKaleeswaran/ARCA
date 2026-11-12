@@ -2,6 +2,9 @@ import express from 'express';
 import { GoogleGenAI } from '@google/genai';
 import { createRateLimiter } from '../middleware/security.js';
 import { sanitizeError } from '../utils/sanitize.js';
+import { STOCK_CATALOG, REAL_ARTICLES } from '../../src/data/marketData.js';
+
+export { STOCK_CATALOG, REAL_ARTICLES };
 
 const router = express.Router();
 
@@ -55,27 +58,21 @@ function generateMarketData() {
       { symbol: 'DJI', name: 'Dow Jones Industrial', price: 43910.80, change: -45.20, changePercent: -0.10, category: 'index' },
       { symbol: 'RUT', name: 'Russell 2000', price: 2398.60, change: 18.90, changePercent: 0.79, category: 'index' },
     ],
-    stocks: [
-      { symbol: 'AAPL', name: 'Apple Inc.', price: 227.48, change: 1.85, changePercent: 0.82, volume: '48.2M', pe: 34.2 },
-      { symbol: 'MSFT', name: 'Microsoft Corp.', price: 422.50, change: 3.10, changePercent: 0.74, volume: '21.5M', pe: 35.8 },
-      { symbol: 'NVDA', name: 'NVIDIA Corp.', price: 147.60, change: 4.25, changePercent: 2.96, volume: '95.1M', pe: 58.4 },
-      { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 181.30, change: -0.90, changePercent: -0.49, volume: '23.8M', pe: 24.1 },
-      { symbol: 'AMZN', name: 'Amazon.com Inc.', price: 208.20, change: 2.45, changePercent: 1.19, volume: '38.4M', pe: 43.6 },
-      { symbol: 'TSLA', name: 'Tesla Inc.', price: 321.22, change: 12.80, changePercent: 4.15, volume: '88.7M', pe: 89.2 },
-    ],
+    // Top featured equities for quick overview
+    stocks: STOCK_CATALOG.slice(0, 12),
     rates: [
-      { id: 'fed-funds', name: 'Fed Funds Target Rate', rate: 4.75, change: -0.25, type: 'Central Bank', description: 'Federal Reserve benchmark lending rate' },
-      { id: 'mortgage-30', name: '30-Yr Fixed Mortgage', rate: 6.78, change: 0.04, type: 'Consumer Lending', description: 'National average for conforming 30-year mortgages' },
-      { id: 'mortgage-15', name: '15-Yr Fixed Mortgage', rate: 5.99, change: -0.02, type: 'Consumer Lending', description: 'National average for 15-year fixed home loans' },
-      { id: 'treasury-10', name: '10-Year US Treasury Yield', rate: 4.31, change: 0.03, type: 'Sovereign Debt', description: 'Benchmark yield for long-term borrowing costs' },
-      { id: 'treasury-2', name: '2-Year US Treasury Yield', rate: 4.25, change: -0.01, type: 'Sovereign Debt', description: 'Leading indicator for near-term Fed policy expectations' },
-      { id: 'hysa-avg', name: 'High-Yield Savings APY', rate: 4.60, change: 0.00, type: 'Deposits', description: 'Top competitive online savings accounts return' },
+      { id: 'fed-funds', name: 'Fed Funds Target Rate', rate: 4.75, change: -0.25, type: 'Central Bank', description: 'Federal Reserve benchmark rate influencing all borrowing costs.' },
+      { id: 'mortgage-30', name: '30-Yr Fixed Mortgage', rate: 6.78, change: 0.04, type: 'Consumer Lending', description: 'National average for standard conforming home loans.' },
+      { id: 'mortgage-15', name: '15-Yr Fixed Mortgage', rate: 5.99, change: -0.02, type: 'Consumer Lending', description: 'Lower interest option for aggressive home equity building.' },
+      { id: 'treasury-10', name: '10-Year US Treasury Yield', rate: 4.31, change: 0.03, type: 'Sovereign Debt', description: 'The global benchmark for long-term bond yields and mortgages.' },
+      { id: 'treasury-2', name: '2-Year US Treasury Yield', rate: 4.25, change: -0.01, type: 'Sovereign Debt', description: 'Leading indicator for near-term Fed policy expectations.' },
+      { id: 'hysa-avg', name: 'High-Yield Savings APY', rate: 4.60, change: 0.00, type: 'Cash Reserves', description: 'Top competitive online savings accounts return.' },
     ],
     economicIndicators: [
-      { name: 'CPI Inflation (YoY)', value: '2.6%', trend: 'cooling', period: 'Latest Release', impact: 'Moderate' },
-      { name: 'Core PCE Price Index', value: '2.7%', trend: 'neutral', period: 'Monthly Report', impact: 'High (Fed target 2.0%)' },
-      { name: 'US Unemployment Rate', value: '4.1%', trend: 'stable', period: 'Bureau of Labor Statistics', impact: 'Healthy labor market' },
-      { name: 'Real GDP Growth (QoQ)', value: '2.8%', trend: 'strong', period: 'Bureau of Economic Analysis', impact: 'Resilient economic expansion' },
+      { name: 'CPI Inflation (YoY)', value: '2.6%', trend: 'cooling', period: 'Latest Release', impact: 'Moderate headline price growth' },
+      { name: 'Core PCE Price Index', value: '2.7%', trend: 'neutral', period: 'Fed Preferred Gauge', impact: 'Fed 2.0% target in focus' },
+      { name: 'US Unemployment Rate', value: '4.1%', trend: 'stable', period: 'Bureau of Labor Statistics', impact: 'Historically healthy employment' },
+      { name: 'Real GDP Growth (QoQ)', value: '2.8%', trend: 'strong', period: 'Bureau of Economic Analysis', impact: 'Sustained domestic economic activity' },
     ],
     commoditiesAndCrypto: [
       { symbol: 'BTC', name: 'Bitcoin', price: 79240.00, change: 2850.00, changePercent: 3.73, category: 'crypto' },
@@ -83,44 +80,7 @@ function generateMarketData() {
       { symbol: 'GOLD', name: 'Gold (Oz)', price: 2684.20, change: -8.40, changePercent: -0.31, category: 'commodity' },
       { symbol: 'OIL', name: 'Crude Oil (WTI)', price: 70.35, change: 0.45, changePercent: 0.64, category: 'commodity' },
     ],
-    newsDigest: [
-      {
-        id: 'news-1',
-        title: 'Federal Reserve Signals Measured Pace for Rate Cuts as Labor Market Holds Firm',
-        source: 'Financial Intelligence Feed',
-        time: '2 hours ago',
-        category: 'Monetary Policy',
-        summary: 'Fed officials emphasized a data-dependent, gradual approach to further rate cuts following their recent 25 basis point reduction, keeping borrowing costs moderately restrictive.',
-        budgetImpact: 'High-yield savings accounts remain attractive at ~4.5% APY, while mortgage and auto loan rates are expected to decline slowly rather than rapidly.',
-      },
-      {
-        id: 'news-2',
-        title: 'Consumer Price Index Reflects Easing Shelter Costs and Stable Energy Prices',
-        source: 'Bureau of Labor Statistics / Economic Analysis',
-        time: '4 hours ago',
-        category: 'Inflation & Costs',
-        summary: 'Headline inflation registered at 2.6% year-over-year, supported by moderation in rental inflation and energy prices, though services inflation remains sticky.',
-        budgetImpact: 'Grocery and everyday utility pressures are stabilizing; households can keep inflation adjustments to food envelopes around 2.5–3.0%.',
-      },
-      {
-        id: 'news-3',
-        title: 'Treasury Yields Stabilize Around 4.30% Following Treasury Refunding Announcements',
-        source: 'Bond Market Digest',
-        time: '6 hours ago',
-        category: 'Fixed Income',
-        summary: 'The 10-year Treasury yield hovered near 4.31% as investors balanced resilient economic growth expectations against federal deficit supply projections.',
-        budgetImpact: 'Fixed-income yields remain historically attractive for conservative cash buffers and short-term certificate of deposit ladders.',
-      },
-      {
-        id: 'news-4',
-        title: 'Tech Earnings Show Sustained Cloud and AI Capital Expenditure Growth',
-        source: 'Equity Research Review',
-        time: '8 hours ago',
-        category: 'Stock Markets',
-        summary: 'Major technology enterprises reported steady revenue gains with heightened capital spending in computing infrastructure, supporting broad equity index gains.',
-        budgetImpact: 'Long-term retirement allocations (401k/IRA envelopes) benefit from broad index resilience, reinforcing steady dollar-cost averaging.',
-      },
-    ],
+    newsDigest: REAL_ARTICLES,
     budgetAdviceHighlights: [
       {
         title: 'Optimize Liquid Cash in HYSA',
@@ -143,7 +103,7 @@ function generateMarketData() {
 
 /**
  * GET /api/markets/overview
- * Returns unified market metrics, rates, economic data, and news digest
+ * Returns unified market metrics, rates, economic data, and real articles
  */
 router.get('/overview', marketsLimiter, (req, res) => {
   const now = Date.now();
@@ -155,6 +115,75 @@ router.get('/overview', marketsLimiter, (req, res) => {
   cachedOverview = data;
   lastFetchTime = now;
   return res.json(data);
+});
+
+/**
+ * GET /api/markets/catalog
+ * Returns the full searchable 100+ stock and ETF universe with optional sector filter
+ */
+router.get('/catalog', marketsLimiter, (req, res) => {
+  const { sector = 'all', limit = 100, page = 1 } = req.query;
+
+  let filtered = STOCK_CATALOG;
+  if (sector && sector.toLowerCase() !== 'all') {
+    filtered = filtered.filter(s => s.sector.toLowerCase() === sector.toLowerCase());
+  }
+
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const pageSize = Math.min(200, Math.max(1, parseInt(limit, 10) || 100));
+  const startIdx = (pageNum - 1) * pageSize;
+  const paginated = filtered.slice(startIdx, startIdx + pageSize);
+
+  return res.json({
+    total: filtered.length,
+    page: pageNum,
+    pageSize,
+    sector,
+    stocks: paginated,
+  });
+});
+
+/**
+ * GET /api/markets/search
+ * Fast typeahead search across stock symbols and company names
+ */
+router.get('/search', marketsLimiter, (req, res) => {
+  const query = (req.query.q || '').trim().toLowerCase();
+  if (!query) {
+    return res.json({ results: STOCK_CATALOG.slice(0, 15) });
+  }
+
+  const matches = STOCK_CATALOG.filter(stock => {
+    return (
+      stock.symbol.toLowerCase().includes(query) ||
+      stock.name.toLowerCase().includes(query) ||
+      stock.sector.toLowerCase().includes(query)
+    );
+  });
+
+  // Sort exact symbol starts first
+  matches.sort((a, b) => {
+    const aSym = a.symbol.toLowerCase();
+    const bSym = b.symbol.toLowerCase();
+    if (aSym === query) return -1;
+    if (bSym === query) return 1;
+    if (aSym.startsWith(query) && !bSym.startsWith(query)) return -1;
+    if (!aSym.startsWith(query) && bSym.startsWith(query)) return 1;
+    return 0;
+  });
+
+  return res.json({ results: matches.slice(0, 20) });
+});
+
+/**
+ * GET /api/markets/news
+ * Returns curated real financial journalism articles
+ */
+router.get('/news', marketsLimiter, (req, res) => {
+  return res.json({
+    articles: REAL_ARTICLES,
+    total: REAL_ARTICLES.length,
+  });
 });
 
 /**

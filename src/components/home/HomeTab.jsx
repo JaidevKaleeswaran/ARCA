@@ -2,9 +2,10 @@ import React from 'react';
 import IncomeSettings from './IncomeSettings';
 import CategoryGrid from './CategoryGrid';
 import LeftToBudgetBanner from './LeftToBudgetBanner';
+import StocksWidget from '../widgets/StocksWidget';
 import Reveal from '../ui/Reveal';
 
-export default function HomeTab() {
+export default function HomeTab({ onNavigateToMarkets }) {
   return (
     <div className="flex flex-col">
       {/* Banner fades in first */}
@@ -13,10 +14,16 @@ export default function HomeTab() {
       </Reveal>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-0">
-        {/* Left column: Income settings stagger slightly after banner */}
-        <Reveal delay={0.1} y={28} as="div" className="lg:col-span-1">
-          <IncomeSettings />
-        </Reveal>
+        {/* Left column: Income settings and Stocks Widget */}
+        <div className="lg:col-span-1 space-y-6">
+          <Reveal delay={0.1} y={28}>
+            <IncomeSettings />
+          </Reveal>
+
+          <Reveal delay={0.15} y={28}>
+            <StocksWidget onNavigateToMarkets={onNavigateToMarkets} />
+          </Reveal>
+        </div>
 
         {/* Right column: Category grid stagger last */}
         <Reveal delay={0.2} y={28} as="div" className="lg:col-span-2">

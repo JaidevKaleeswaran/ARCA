@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Security: Block any attempts to probe .env, .git, package.json, or traverse directories
 app.use(blockSensitivePaths);

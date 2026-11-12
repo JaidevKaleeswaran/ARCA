@@ -84,9 +84,21 @@ SUMMARY:
 • Total Spent (current cycle): $${snapshot?.summary?.totalSpent ?? 0}
 • Total Budget Allocated: $${snapshot?.summary?.totalAllocated ?? 0}
 • Left to Budget: $${snapshot?.summary?.leftToBudget ?? 0}
-• Net Balance: $${snapshot?.summary?.netBalance ?? 0}
+• Net Cash Flow: $${snapshot?.summary?.netBalance ?? 0}
+• Estimated Total Net Worth (Cash Flow + Stocks): $${snapshot?.summary?.netWorth ?? snapshot?.netWorth ?? 0}
 • Total Transactions: ${snapshot?.summary?.transactionCount ?? 0}
 • Budget Cycle: ${snapshot?.summary?.cycleFrequency ?? 'Monthly'}
+
+STOCK PORTFOLIO & INVESTMENTS:
+• Total Stock Value: $${snapshot?.portfolio?.totalValue ?? 0}
+• Total Invested (Cost Basis): $${snapshot?.portfolio?.totalInvested ?? 0}
+• Total Return: $${snapshot?.portfolio?.totalGain ?? 0} (${snapshot?.portfolio?.totalGainPercent ?? 0}%)
+• Holdings Count: ${snapshot?.portfolio?.holdingsCount ?? (snapshot?.portfolio?.holdings || []).length}
+${(snapshot?.portfolio?.holdings || []).length > 0
+    ? (snapshot?.portfolio?.holdings || []).map(h =>
+      `  - ${h.symbol} (${h.name}): ${h.shares} shares @ $${h.currentPrice} | Value: $${h.currentValue} | P/L: $${h.gain} (${h.gainPercent}%)`
+    ).join('\n')
+    : '  - No stock investments added yet'}
 
 INCOME SOURCES:
 ${(snapshot?.incomeSources || []).length > 0
