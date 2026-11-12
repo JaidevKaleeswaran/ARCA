@@ -11,6 +11,7 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   sendEmailVerification,
+  sendPasswordResetEmail,
   updateProfile
 } from 'firebase/auth';
 
@@ -23,12 +24,26 @@ function formatAuthError(error) {
   if (!error) return new Error('Authentication failed. Please try again.');
   
   switch (error.code) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return new Error('Incorrect email or password. If you originally registered with Google, please click "Continue with Google", or use "Forgot password?" to reset it.');
+    case 'auth/email-already-in-use':
+      return new Error('An account with this email already exists. Please sign in or use Google sign-in.');
+    case 'auth/weak-password':
+      return new Error('Password should be at least 6 characters long.');
+    case 'auth/invalid-email':
+      return new Error('Please enter a valid email address.');
+    case 'auth/user-disabled':
+      return new Error('This account has been disabled. Please contact support.');
+    case 'auth/missing-password':
+      return new Error('Please enter your password.');
     case 'auth/unauthorized-continue-uri':
       return new Error(`The domain (${window.location.origin}) is not allowlisted as a return URL in Firebase Console. Please add it to Firebase Console -> Authentication -> Settings -> Authorized domains.`);
     case 'auth/operation-not-allowed':
-      return new Error('Google Sign-in is not enabled in your Firebase Console project. Please enable Google Auth under Firebase Console -> Authentication -> Sign-in method.');
+      return new Error('Sign-in method is not enabled in your Firebase Console project. Please check Firebase Console -> Authentication -> Sign-in method.');
     case 'auth/unauthorized-domain':
-      return new Error(`This domain (${window.location.hostname}) is not authorized for Google Sign-in. Please add it to Firebase Console -> Authentication -> Settings -> Authorized domains.`);
+      return new Error(`This domain (${window.location.hostname}) is not authorized for Firebase Auth. Please add it to Firebase Console -> Authentication -> Settings -> Authorized domains.`);
     case 'auth/popup-blocked':
       return new Error('Sign-in popup was blocked by your browser. Please allow popups or try again.');
     case 'auth/popup-closed-by-user':
@@ -36,12 +51,12 @@ function formatAuthError(error) {
     case 'auth/cancelled-popup-request':
       return new Error('Sign-in request was cancelled. Please try again.');
     case 'auth/network-request-failed':
-      return new Error('Network error during Google Sign-in. Please check your internet connection.');
+      return new Error('Network error during authentication. Please check your internet connection.');
     case 'auth/too-many-requests':
-      return new Error('Too many requests. Please wait a moment before trying again.');
+      return new Error('Too many failed attempts. Please wait a moment or reset your password.');
     case 'auth/invalid-api-key':
     case 'auth/api-key-not-valid-please-pass-a-valid-api-key':
-      return new Error('Invalid Firebase API Key. Please check your .env.local configuration.');
+      return new Error('Invalid Firebase API Key. Please check your environment configuration.');
     default:
       return new Error(error.message || 'Authentication failed. Please try again.');
   }
@@ -149,24 +164,11 @@ export function AuthProvider({ children }) {
 
   const loginWithEmail = async (email, password) => {
     if (auth) {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-
-      // Strict Activation Check: Block user if email is not verified
-      if (!cred.user.emailVerified) {
-        // Attempt to resend activation link if unverified
-        try {
-          await safeSendEmailVerification(cred.user);
-        } catch (e) {
-          console.error('Could not auto-resend verification email', e);
-        }
-
-        await firebaseSignOut(auth);
-        setUser(null);
-        localStorage.removeItem(STORAGE_KEY);
-
-        const unverifiedError = new Error('Your account is not activated yet! We have sent an activation link to your email. Please click the link in your email to activate your account before logging in.');
-        unverifiedError.code = 'auth/email-not-verified';
-        throw unverifiedError;
+      let cred;
+      try {
+        cred = await signInWithEmailAndPassword(auth, email, password);
+      } catch (err) {
+        throw formatAuthError(err);
       }
 
       const userData = {
@@ -174,9 +176,10 @@ export function AuthProvider({ children }) {
         email: cred.user.email,
         displayName: cred.user.displayName || cred.user.email.split('@')[0],
         photoURL: cred.user.photoURL || null,
-        emailVerified: true,
+        emailVerified: cred.user.emailVerified,
         isGuest: false,
       };
+
       setUser(userData);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
       return userData;
@@ -192,6 +195,38 @@ export function AuthProvider({ children }) {
       setUser(userData);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
       return userData;
+    }
+  };
+
+  const resetPassword = async (email) => {
+    if (!email || !email.trim()) {
+      throw new Error('Please enter your email address to reset your password.');
+    }
+    const cleanEmail = email.trim();
+    if (auth) {
+      try {
+        const actionCodeSettings = {
+          url: window.location.origin,
+          handleCodeInApp: true,
+        };
+        await sendPasswordResetEmail(auth, cleanEmail, actionCodeSettings);
+        return { success: true };
+      } catch (err) {
+        if (
+          err.code === 'auth/unauthorized-continue-uri' ||
+          err.code === 'auth/invalid-continue-uri' ||
+          err.message?.includes('unauthorized-continue-uri')
+        ) {
+          // Fall back to default Firebase reset URL
+          await sendPasswordResetEmail(auth, cleanEmail);
+          return { success: true };
+        } else {
+          throw formatAuthError(err);
+        }
+      }
+    } else {
+      // In offline/guest simulation mode
+      return { success: true, simulated: true };
     }
   };
 
@@ -381,6 +416,7 @@ export function AuthProvider({ children }) {
         signupWithEmail,
         loginWithGoogle,
         loginAsGuest,
+        resetPassword,
         resendVerificationEmail,
         refreshUserStatus,
         logout,

@@ -68,10 +68,11 @@ function MainApp() {
                 <button
                   type="button"
                   onClick={() => startTutorial(activeTab, true)}
-                  title="Page Tutorial & Guide"
-                  className="p-1.5 sm:p-2 text-zinc-400 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors border border-transparent hover:border-accent/20 shrink-0"
+                  title="Start Interactive Page Tutorial"
+                  className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-accent bg-accent/15 hover:bg-accent/25 border border-accent/40 hover:border-accent rounded-full transition-all shadow-sm shrink-0 cursor-pointer"
                 >
-                  <HelpCircle size={16} />
+                  <HelpCircle size={15} className="text-accent shrink-0" />
+                  <span className="font-semibold text-[11px] sm:text-xs">Tutorial ?</span>
                 </button>
 
                 <button
@@ -96,6 +97,17 @@ function MainApp() {
                 {activeTab === 'transactions' && <TransactionsTab />}
               </div>
             </main>
+
+            {/* Floating Tutorial quick launcher always visible regardless of scroll depth */}
+            <button
+              type="button"
+              onClick={() => startTutorial(activeTab, true)}
+              title="Start interactive tutorial for this page"
+              className="fixed bottom-5 right-5 z-40 bg-[#1e1c18]/95 hover:bg-[#2b2721] border border-accent/40 hover:border-accent text-accent font-semibold text-xs px-3.5 py-2 rounded-full shadow-2xl flex items-center gap-2 transition-all hover:scale-105 backdrop-blur-md cursor-pointer group"
+            >
+              <HelpCircle size={16} className="text-accent group-hover:rotate-12 transition-transform shrink-0" />
+              <span>Tutorial ?</span>
+            </button>
           </>
         )}
       </div>

@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card } from '../ui/Card';
 import toast from 'react-hot-toast';
-import { MailCheck, RefreshCw, LogOut, CheckCircle2 } from 'lucide-react';
+import { MailCheck, RefreshCw, LogOut, CheckCircle2, HelpCircle } from 'lucide-react';
 
 export default function VerifyEmailPage() {
-  const { user, resendVerificationEmail, refreshUserStatus, logout } = useAuth();
+  const { user, resendVerificationEmail, refreshUserStatus, logout, loginAsGuest } = useAuth();
   const [checking, setChecking] = useState(false);
   const [resending, setResending] = useState(false);
 
@@ -100,6 +100,18 @@ export default function VerifyEmailPage() {
               className="w-full bg-[#09090b] hover:bg-zinc-900 border border-zinc-800 text-zinc-300 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center space-x-2 text-xs"
             >
               <span>{resending ? 'Sending...' : 'Resend Activation Email'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                loginAsGuest();
+                toast.success('Switched to Guest mode! Welcome to ARCA.');
+              }}
+              className="w-full bg-[#1c1a17] hover:bg-[#26231f] border border-accent/40 text-accent font-semibold py-2.5 rounded-lg transition-all flex items-center justify-center space-x-2 text-xs shadow-sm cursor-pointer"
+            >
+              <HelpCircle size={15} className="text-accent" />
+              <span>Explore as Guest & Launch Tutorial →</span>
             </button>
 
             <button
