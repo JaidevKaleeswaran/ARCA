@@ -1,7 +1,17 @@
-import React, { createContext, useReducer, useContext, useEffect } from 'react';
+import React, { createContext, useReducer, useContext, useEffect, useRef, useState } from 'react';
 import { normalizeToMasterCycle, getCycleWindow, isWithinCycle } from '../utils/cycleUtils';
 import { useAuth } from './AuthContext';
 import { env } from '../config/env';
+import { db } from '../config/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import {
+  QUOTA_LIMITS,
+  getMondayOfCurrentWeekISO,
+  getNextMondayCountdown,
+  normalizeQuotaState,
+  checkAndIncrementQuota,
+} from '../utils/quotaManager';
+import StackedProModal from '../components/ui/StackedProModal';
 
 const STORAGE_KEY = 'arca_budget_state';
 const LEGACY_STORAGE_KEY = 'stacked_budget_state';
@@ -20,6 +30,13 @@ const defaultState = {
   investments: [], // User stock portfolio holdings
   voiceLogs: [],
   chatMessages: [],
+  quotaUsage: {
+    weekStartDate: getMondayOfCurrentWeekISO(),
+    receiptsUsed: 0,
+    voiceUsed: 0,
+    assistantUsed: 0,
+  },
+  updatedAt: new Date().toISOString(),
 };
 
 // Helper to eliminate duplicate categories by name & preserve transaction links
@@ -80,6 +97,8 @@ function sanitizeState(state) {
     transactions: cleanedTransactions,
     investments: Array.isArray(state.investments) ? state.investments : [],
     chatMessages: cleanedMessages,
+    quotaUsage: normalizeQuotaState(state?.quotaUsage),
+    updatedAt: state?.updatedAt || new Date().toISOString(),
   };
 }
 
@@ -110,7 +129,7 @@ const getInitialState = () => {
 
 const BudgetContext = createContext();
 
-function budgetReducer(state, action) {
+function internalBudgetReducer(state, action) {
   switch (action.type) {
     case 'ADD_INCOME_SOURCE':
       return { ...state, incomeSources: [...state.incomeSources, action.payload] };
@@ -423,7 +442,18 @@ function budgetReducer(state, action) {
         investments: Array.from(invMap.values()),
         voiceLogs: Array.from(logMap.values()),
         chatMessages: Array.from(msgMap.values()),
+        quotaUsage: normalizeQuotaState(incoming.quotaUsage || state.quotaUsage),
       });
+    }
+    case 'UPDATE_QUOTA_USAGE': {
+      const currentQuota = normalizeQuotaState(state.quotaUsage);
+      return {
+        ...state,
+        quotaUsage: {
+          ...currentQuota,
+          ...action.payload,
+        },
+      };
     }
     case 'RESET_STATE':
       return sanitizeState(defaultState);
@@ -433,33 +463,192 @@ function budgetReducer(state, action) {
   }
 }
 
+function budgetReducer(state, action) {
+  const nextState = internalBudgetReducer(state, action);
+  if (nextState !== state && action.type !== 'SET_FULL_STATE') {
+    return {
+      ...nextState,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+  return nextState;
+}
+
 export function BudgetProvider({ children }) {
   const [state, dispatch] = useReducer(budgetReducer, null, getInitialState);
   const { user } = useAuth();
+  const isCloudLoadedRef = useRef(false);
+  const saveTimeoutRef = useRef(null);
 
-  // Load user-specific cached budget state from localStorage when active user logs in
+  // Stacked Pro Modal state
+  const [proModalConfig, setProModalConfig] = useState({
+    isOpen: false,
+    reason: 'QUOTA_EXHAUSTED',
+    feature: 'receipts',
+    used: 18,
+    limit: 18,
+    resetCountdown: getNextMondayCountdown(),
+  });
+
+  const openProModal = (config = {}) => {
+    const feat = config.feature || 'receipts';
+    setProModalConfig({
+      isOpen: true,
+      reason: config.reason || 'QUOTA_EXHAUSTED',
+      feature: feat,
+      used: config.used ?? (state.quotaUsage?.[`${feat}Used`] ?? QUOTA_LIMITS[feat] ?? 18),
+      limit: config.limit ?? (QUOTA_LIMITS[feat] ?? 18),
+      resetCountdown: config.resetCountdown || getNextMondayCountdown(),
+    });
+  };
+
+  const closeProModal = () => {
+    setProModalConfig(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const updateQuota = async (feature, skipIncrement = false) => {
+    const result = await checkAndIncrementQuota(user?.uid, feature, state.quotaUsage, { skipIncrement });
+    if (!skipIncrement && result.allowed) {
+      dispatch({
+        type: 'UPDATE_QUOTA_USAGE',
+        payload: {
+          [`${feature}Used`]: result.used,
+          weekStartDate: getMondayOfCurrentWeekISO(),
+        },
+      });
+    }
+    return result;
+  };
+
+  // Load user-specific budget state: localStorage first, then Cloud Firestore source-of-truth
   useEffect(() => {
+    isCloudLoadedRef.current = false;
+    let isCancelled = false;
+
     if (user && user.uid && !user.isGuest) {
+      const userStorageKey = `arca_budget_state_${user.uid}`;
+
+      // 1. Instant local cache load
+      let localState = null;
       try {
-        const userStorageKey = `arca_budget_state_${user.uid}`;
         const saved = localStorage.getItem(userStorageKey);
         if (saved) {
-          const parsed = JSON.parse(saved);
-          dispatch({ type: 'SET_FULL_STATE', payload: parsed });
+          localState = JSON.parse(saved);
+          dispatch({ type: 'SET_FULL_STATE', payload: localState });
         }
       } catch (e) {
         console.warn('Failed to load user state from localStorage:', e);
       }
+
+      // 2. Cloud Firestore synchronization (cross-device & persistent)
+      const fetchFromFirestore = async () => {
+        if (!db) {
+          isCloudLoadedRef.current = true;
+          return;
+        }
+        try {
+          const docRef = doc(db, 'users', user.uid, 'budgetData', 'main');
+          const docSnap = await getDoc(docRef);
+
+          if (isCancelled) return;
+
+          if (docSnap.exists()) {
+            const cloudData = docSnap.data();
+            const localUpdatedAt = localState?.updatedAt ? new Date(localState.updatedAt).getTime() : 0;
+            const cloudUpdatedAt = cloudData?.updatedAt ? new Date(cloudData.updatedAt).getTime() : 0;
+
+            // Preserve unflushed local edits if local is strictly newer, while syncing authoritative quotaUsage
+            const baseData = (localUpdatedAt > cloudUpdatedAt && localState)
+              ? { ...localState, quotaUsage: cloudData.quotaUsage || localState.quotaUsage }
+              : { ...cloudData, quotaUsage: cloudData.quotaUsage };
+
+            const merged = sanitizeState({
+              ...defaultState,
+              ...baseData,
+              categories: baseData.categories && baseData.categories.length > 0
+                ? baseData.categories
+                : defaultState.categories,
+            });
+
+            dispatch({ type: 'SET_FULL_STATE', payload: merged });
+            localStorage.setItem(userStorageKey, JSON.stringify(merged));
+            localStorage.setItem('arca_last_active_user', user.uid);
+          } else {
+            // First-time cloud user: seed their initial document to Firestore
+            const initialDoc = {
+              transactions: state.transactions || [],
+              categories: state.categories || defaultState.categories,
+              incomeSources: state.incomeSources || [],
+              investments: state.investments || [],
+              cycleStartDate: state.cycleStartDate || null,
+              cycleFrequency: state.cycleFrequency || 'monthly',
+              voiceLogs: state.voiceLogs || [],
+              chatMessages: state.chatMessages || [],
+              quotaUsage: normalizeQuotaState(state.quotaUsage),
+              uid: user.uid,
+              userId: user.uid,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            await setDoc(docRef, initialDoc, { merge: true });
+          }
+        } catch (cloudErr) {
+          console.warn('[Firestore] Cloud sync error:', cloudErr);
+        } finally {
+          if (!isCancelled) {
+            isCloudLoadedRef.current = true;
+          }
+        }
+      };
+
+      fetchFromFirestore();
+
+      return () => {
+        isCancelled = true;
+      };
+    } else {
+      isCloudLoadedRef.current = true;
     }
   }, [user?.uid]);
 
-  // Sync state to localStorage on changes
+  // Sync state to localStorage immediately and debounce sync to Cloud Firestore
   useEffect(() => {
     try {
       if (user && user.uid && !user.isGuest) {
         const userStorageKey = `arca_budget_state_${user.uid}`;
         localStorage.setItem(userStorageKey, JSON.stringify(state));
         localStorage.setItem('arca_last_active_user', user.uid);
+
+        // Debounced Firestore Cloud Save (1.2s delay to avoid excessive write operations)
+        if (db && isCloudLoadedRef.current) {
+          if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+          }
+          saveTimeoutRef.current = setTimeout(async () => {
+            try {
+              const docRef = doc(db, 'users', user.uid, 'budgetData', 'main');
+              await setDoc(
+                docRef,
+                {
+                  transactions: state.transactions || [],
+                  categories: state.categories || [],
+                  incomeSources: state.incomeSources || [],
+                  investments: state.investments || [],
+                  cycleStartDate: state.cycleStartDate || null,
+                  cycleFrequency: state.cycleFrequency || 'monthly',
+                  voiceLogs: state.voiceLogs || [],
+                  chatMessages: state.chatMessages || [],
+                  uid: user.uid,
+                  userId: user.uid,
+                  updatedAt: new Date().toISOString(),
+                },
+                { merge: true }
+              );
+            } catch (err) {
+              console.warn('[Firestore] Background auto-save failed:', err);
+            }
+          }, 1200);
+        }
       } else {
         localStorage.setItem('arca_budget_state_guest', JSON.stringify(state));
       }
@@ -467,6 +656,12 @@ export function BudgetProvider({ children }) {
     } catch (e) {
       console.warn('Failed to save budget state to localStorage:', e);
     }
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
   }, [state, user]);
 
   // Continuously refresh user stock holdings with accurate live market prices
@@ -563,10 +758,20 @@ export function BudgetProvider({ children }) {
     portfolioCurrentValue: Number(portfolioCurrentValue.toFixed(2)),
     portfolioTotalGain: Number(portfolioTotalGain.toFixed(2)),
     portfolioTotalGainPercent: Number(portfolioTotalGainPercent.toFixed(2)),
+    quotaUsage: state.quotaUsage,
+    proModalConfig,
+    openProModal,
+    closeProModal,
+    updateQuota,
   };
 
 
-  return <BudgetContext.Provider value={value}>{children}</BudgetContext.Provider>;
+  return (
+    <BudgetContext.Provider value={value}>
+      {children}
+      <StackedProModal />
+    </BudgetContext.Provider>
+  );
 }
 
 export function useBudget() {

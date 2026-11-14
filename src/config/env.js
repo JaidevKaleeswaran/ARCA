@@ -6,31 +6,35 @@
  * `import { env } from '../config/env';`
  */
 
+const metaEnv = (typeof import.meta !== 'undefined' && import.meta.env)
+  ? import.meta.env
+  : (typeof process !== 'undefined' && process.env ? process.env : {});
+
 export const env = {
   // Firebase Configuration (Public client identifiers)
   firebase: {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-    appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
-    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || '',
+    apiKey: metaEnv.VITE_FIREBASE_API_KEY || '',
+    authDomain: metaEnv.VITE_FIREBASE_AUTH_DOMAIN || '',
+    projectId: metaEnv.VITE_FIREBASE_PROJECT_ID || '',
+    storageBucket: metaEnv.VITE_FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: metaEnv.VITE_FIREBASE_APP_ID || '',
+    measurementId: metaEnv.VITE_FIREBASE_MEASUREMENT_ID || '',
   },
 
   // ElevenLabs Voice Widget Configuration (Public Agent ID only)
   elevenLabs: {
-    agentId: import.meta.env.VITE_ELEVENLABS_AGENT_ID || '',
+    agentId: metaEnv.VITE_ELEVENLABS_AGENT_ID || '',
   },
 
   // AWS Infrastructure Endpoints (Public API Gateway)
   aws: {
-    httpEndpoint: import.meta.env.VITE_AWS_HTTP_ENDPOINT || '',
-    wsEndpoint: import.meta.env.VITE_AWS_WS_ENDPOINT || '',
+    httpEndpoint: metaEnv.VITE_AWS_HTTP_ENDPOINT || '',
+    wsEndpoint: metaEnv.VITE_AWS_WS_ENDPOINT || '',
   },
 
   // Backend API Base URL (empty string = relative /api for local proxy or Vercel)
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || '',
+  apiBaseUrl: metaEnv.VITE_API_BASE_URL || '',
 };
 
 export default env;

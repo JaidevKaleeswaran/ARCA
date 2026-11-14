@@ -4,6 +4,7 @@ import { GoogleGenAI } from '@google/genai';
 import { createRateLimiter } from '../middleware/security.js';
 import { sanitizeError } from '../utils/sanitize.js';
 import { STOCK_CATALOG, REAL_ARTICLES } from '../../src/data/marketData.js';
+import { getMacroRates } from '../services/macroRates.js';
 
 export { STOCK_CATALOG };
 
@@ -33,9 +34,16 @@ const OVERVIEW_CACHE_TTL = 30 * 1000; // 30 seconds cache to stay real-time
 const newsCache = new Map();
 const NEWS_CACHE_TTL = 2 * 60 * 1000; // 2 minutes news cache per topic
 
+// Screener backfill cache for deeper catalog pages
+let cachedScreenerStocks = null;
+let lastScreenerFetchTime = 0;
+const SCREENER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 // ── Helper formatters ──
 function formatCap(cap) {
-  if (!cap || typeof cap !== 'number') return 'N/A';
+  if (!cap) return null;
+  if (typeof cap === 'string') return cap;
+  if (typeof cap !== 'number' || isNaN(cap)) return null;
   if (cap >= 1e12) return `$${(cap / 1e12).toFixed(2)}T`;
   if (cap >= 1e9) return `$${(cap / 1e9).toFixed(1)}B`;
   if (cap >= 1e6) return `$${(cap / 1e6).toFixed(1)}M`;
@@ -46,12 +54,50 @@ function formatVol(vol) {
   if (!vol || typeof vol !== 'number') return 'N/A';
   if (vol >= 1e6) return `${(vol / 1e6).toFixed(1)}M`;
   if (vol >= 1e3) return `${(vol / 1e3).toFixed(1)}K`;
-  return `${vol.toLocaleString()}`;
+  return vol.toLocaleString();
+}
+
+function normalizeTickerDisplay(symbol) {
+  if (!symbol || typeof symbol !== 'string') return '';
+  return symbol.toUpperCase().trim().replace(/-(A|B)$/, '.$1');
+}
+
+function toYahooSymbol(symbol) {
+  if (!symbol || typeof symbol !== 'string') return '';
+  return symbol.toUpperCase().trim().replace(/\.(A|B)$/, '-$1');
 }
 
 function getSectorForSymbol(symbol) {
-  const found = STOCK_CATALOG.find(s => s.symbol.toUpperCase() === symbol.toUpperCase());
+  const norm = normalizeTickerDisplay(symbol);
+  const found = STOCK_CATALOG.find(s => s.symbol.toUpperCase() === norm);
   return found ? found.sector : 'Equities';
+}
+
+function isDomesticUsTicker(symbol) {
+  if (!symbol || typeof symbol !== 'string') return false;
+  const s = symbol.toUpperCase().trim();
+  // Domestic dual-share classes like BRK.A, BRK.B, BF.A, BF.B, HEI.A
+  if (/^[A-Z]{1,4}[\.\-][AB]$/.test(s)) return true;
+  // Exclude foreign ticker extensions (.TO, .DE, .MX, .NE, .L, .AX, etc.)
+  if (s.includes('.')) return false;
+  // Exclude futures, currency pairs, or indices
+  if (s.includes('=') || s.includes('-') || s.startsWith('^')) return false;
+  return /^[A-Z]{1,5}$/.test(s);
+}
+
+function isLeveragedOrInverse(item, query = '') {
+  const qLower = query.toLowerCase();
+  const isExplicitSearch = /(2x|3x|inverse|ultra|short|bear|yield shares|tslz|nvdx|ptir|sqqq|tqqq|soxl|soxs|spxu|upro)/i.test(qLower);
+  if (isExplicitSearch) return false;
+
+  const sym = (item.symbol || '').toUpperCase();
+  const name = (item.shortname || item.longName || item.name || '').toLowerCase();
+
+  const DERIVATIVE_SYMBOLS = new Set(['TSLZ', 'NVDX', 'PTIR', 'SQQQ', 'TQQQ', 'SOXL', 'SOXS', 'SPXU', 'UPRO']);
+  if (DERIVATIVE_SYMBOLS.has(sym)) return true;
+
+  if (/\b(2x|3x|inverse|ultra|daily target|short|bear|yield shares)\b/i.test(name)) return true;
+  return false;
 }
 
 function getMarketStatus() {
@@ -212,7 +258,7 @@ async function fetchRealMarketNews(topic = 'general', page = 1) {
   return REAL_ARTICLES.slice(0, 8);
 }
 
-// ── Fetch Live Overview with 100% Accurate Real-Time Prices for ALL Stocks ──
+// ── Fetch Live Overview with 100% Accurate Real-Time Prices for ALL Stocks & FRED Rates ──
 async function fetchRealMarketOverview() {
   const now = Date.now();
   if (cachedOverview && (now - lastOverviewTime) < OVERVIEW_CACHE_TTL) {
@@ -230,7 +276,13 @@ async function fetchRealMarketOverview() {
   const allSymbols = [...indexSymbols, ...commoditySymbols, ...yieldSymbols, ...catalogSymbols];
 
   try {
-    const rawQuotes = await yf.quote(allSymbols);
+    // Concurrently fetch Yahoo Finance quotes, FRED macro rates, and real news
+    const [rawQuotes, macroData, newsDigest] = await Promise.all([
+      yf.quote(allSymbols),
+      getMacroRates(),
+      fetchRealMarketNews('general', 1),
+    ]);
+
     const quoteMap = new Map();
     (Array.isArray(rawQuotes) ? rawQuotes : [rawQuotes]).forEach((q) => {
       if (q && q.symbol) quoteMap.set(q.symbol, q);
@@ -278,24 +330,9 @@ async function fetchRealMarketOverview() {
       };
     });
 
-    // 3. Format Real Interest Rates & Treasury Yields
-    const tnx = quoteMap.get('^TNX');
-    const irx = quoteMap.get('^IRX');
-    const tenYearYield = tnx?.regularMarketPrice ? Number(tnx.regularMarketPrice.toFixed(2)) : 5.00;
-    const threeMonthYield = irx?.regularMarketPrice ? Number(irx.regularMarketPrice.toFixed(2)) : 4.12;
-
-    const rates = [
-      { id: 'fed-funds', name: 'Fed Funds Target Rate', rate: 4.75, change: 0, type: 'Central Bank', description: 'Federal Reserve benchmark rate influencing all borrowing costs.' },
-      { id: 'treasury-10', name: '10-Year US Treasury Yield', rate: tenYearYield, change: Number((tnx?.regularMarketChange ?? 0).toFixed(2)), type: 'Live Sovereign Debt', description: 'The global benchmark for long-term bond yields and residential mortgages.' },
-      { id: 'treasury-3m', name: '3-Month US Treasury Bill', rate: threeMonthYield, change: Number((irx?.regularMarketChange ?? 0).toFixed(2)), type: 'Live Sovereign Debt', description: 'Leading gauge for short-term risk-free cash yields.' },
-      { id: 'mortgage-30', name: '30-Yr Fixed Mortgage', rate: Number((tenYearYield + 2.45).toFixed(2)), change: 0.02, type: 'Consumer Lending', description: 'Conforming 30-year residential home loan benchmark.' },
-      { id: 'hysa-avg', name: 'Top High-Yield Savings APY', rate: 4.60, change: 0.00, type: 'Cash Reserves', description: 'Top competitive online savings accounts return.' },
-      { id: 'credit-card-avg', name: 'Average Credit Card APR', rate: 21.40, change: 0.10, type: 'Consumer Lending', description: 'National average APR on revolving credit lines.' },
-    ];
-
-    // 4. Format ALL Stocks with Live Yahoo Finance Quotes
+    // 3. Format ALL Stocks with Live Yahoo Finance Quotes & Net Asset Capitalization for ETFs
     const stocks = STOCK_CATALOG.map((item) => {
-      const sym = item.symbol === 'BRK.B' ? 'BRK-B' : item.symbol;
+      const sym = toYahooSymbol(item.symbol);
       const q = quoteMap.get(sym);
       if (!q || !q.regularMarketPrice) {
         return item;
@@ -309,45 +346,22 @@ async function fetchRealMarketOverview() {
         changePercent: Number((q.regularMarketChangePercent ?? 0).toFixed(2)),
         volume: formatVol(q.regularMarketVolume) || item.volume,
         pe: q.trailingPE ? Number(q.trailingPE.toFixed(1)) : item.pe,
-        marketCap: formatCap(q.marketCap) || item.marketCap,
+        marketCap: formatCap(q.marketCap || q.netAssets || q.totalAssets) || item.marketCap || 'N/A',
         high52: q.fiftyTwoWeekHigh ? Number(q.fiftyTwoWeekHigh.toFixed(2)) : item.high52,
         low52: q.fiftyTwoWeekLow ? Number(q.fiftyTwoWeekLow.toFixed(2)) : item.low52,
       };
     });
 
-    // 5. Fetch Real News
-    const newsDigest = await fetchRealMarketNews('general', 1);
-
     const overviewData = {
       marketStatus: status,
       indices,
       stocks,
-      rates,
+      rates: macroData.rates,
       commoditiesAndCrypto,
       newsDigest,
-      economicIndicators: [
-        { name: '10-Yr US Treasury', value: `${tenYearYield}%`, trend: 'live', period: 'Real-Time Yield', impact: 'Mortgage anchor' },
-        { name: '3-Mo US Treasury', value: `${threeMonthYield}%`, trend: 'live', period: 'Real-Time Yield', impact: 'Cash yield benchmark' },
-        { name: 'US Unemployment', value: '4.1%', trend: 'stable', period: 'BLS Latest', impact: 'Healthy labor market' },
-        { name: 'CPI Inflation (YoY)', value: '2.6%', trend: 'cooling', period: 'Latest Release', impact: 'Target 2.0% in view' },
-      ],
-      budgetAdviceHighlights: [
-        {
-          title: 'Optimize Liquid Cash in HYSA',
-          description: `With Treasury yields near ${threeMonthYield}%, competitive high-yield savings accounts pay over 4.5% APY. Keep your Emergency Fund envelope actively earning yield.`,
-          tag: 'Savings Strategy',
-        },
-        {
-          title: 'Credit Card & Debt Strategy',
-          description: 'Average credit card APRs top 21.4%. Allocate unassigned budget dollars aggressively toward high-interest revolving balances before funding discretionary envelopes.',
-          tag: 'Debt Payoff',
-        },
-        {
-          title: 'Planning Big Purchases',
-          description: `30-year fixed mortgages hover around ${(tenYearYield + 2.45).toFixed(2)}%. When planning a vehicle or home purchase, prioritize a larger down payment envelope to lower lifetime interest.`,
-          tag: 'Purchase Budgeting',
-        },
-      ],
+      economicIndicators: macroData.economicIndicators,
+      budgetAdviceHighlights: macroData.budgetAdviceHighlights,
+      macroRaw: macroData.raw,
     };
 
     cachedOverview = overviewData;
@@ -361,8 +375,69 @@ async function fetchRealMarketOverview() {
 }
 
 /**
+ * Backfill deeper catalog pages using Yahoo Finance most active screener
+ */
+async function getScreenerBackfill() {
+  const now = Date.now();
+  if (cachedScreenerStocks && (now - lastScreenerFetchTime) < SCREENER_CACHE_TTL) {
+    return cachedScreenerStocks;
+  }
+
+  try {
+    const scr = await yf.screener({ scrIds: 'most_actives', count: 100 });
+    const existingSyms = new Set(STOCK_CATALOG.map(s => s.symbol.toUpperCase()));
+
+    const backfill = (scr.quotes || [])
+      .filter(q => {
+        if (!q || !q.symbol) return false;
+        if (!isDomesticUsTicker(q.symbol)) return false;
+        if (isLeveragedOrInverse(q)) return false;
+        const norm = normalizeTickerDisplay(q.symbol);
+        return !existingSyms.has(norm.toUpperCase());
+      })
+      .map(q => {
+        const cleanSym = normalizeTickerDisplay(q.symbol);
+        return {
+          symbol: cleanSym,
+          name: q.shortName || q.longName || cleanSym,
+          sector: q.sectorDisp || q.sector || (q.quoteType === 'ETF' ? 'ETFs' : 'Equities'),
+          price: Number((q.regularMarketPrice || 0).toFixed(2)),
+          change: Number((q.regularMarketChange || 0).toFixed(2)),
+          changePercent: Number((q.regularMarketChangePercent || 0).toFixed(2)),
+          volume: formatVol(q.regularMarketVolume),
+          pe: q.trailingPE ? Number(q.trailingPE.toFixed(1)) : null,
+          marketCap: formatCap(q.marketCap || q.netAssets || q.totalAssets) || 'N/A',
+          high52: q.fiftyTwoWeekHigh ? Number(q.fiftyTwoWeekHigh.toFixed(2)) : null,
+          low52: q.fiftyTwoWeekLow ? Number(q.fiftyTwoWeekLow.toFixed(2)) : null,
+        };
+      });
+
+    cachedScreenerStocks = backfill;
+    lastScreenerFetchTime = now;
+    return backfill;
+  } catch (err) {
+    console.warn('Screener backfill fetch error:', err.message);
+    return [];
+  }
+}
+
+/**
+ * GET /api/markets/rates
+ * Returns authoritative FRED series and live Treasury yields
+ */
+router.get('/rates', marketsLimiter, async (req, res) => {
+  try {
+    const data = await getMacroRates();
+    return res.json(data);
+  } catch (err) {
+    console.error('Markets rates error:', err);
+    return res.status(500).json({ error: 'Could not fetch live macro rates' });
+  }
+});
+
+/**
  * GET /api/markets/overview
- * Returns 100% live indices, real stock prices for all 112 assets, and real news
+ * Returns 100% live indices, real stock prices for 250 assets, and real news
  */
 router.get('/overview', marketsLimiter, async (req, res) => {
   try {
@@ -376,38 +451,88 @@ router.get('/overview', marketsLimiter, async (req, res) => {
 
 /**
  * GET /api/markets/catalog
- * Returns the full stock catalog with 100% real-time live prices
+ * Returns paginated stock catalog with 100% real-time live prices & screener backfill
  */
 router.get('/catalog', marketsLimiter, async (req, res) => {
-  const { sector = 'all', limit = 200, page = 1 } = req.query;
+  const { sector = 'all', limit = 36, page = 1 } = req.query;
+
+  const matchesSector = (itemSector, targetSector) => {
+    if (!targetSector || targetSector.toLowerCase() === 'all') return true;
+    if (!itemSector) return false;
+    const is = itemSector.toLowerCase();
+    const ts = targetSector.toLowerCase();
+    if (is === ts) return true;
+    if (ts === 'financials' && is.includes('financial')) return true;
+    if (ts === 'consumer' && is.includes('consumer')) return true;
+    return false;
+  };
 
   try {
     const overview = await fetchRealMarketOverview();
     let catalogWithLive = overview.stocks || STOCK_CATALOG;
 
     if (sector && sector.toLowerCase() !== 'all') {
-      catalogWithLive = catalogWithLive.filter(s => s.sector.toLowerCase() === sector.toLowerCase());
+      catalogWithLive = catalogWithLive.filter(s => matchesSector(s.sector, sector));
     }
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const pageSize = Math.min(250, Math.max(1, parseInt(limit, 10) || 200));
+    const pageSize = Math.min(100, Math.max(1, parseInt(limit, 10) || 36));
     const startIdx = (pageNum - 1) * pageSize;
-    const paginated = catalogWithLive.slice(startIdx, startIdx + pageSize);
+    const totalCore = catalogWithLive.length;
+
+    let paginated = [];
+    let hasMore = false;
+
+    if (startIdx < totalCore) {
+      const coreSlice = catalogWithLive.slice(startIdx, startIdx + pageSize);
+      paginated = [...coreSlice];
+
+      if (paginated.length < pageSize && (sector.toLowerCase() === 'all' || sector.toLowerCase() === 'equities')) {
+        const screenerStocks = await getScreenerBackfill();
+        const needed = pageSize - paginated.length;
+        const backfillSlice = screenerStocks.slice(0, needed);
+        paginated = [...paginated, ...backfillSlice];
+        hasMore = screenerStocks.length > needed;
+      } else {
+        hasMore = (startIdx + pageSize) < totalCore;
+      }
+    } else if (sector.toLowerCase() === 'all' || sector.toLowerCase() === 'equities') {
+      const screenerStocks = await getScreenerBackfill();
+      const screenerOffset = startIdx - totalCore;
+      if (screenerOffset < screenerStocks.length) {
+        paginated = screenerStocks.slice(screenerOffset, screenerOffset + pageSize);
+        hasMore = (screenerOffset + pageSize) < screenerStocks.length;
+      } else {
+        paginated = [];
+        hasMore = false;
+      }
+    }
 
     return res.json({
-      total: catalogWithLive.length,
+      total: totalCore,
       page: pageNum,
       pageSize,
+      hasMore,
       sector,
       stocks: paginated,
     });
   } catch (err) {
+    let fallback = STOCK_CATALOG;
+    if (sector && sector.toLowerCase() !== 'all') {
+      fallback = fallback.filter(s => matchesSector(s.sector, sector));
+    }
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(limit, 10) || 36));
+    const startIdx = (pageNum - 1) * pageSize;
+    const paginated = fallback.slice(startIdx, startIdx + pageSize);
+
     return res.json({
-      total: STOCK_CATALOG.length,
-      page: 1,
-      pageSize: 200,
+      total: fallback.length,
+      page: pageNum,
+      pageSize,
+      hasMore: (startIdx + pageSize) < fallback.length,
       sector,
-      stocks: STOCK_CATALOG,
+      stocks: paginated,
     });
   }
 });
@@ -418,17 +543,19 @@ router.get('/catalog', marketsLimiter, async (req, res) => {
  */
 router.get('/quote/:symbol', marketsLimiter, async (req, res) => {
   const rawSym = req.params.symbol.toUpperCase().trim();
-  const sym = rawSym.replace(/\./g, '-');
+  const sym = toYahooSymbol(rawSym);
 
   try {
     const q = await yf.quote(sym);
     if (!q || !q.regularMarketPrice) {
-      const found = STOCK_CATALOG.find(s => s.symbol.toUpperCase() === rawSym);
+      const found = STOCK_CATALOG.find(s => s.symbol.toUpperCase() === normalizeTickerDisplay(rawSym));
       if (found) return res.json(found);
       return res.status(404).json({ error: `Quote not found for ${rawSym}` });
     }
 
-    const cleanSym = sym === 'BRK-B' ? 'BRK.B' : sym;
+    const cleanSym = normalizeTickerDisplay(q.symbol || sym);
+    const found = STOCK_CATALOG.find(s => s.symbol.toUpperCase() === cleanSym);
+
     return res.json({
       symbol: cleanSym,
       name: q.shortName || q.longName || cleanSym,
@@ -437,7 +564,7 @@ router.get('/quote/:symbol', marketsLimiter, async (req, res) => {
       change: Number((q.regularMarketChange ?? 0).toFixed(2)),
       changePercent: Number((q.regularMarketChangePercent ?? 0).toFixed(2)),
       volume: formatVol(q.regularMarketVolume),
-      marketCap: formatCap(q.marketCap),
+      marketCap: formatCap(q.marketCap || q.netAssets || q.totalAssets) || found?.marketCap || 'N/A',
       pe: q.trailingPE ? Number(q.trailingPE.toFixed(1)) : null,
       high52: q.fiftyTwoWeekHigh ? Number(q.fiftyTwoWeekHigh.toFixed(2)) : 0,
       low52: q.fiftyTwoWeekLow ? Number(q.fiftyTwoWeekLow.toFixed(2)) : 0,
@@ -449,7 +576,7 @@ router.get('/quote/:symbol', marketsLimiter, async (req, res) => {
       exchange: q.exchange || 'US',
     });
   } catch (err) {
-    const found = STOCK_CATALOG.find(s => s.symbol.toUpperCase() === rawSym);
+    const found = STOCK_CATALOG.find(s => s.symbol.toUpperCase() === normalizeTickerDisplay(rawSym));
     if (found) return res.json(found);
     return res.status(500).json({ error: `Failed to fetch quote for ${rawSym}: ${err.message}` });
   }
@@ -466,14 +593,15 @@ router.post('/quotes', marketsLimiter, async (req, res) => {
   }
 
   try {
-    const cleanSymbols = symbols.map(s => String(s).toUpperCase().trim().replace(/\./g, '-')).filter(Boolean);
+    const cleanSymbols = symbols.map(s => toYahooSymbol(String(s))).filter(Boolean);
     const rawQuotes = await yf.quote(cleanSymbols);
     const quoteList = Array.isArray(rawQuotes) ? rawQuotes : [rawQuotes];
     const quotes = {};
 
     quoteList.forEach(q => {
       if (q && q.symbol) {
-        const originalSym = q.symbol === 'BRK-B' ? 'BRK.B' : q.symbol;
+        const originalSym = normalizeTickerDisplay(q.symbol);
+        const found = STOCK_CATALOG.find(s => s.symbol.toUpperCase() === originalSym);
         quotes[originalSym] = {
           symbol: originalSym,
           name: q.shortName || q.longName || originalSym,
@@ -481,7 +609,7 @@ router.post('/quotes', marketsLimiter, async (req, res) => {
           change: Number((q.regularMarketChange ?? 0).toFixed(2)),
           changePercent: Number((q.regularMarketChangePercent ?? 0).toFixed(2)),
           volume: formatVol(q.regularMarketVolume),
-          marketCap: formatCap(q.marketCap),
+          marketCap: formatCap(q.marketCap || q.netAssets || q.totalAssets) || found?.marketCap || 'N/A',
         };
       }
     });
@@ -495,45 +623,62 @@ router.post('/quotes', marketsLimiter, async (req, res) => {
 
 /**
  * GET /api/markets/search
- * Fast real-time live ticker & company search querying Yahoo Finance API
+ * Fast real-time live ticker & company search querying Yahoo Finance API with strict hygiene
  */
 router.get('/search', marketsLimiter, async (req, res) => {
   const query = (req.query.q || '').trim();
   if (!query) {
     const overview = await fetchRealMarketOverview().catch(() => null);
-    return res.json({ results: overview ? overview.stocks.slice(0, 24) : STOCK_CATALOG.slice(0, 24) });
+    return res.json({ results: overview ? overview.stocks.slice(0, 36) : STOCK_CATALOG.slice(0, 36) });
   }
 
   try {
     const searchRes = await yf.search(query);
-    const rawQuotes = (searchRes.quotes || []).filter(
-      item => item.isYahooFinance && (item.quoteType === 'EQUITY' || item.quoteType === 'ETF')
-    );
+    const rawQuotes = (searchRes.quotes || []).filter(item => {
+      if (!item.isYahooFinance || !item.symbol) return false;
+      if (item.quoteType !== 'EQUITY' && item.quoteType !== 'ETF') return false;
+      if (!isDomesticUsTicker(item.symbol)) return false;
+      if (isLeveragedOrInverse(item, query)) return false;
+      return true;
+    });
 
-    const symbols = rawQuotes.slice(0, 10).map(i => i.symbol);
+    const symbols = rawQuotes.slice(0, 15).map(i => i.symbol);
 
     if (symbols.length === 0) {
       const localMatches = STOCK_CATALOG.filter(s =>
         s.symbol.toLowerCase().includes(query.toLowerCase()) ||
         s.name.toLowerCase().includes(query.toLowerCase())
       );
-      return res.json({ results: localMatches.slice(0, 15) });
+      return res.json({ results: localMatches.slice(0, 20) });
     }
 
-    const liveQuotes = await yf.quote(symbols);
+    // Map sectorDisp || sector from search response
+    const sectorMap = new Map();
+    rawQuotes.forEach(i => {
+      const sec = i.sectorDisp || i.sector;
+      if (sec) sectorMap.set(normalizeTickerDisplay(i.symbol), sec);
+    });
+
+    const liveQuotes = await yf.quote(symbols.map(s => toYahooSymbol(s)));
     const quoteList = Array.isArray(liveQuotes) ? liveQuotes : [liveQuotes];
 
     const results = quoteList.map(q => {
-      const cleanSym = q.symbol === 'BRK-B' ? 'BRK.B' : q.symbol;
+      const cleanSym = normalizeTickerDisplay(q.symbol);
+      const dynamicSector = sectorMap.get(cleanSym)
+        || getSectorForSymbol(cleanSym)
+        || (q.quoteType === 'ETF' ? 'ETFs' : 'Equities');
+
+      const foundCatalog = STOCK_CATALOG.find(s => s.symbol.toUpperCase() === cleanSym);
+
       return {
         symbol: cleanSym,
         name: q.shortName || q.longName || cleanSym,
-        sector: getSectorForSymbol(cleanSym),
+        sector: dynamicSector,
         price: Number(q.regularMarketPrice ? q.regularMarketPrice.toFixed(2) : 0),
         change: Number(q.regularMarketChange ? q.regularMarketChange.toFixed(2) : 0),
         changePercent: Number(q.regularMarketChangePercent ? q.regularMarketChangePercent.toFixed(2) : 0),
         volume: formatVol(q.regularMarketVolume),
-        marketCap: formatCap(q.marketCap),
+        marketCap: formatCap(q.marketCap || q.netAssets || q.totalAssets) || foundCatalog?.marketCap || 'N/A',
         pe: q.trailingPE ? Number(q.trailingPE.toFixed(1)) : null,
       };
     });
@@ -545,7 +690,7 @@ router.get('/search', marketsLimiter, async (req, res) => {
       s.symbol.toLowerCase().includes(query.toLowerCase()) ||
       s.name.toLowerCase().includes(query.toLowerCase())
     );
-    return res.json({ results: localMatches.slice(0, 15) });
+    return res.json({ results: localMatches.slice(0, 20) });
   }
 });
 
@@ -598,29 +743,49 @@ router.get('/news/generate-more', marketsLimiter, async (req, res) => {
 
 /**
  * POST /api/markets/ai-summary
- * Generates an up-to-date AI economic briefing using Gemini
+ * Generates an up-to-date AI economic briefing using Gemini, grounded in live macro rates
  */
 router.post('/ai-summary', marketsLimiter, async (req, res) => {
   const { topic = 'general' } = req.body;
   const startTime = Date.now();
 
   try {
+    const macro = await getMacroRates().catch(() => null);
+    const dff = macro?.raw?.dff ?? 3.88;
+    const tenYr = macro?.raw?.tenYearYield ?? 5.15;
+    const threeM = macro?.raw?.threeMonthYield ?? 4.12;
+    const hysa = macro?.raw?.topHysa ?? 4.23;
+    const cpi = macro?.raw?.cpiYoY ?? 4.1;
+    const unemp = macro?.raw?.unemployment ?? 4.1;
+    const m30 = macro?.raw?.mortgage30 ?? 7.11;
+    const cc = macro?.raw?.creditCardApr ?? 21.19;
+
     const ai = getAI();
     if (!ai) {
       return res.json({
-        summary: 'Economic conditions are characterized by resilient US GDP growth, cooling inflation near 2.6%, and the 10-Year Treasury Yield around 5.00%. For everyday personal budgeting, this environment favors keeping cash reserves in competitive high-yield accounts while avoiding carrying variable high-interest debt.',
+        summary: `Economic conditions are characterized by steady growth, headline CPI inflation near ${cpi}%, and the 10-Year Treasury Yield around ${tenYr.toFixed(2)}%. The Federal Reserve Effective Funds Rate stands at ${dff}%, anchoring top high-yield savings APYs near ${hysa}% while 30-year fixed mortgages average ${m30}%. For everyday household budgeting, this climate strongly favors holding 3–6 month emergency fund reserves in competitive high-yield vehicles while aggressively eliminating high-interest credit card debt averaging ${cc}%.`,
         keyTakeaways: [
-          'Cash buffers: High-yield savings accounts offer ~4.5% risk-free returns.',
-          'Borrowing costs: Mortgage and auto loan rates are declining gradually.',
-          'Inflation: Food and goods price increases have normalized compared to 2022-2023 peaks.',
+          `Cash buffers: Top high-yield savings accounts offer ~${hysa}% APY risk-free.`,
+          `Borrowing costs: Conforming 30-year mortgages average ${m30}%; keep down payment envelopes high.`,
+          `Debt payoff: Credit card rates average ${cc}%; prioritize paying variable balances first.`,
         ],
-        model: 'baseline-digest',
+        model: 'macro-grounded-baseline',
         latencyMs: Date.now() - startTime,
       });
     }
 
     const prompt = `You are a chief economic strategist and financial analyst embedded in the ARCA personal finance app.
 Generate a concise, insightful 3-paragraph economic digest for consumers and budgeters.
+Grounded in these REAL live macroeconomic data:
+- Fed Funds Effective Rate: ${dff}%
+- 10-Year US Treasury Yield: ${tenYr.toFixed(2)}%
+- 3-Month US Treasury Bill: ${threeM.toFixed(2)}%
+- Top HYSA APY: ~${hysa}%
+- 30-Year Fixed Mortgage Average: ${m30}%
+- Average Credit Card APR: ${cc}%
+- CPI Inflation (YoY): ${cpi}%
+- Unemployment Rate: ${unemp}%
+
 Cover:
 1. Current state of interest rates, the Fed policy outlook, and what it means for borrowing & savings.
 2. Stock market momentum, inflation trends, and employment conditions.
@@ -644,12 +809,18 @@ Format: Return clean plain text paragraphs with no markdown bolding in titles. I
     });
   } catch (err) {
     console.warn('AI market summary error:', err.message);
+    const macro = await getMacroRates().catch(() => null);
+    const dff = macro?.raw?.dff ?? 3.88;
+    const hysa = macro?.raw?.topHysa ?? 4.23;
+    const m30 = macro?.raw?.mortgage30 ?? 7.11;
+    const cc = macro?.raw?.creditCardApr ?? 21.19;
+
     return res.json({
-      summary: 'Markets continue to balance resilient macroeconomic growth against monetary policy normalization. Interest rates remain relatively elevated, rewarding savers while placing a premium on debt elimination and disciplined envelope budgeting.',
+      summary: `Markets continue to balance macroeconomic stability against monetary policy normalization. The Fed Funds rate of ${dff}% preserves attractive yields near ${hysa}% in cash accounts, while borrowing benchmarks remain elevated with mortgages near ${m30}% and credit cards averaging ${cc}%. Disciplined envelope budgeting remains paramount.`,
       keyTakeaways: [
-        'Maintain emergency reserves in high-yield vehicles.',
-        'Prioritize paying down any variable credit card balances.',
-        'Stick to dollar-cost averaging in long-term investment envelopes.',
+        `Maintain emergency reserves in high-yield vehicles earning ~${hysa}% APY.`,
+        `Prioritize paying down any variable credit card balances averaging ${cc}%.`,
+        'Stick to dollar-cost averaging in long-term index investment envelopes.',
       ],
       model: 'fallback',
       latencyMs: Date.now() - startTime,

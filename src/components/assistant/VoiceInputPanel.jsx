@@ -2,6 +2,9 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, MicOff, Loader2, CheckCircle2, X, Volume2, Send, Sparkles, AlertCircle } from 'lucide-react';
 import { parseSpokenReceipt, createWebSpeechRecognition, speakTransactionDetails } from '../../services/agents/voiceAgent';
 import { env } from '../../config/env';
+import { useBudget } from '../../contexts/BudgetContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { checkAndIncrementQuota, QUOTA_LIMITS, getNextMondayCountdown } from '../../utils/quotaManager';
 
 /**
  * VoiceInputPanel — ARCA Dual Voice & Text Receipt Input Agent
@@ -12,6 +15,9 @@ import { env } from '../../config/env';
  * 3. Direct natural language text entry
  */
 export default function VoiceInputPanel({ onTransactionReady, onClose }) {
+  const { quotaUsage, openProModal, updateQuota } = useBudget();
+  const { user } = useAuth();
+
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
@@ -108,10 +114,22 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
 
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
+        if (response.status === 429 || errJson.error === 'UPSTREAM_RATE_LIMIT') {
+          setIsProcessing(false);
+          openProModal({
+            reason: 'UPSTREAM_RATE_LIMIT',
+            feature: 'voice',
+            used: quotaUsage?.voiceUsed ?? QUOTA_LIMITS.voice,
+            limit: QUOTA_LIMITS.voice,
+            resetCountdown: getNextMondayCountdown(),
+          });
+          return;
+        }
         throw new Error(errJson.message || `Audio transcription failed (${response.status})`);
       }
 
       const data = await response.json();
+      await updateQuota('voice');
 
       const fullTranscript = data.transcript || inputText || 'Spoken Receipt';
       setInputText(fullTranscript);
@@ -133,6 +151,17 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
       return true;
     } catch (err) {
       console.warn('[Voice] Audio transcription error:', err);
+      if (err.status === 429 || err?.message?.includes('429')) {
+        setIsProcessing(false);
+        openProModal({
+          reason: 'UPSTREAM_RATE_LIMIT',
+          feature: 'voice',
+          used: quotaUsage?.voiceUsed ?? QUOTA_LIMITS.voice,
+          limit: QUOTA_LIMITS.voice,
+          resetCountdown: getNextMondayCountdown(),
+        });
+        return;
+      }
       if (inputText && inputText.trim()) {
         processText(inputText);
       } else {
@@ -144,6 +173,19 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
 
   // Start voice recording (MediaRecorder + WebSpeech fallback)
   const startListening = useCallback(async () => {
+    // Pre-validate quota before opening mic
+    const quotaCheck = await checkAndIncrementQuota(user?.uid, 'voice', quotaUsage, { skipIncrement: true });
+    if (!quotaCheck.allowed) {
+      openProModal({
+        reason: 'QUOTA_EXHAUSTED',
+        feature: 'voice',
+        used: quotaCheck.used,
+        limit: quotaCheck.limit,
+        resetCountdown: quotaCheck.resetCountdown,
+      });
+      return;
+    }
+
     setError(null);
     setInterimTranscript('');
     setParsedData(null);

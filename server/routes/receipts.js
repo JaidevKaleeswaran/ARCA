@@ -8,6 +8,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { sanitizeError } from '../utils/sanitize.js';
 import { createRateLimiter } from '../middleware/security.js';
+import { getReceiptClient, callWithModelCascade, getNextMondayISO } from '../config/aiClients.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -216,17 +217,12 @@ async function parseReceiptWithOpenAI(imagePath) {
 }
 
 async function parseReceiptWithGemini(imagePath) {
-  // Use dedicated Receipt Scanner API Key first, then fallback to shared Gemini key
-  const apiKey = process.env.RECEIPT_SCANNER_API_KEY
-    || process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw Object.assign(new Error('No Gemini API key configured for receipt scanning. Set GEMINI_API_KEY in environment variables.'), {
+  const client = getReceiptClient();
+  if (!client) {
+    throw Object.assign(new Error('No Gemini API key configured for receipt scanning. Set RECEIPT_SCANNER_API_KEY in environment variables.'), {
       code: 'MISSING_API_KEY',
     });
   }
-
-
-  const ai = new GoogleGenAI({ apiKey });
 
   // Read the image file and convert to base64
   const imageBuffer = fs.readFileSync(imagePath);
@@ -237,38 +233,28 @@ async function parseReceiptWithGemini(imagePath) {
       ? 'image/webp'
       : 'image/jpeg';
 
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
-  let lastError = null;
-
-  for (const model of modelsToTry) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: [
+  const response = await callWithModelCascade(client, 'vision', {
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          { text: RECEIPT_PROMPT },
           {
-            role: 'user',
-            parts: [
-              { text: RECEIPT_PROMPT },
-              {
-                inlineData: {
-                  mimeType,
-                  data: base64Image,
-                },
-              },
-            ],
+            inlineData: {
+              mimeType,
+              data: base64Image,
+            },
           },
         ],
-      });
+      },
+    ],
+  });
 
-      const rawText = response.text?.trim();
-      if (rawText) return rawText;
-    } catch (err) {
-      console.warn(`Model ${model} failed:`, err.message);
-      lastError = err;
-    }
+  const rawText = response.text?.trim();
+  if (!rawText) {
+    throw new Error('Gemini returned an empty response for receipt scan.');
   }
-
-  throw lastError || new Error('All Gemini models failed to process the image.');
+  return rawText;
 }
 
 
@@ -353,6 +339,13 @@ router.post('/scan', scanLimiter, (req, res, next) => {
         parsedData = JSON.parse(cleaned);
         engine = 'gemini_vision';
       } catch (geminiErr) {
+        if (geminiErr.status === 429 || geminiErr.code === 'UPSTREAM_RATE_LIMIT') {
+          return res.status(429).json(geminiErr.payload || {
+            error: 'UPSTREAM_RATE_LIMIT',
+            message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+            resetDate: getNextMondayISO(),
+          });
+        }
         console.warn('Gemini Vision failed:', geminiErr.message);
         
         // Try Claude as backup (in case user adds credits later)
@@ -412,6 +405,14 @@ router.post('/scan', scanLimiter, (req, res, next) => {
       });
     } catch (apiErr) {
       console.error('Receipt Vision API error:', apiErr);
+
+      if (apiErr.status === 429 || apiErr.code === 'UPSTREAM_RATE_LIMIT') {
+        return res.status(429).json(apiErr.payload || {
+          error: 'UPSTREAM_RATE_LIMIT',
+          message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+          resetDate: getNextMondayISO(),
+        });
+      }
 
       if (apiErr.code === 'MISSING_API_KEY') {
         return res.status(500).json({

@@ -4,6 +4,7 @@ import { GoogleGenAI } from '@google/genai';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { sanitizeError } from '../utils/sanitize.js';
 import { createRateLimiter, validateSpeakInput } from '../middleware/security.js';
+import { getVoiceClient, callWithModelCascade, getNextMondayISO } from '../config/aiClients.js';
 
 const uploadMemory = multer({ limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -130,6 +131,13 @@ router.post('/speak', speakLimiter, validateSpeakInput, async (req, res) => {
 
     if (!response.ok) {
       const errText = await response.text();
+      if (response.status === 429 || /quota|credit|rate\s*limit|resource_exhausted|429/i.test(errText)) {
+        return res.status(429).json({
+          error: 'UPSTREAM_RATE_LIMIT',
+          message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+          resetDate: getNextMondayISO(),
+        });
+      }
       throw new Error(`ElevenLabs API error (${response.status}): ${errText}`);
     }
 
@@ -141,6 +149,13 @@ router.post('/speak', speakLimiter, validateSpeakInput, async (req, res) => {
     return res.send(buffer);
   } catch (err) {
     console.error('ElevenLabs TTS error:', err);
+    if (err.status === 429 || /quota|credit|rate\s*limit|resource_exhausted|429/i.test(err.message)) {
+      return res.status(429).json({
+        error: 'UPSTREAM_RATE_LIMIT',
+        message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+        resetDate: getNextMondayISO(),
+      });
+    }
     return res.status(502).json({
       error: 'Failed to generate speech audio',
       message: sanitizeError(err),
@@ -150,7 +165,7 @@ router.post('/speak', speakLimiter, validateSpeakInput, async (req, res) => {
 
 /**
  * POST /api/voice/transcribe
- * Transcribes recorded microphone audio using Gemini 2.5 Flash AI
+ * Transcribes recorded microphone audio using Gemini AI with model cascade
  */
 router.post('/transcribe', transcribeLimiter, uploadMemory.single('audio'), async (req, res) => {
   try {
@@ -158,14 +173,11 @@ router.post('/transcribe', transcribeLimiter, uploadMemory.single('audio'), asyn
       return res.status(400).json({ error: 'No audio file provided' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY
-      || process.env.RECEIPT_SCANNER_API_KEY;
-
-    if (!apiKey) {
+    const client = getVoiceClient();
+    if (!client) {
       return res.status(500).json({ error: 'No Gemini API key configured for audio transcription' });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
     const base64Audio = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype || 'audio/webm';
 
@@ -186,8 +198,7 @@ Return ONLY valid JSON (no markdown formatting) in this exact structure:
 
 If the year/date is not mentioned, use today's date (${new Date().toISOString().split('T')[0]}).`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const response = await callWithModelCascade(client, 'voice', {
       contents: [
         {
           role: 'user',
@@ -230,6 +241,13 @@ If the year/date is not mentioned, use today's date (${new Date().toISOString().
     });
   } catch (err) {
     console.error('Audio transcription error:', err);
+    if (err.status === 429 || err.code === 'UPSTREAM_RATE_LIMIT') {
+      return res.status(429).json(err.payload || {
+        error: 'UPSTREAM_RATE_LIMIT',
+        message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+        resetDate: getNextMondayISO(),
+      });
+    }
     return res.status(502).json({
       error: 'Failed to transcribe audio',
       message: sanitizeError(err),

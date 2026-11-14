@@ -4,8 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.js",
+    "dev:client": "vite",
+    "dev:server": "node server/index.js",
     "build": "vite build",
+    "test": "node server/tests/test-ai-mcp-quotas.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "node server/index.js",

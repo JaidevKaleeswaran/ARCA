@@ -15,6 +15,7 @@ import ReceiptScannerModal from '../transactions/ReceiptScannerModal';
 import VoiceAuditLogModal from './VoiceAuditLogModal';
 import Reveal from '../ui/Reveal';
 import { toast } from 'react-hot-toast';
+import { checkAndIncrementQuota, QUOTA_LIMITS, getNextMondayCountdown } from '../../utils/quotaManager';
 
 // ── Markdown rendering helpers ──────────────────────────────────────────────
 
@@ -176,6 +177,24 @@ export default function AIAssistantTab() {
   const [showVoiceAuditLog, setShowVoiceAuditLog] = useState(false);
   const [isVoicePrompting, setIsVoicePrompting] = useState(false);
   const [isTranscribingPrompt, setIsTranscribingPrompt] = useState(false);
+  const [isLocalQwen, setIsLocalQwen] = useState(false);
+
+  // Probe local Ollama if running in localhost environment
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(300) })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.models?.some(m => (m.name || '').includes('qwen'))) {
+            setIsLocalQwen(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  const assistantUsed = budgetState.quotaUsage?.assistantUsed ?? 0;
+  const remainingQueries = Math.max(0, (QUOTA_LIMITS.assistant || 35) - assistantUsed);
 
   const chatEndRef = useRef(null);
   const promptMediaRecorderRef = useRef(null);
@@ -185,6 +204,19 @@ export default function AIAssistantTab() {
   const hasUserSubmittedRef = useRef(false);
 
   const handleStartPromptVoice = async () => {
+    // Pre-validate voice quota before starting recording
+    const quotaCheck = await checkAndIncrementQuota(user?.uid, 'voice', budgetState.quotaUsage, { skipIncrement: true });
+    if (!quotaCheck.allowed) {
+      budgetState.openProModal({
+        reason: 'QUOTA_EXHAUSTED',
+        feature: 'voice',
+        used: quotaCheck.used,
+        limit: quotaCheck.limit,
+        resetCountdown: quotaCheck.resetCountdown,
+      });
+      return;
+    }
+
     setIsVoicePrompting(true);
     promptAudioChunksRef.current = [];
 
@@ -265,8 +297,23 @@ export default function AIAssistantTab() {
           body: formData,
         });
 
+        if (!response.ok) {
+          const errJson = await response.json().catch(() => ({}));
+          if (response.status === 429 || errJson.error === 'UPSTREAM_RATE_LIMIT') {
+            budgetState.openProModal({
+              reason: 'UPSTREAM_RATE_LIMIT',
+              feature: 'voice',
+              used: budgetState.quotaUsage?.voiceUsed ?? QUOTA_LIMITS.voice,
+              limit: QUOTA_LIMITS.voice,
+              resetCountdown: getNextMondayCountdown(),
+            });
+            return;
+          }
+        }
+
         if (response.ok) {
           const data = await response.json();
+          await budgetState.updateQuota('voice');
           if (data.transcript) {
             capturedText = data.transcript;
           }
@@ -326,6 +373,21 @@ export default function AIAssistantTab() {
     const query = (queryToRun || inputQuery).trim();
     if (!query || isProcessing) return;
 
+    // Only pre-validate weekly cloud quota if NOT using local unlimited Qwen
+    if (!isLocalQwen) {
+      const quotaCheck = await checkAndIncrementQuota(user?.uid, 'assistant', budgetState.quotaUsage, { skipIncrement: true });
+      if (!quotaCheck.allowed) {
+        budgetState.openProModal({
+          reason: 'QUOTA_EXHAUSTED',
+          feature: 'assistant',
+          used: quotaCheck.used,
+          limit: quotaCheck.limit,
+          resetCountdown: quotaCheck.resetCountdown,
+        });
+        return;
+      }
+    }
+
     hasUserSubmittedRef.current = true;
     setInputQuery('');
     const userMsgId = `user_${Date.now()}`;
@@ -344,6 +406,25 @@ export default function AIAssistantTab() {
     try {
       const result = await answerQuery(query, financialSnapshot);
 
+      // Intercept 429 rate limit or quota exhaustion from upstream
+      if (result.isRateLimit || result.status === 429) {
+        budgetState.openProModal({
+          reason: 'UPSTREAM_RATE_LIMIT',
+          feature: 'assistant',
+          used: budgetState.quotaUsage?.assistantUsed ?? QUOTA_LIMITS.assistant,
+          limit: QUOTA_LIMITS.assistant,
+          resetCountdown: getNextMondayCountdown(),
+        });
+        return;
+      }
+
+      if (result.provider === 'local-qwen') {
+        setIsLocalQwen(true);
+      } else {
+        setIsLocalQwen(false);
+        await budgetState.updateQuota('assistant');
+      }
+
       const aiMsg = {
         id: `ai_${Date.now()}`,
         sender: 'assistant',
@@ -356,6 +437,16 @@ export default function AIAssistantTab() {
       dispatch({ type: 'ADD_CHAT_MESSAGE', payload: aiMsg });
     } catch (error) {
       console.error('Assistant query error:', error);
+      if (error.status === 429 || error?.data?.error === 'UPSTREAM_RATE_LIMIT' || error?.message?.includes('429')) {
+        budgetState.openProModal({
+          reason: 'UPSTREAM_RATE_LIMIT',
+          feature: 'assistant',
+          used: budgetState.quotaUsage?.assistantUsed ?? QUOTA_LIMITS.assistant,
+          limit: QUOTA_LIMITS.assistant,
+          resetCountdown: getNextMondayCountdown(),
+        });
+        return;
+      }
       toast.error('Failed to process your question.');
       dispatch({
         type: 'ADD_CHAT_MESSAGE',
@@ -465,10 +556,33 @@ export default function AIAssistantTab() {
                 <p className="text-text-muted text-xs mt-1">Multi-agent · Voice · Vision · Real-time</p>
               </div>
             </div>
-            <span className="text-[10px] bg-[#2e5b45]/20 text-[#3a7056] font-medium px-2.5 py-1 rounded-full border border-[#2e5b45]/30 flex items-center gap-1.5 shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#3a7056] animate-pulse" />
-              Live
-            </span>
+            <div className="flex items-center gap-2">
+              {isLocalQwen ? (
+                <span className="text-[10px] bg-emerald-500/15 text-emerald-400 font-semibold px-2.5 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
+                  <Zap size={11} className="text-emerald-400" />
+                  Local Qwen 3.5 • Unlimited
+                </span>
+              ) : (
+                <button
+                  onClick={() => budgetState.openProModal({
+                    reason: 'QUOTA_EXHAUSTED',
+                    feature: 'assistant',
+                    used: assistantUsed,
+                    limit: QUOTA_LIMITS.assistant,
+                    resetCountdown: getNextMondayCountdown(),
+                  })}
+                  className="text-[10px] bg-accent/15 hover:bg-accent/25 text-accent font-semibold px-2.5 py-1 rounded-full border border-accent/30 flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                  title="Weekly AI Assistant Quota"
+                >
+                  <Sparkles size={11} className="text-accent" />
+                  {remainingQueries}/{QUOTA_LIMITS.assistant} queries left • Resets Mon
+                </button>
+              )}
+              <span className="text-[10px] bg-[#2e5b45]/20 text-[#3a7056] font-medium px-2.5 py-1 rounded-full border border-[#2e5b45]/30 flex items-center gap-1.5 shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#3a7056] animate-pulse" />
+                Live
+              </span>
+            </div>
           </div>
         </div>
       </Reveal>

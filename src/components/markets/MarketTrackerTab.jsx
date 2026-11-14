@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   TrendingUp, TrendingDown, RefreshCw, Sparkles, DollarSign,
   Percent, Newspaper, Activity, ShieldCheck, ArrowUpRight,
@@ -9,7 +9,7 @@ import Reveal from '../ui/Reveal';
 import { env } from '../../config/env';
 import { useBudget } from '../../contexts/BudgetContext';
 import { formatCurrency } from '../../utils/formatCurrency';
-import { STOCK_CATALOG } from '../../data/marketData.js';
+import { STOCK_CATALOG, DEFAULT_MARKET_DATA } from '../../data/marketData.js';
 import ArticleReaderModal from './ArticleReaderModal';
 import InvestStockModal from './InvestStockModal';
 import { toast } from 'react-hot-toast';
@@ -27,6 +27,9 @@ export default function MarketTrackerTab() {
   // State
   const [overview, setOverview] = useState(null);
   const [catalog, setCatalog] = useState(STOCK_CATALOG);
+  const [stockPage, setStockPage] = useState(1);
+  const [isLoadingMoreStocks, setIsLoadingMoreStocks] = useState(false);
+  const [hasMoreStocks, setHasMoreStocks] = useState(true);
   const [articles, setArticles] = useState([]);
   const [newsPage, setNewsPage] = useState(1);
   const [isLoadingMoreNews, setIsLoadingMoreNews] = useState(false);
@@ -40,7 +43,8 @@ export default function MarketTrackerTab() {
   const [aiBriefing, setAiBriefing] = useState(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-  const [catalogDisplayLimit, setCatalogDisplayLimit] = useState(36);
+
+  const isInitializedRef = useRef(false);
 
   // Modals
   const [selectedStockToInvest, setSelectedStockToInvest] = useState(null);
@@ -53,17 +57,21 @@ export default function MarketTrackerTab() {
       const apiBase = env.apiBaseUrl || '';
       const [overviewRes, catalogRes, newsRes] = await Promise.allSettled([
         fetch(`${apiBase}/api/markets/overview`),
-        fetch(`${apiBase}/api/markets/catalog?limit=250`),
+        !isInitializedRef.current ? fetch(`${apiBase}/api/markets/catalog?page=1&limit=36`) : Promise.resolve(null),
         fetch(`${apiBase}/api/markets/news`),
       ]);
 
-      if (overviewRes.status === 'fulfilled' && overviewRes.value.ok) {
+      if (overviewRes.status === 'fulfilled' && overviewRes.value?.ok) {
         const oData = await overviewRes.value.json();
         setOverview(oData);
 
-        // Update all 112 stock catalog with live prices
+        // Update live prices in-place for existing catalog without truncating loaded pages or resetting view
         if (Array.isArray(oData.stocks) && oData.stocks.length > 0) {
-          setCatalog(oData.stocks);
+          const liveMap = new Map(oData.stocks.map((s) => [s.symbol.toUpperCase(), s]));
+          setCatalog((prev) => {
+            if (!prev || prev.length === 0) return oData.stocks.slice(0, 36);
+            return prev.map((item) => liveMap.get(item.symbol.toUpperCase()) || item);
+          });
         }
 
         // Update user portfolio holdings with live real-time prices
@@ -74,19 +82,22 @@ export default function MarketTrackerTab() {
         dispatch({ type: 'REFRESH_PORTFOLIO_PRICES', payload: quotes });
       }
 
-      if (catalogRes.status === 'fulfilled' && catalogRes.value.ok) {
+      if (catalogRes.status === 'fulfilled' && catalogRes.value?.ok) {
         const catData = await catalogRes.value.json();
         if (Array.isArray(catData.stocks) && catData.stocks.length > 0) {
           setCatalog(catData.stocks);
+          setStockPage(1);
+          setHasMoreStocks(catData.hasMore ?? (catData.stocks.length === 36));
+          isInitializedRef.current = true;
         }
       }
 
-      if (newsRes.status === 'fulfilled' && newsRes.value.ok) {
+      if (newsRes.status === 'fulfilled' && newsRes.value?.ok) {
         const newsData = await newsRes.value.json();
         if (Array.isArray(newsData.articles) && newsData.articles.length > 0) {
           setArticles(newsData.articles);
         }
-      } else if (overviewRes.status === 'fulfilled' && overviewRes.value.ok) {
+      } else if (overviewRes.status === 'fulfilled' && overviewRes.value?.ok) {
         const oData = await overviewRes.value.clone().json().catch(() => null);
         if (oData && Array.isArray(oData.newsDigest)) {
           setArticles(oData.newsDigest);
@@ -157,6 +168,67 @@ export default function MarketTrackerTab() {
       toast.error('Could not fetch additional articles. Try again in a moment.');
     } finally {
       setIsLoadingMoreNews(false);
+    }
+  };
+
+  // Handle Server Pagination for Show More Stocks
+  const handleShowMoreStocks = async () => {
+    setIsLoadingMoreStocks(true);
+    try {
+      const apiBase = env.apiBaseUrl || '';
+      const nextPage = stockPage + 1;
+      const secParam = selectedSector !== 'all' ? `&sector=${encodeURIComponent(selectedSector)}` : '';
+      const res = await fetch(`${apiBase}/api/markets/catalog?page=${nextPage}&limit=36${secParam}`);
+
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.stocks) && data.stocks.length > 0) {
+          setCatalog((prev) => {
+            const seen = new Set(prev.map((s) => s.symbol.toUpperCase()));
+            const fresh = data.stocks.filter((s) => !seen.has(s.symbol.toUpperCase()));
+            return [...prev, ...fresh];
+          });
+          setStockPage(nextPage);
+          setHasMoreStocks(data.hasMore ?? (data.stocks.length === 36));
+          toast.success(`Loaded ${data.stocks.length} more live stock quotes!`);
+        } else {
+          setHasMoreStocks(false);
+          toast.info('All market catalog quotes are loaded.');
+        }
+      } else {
+        throw new Error(`Server returned ${res.status}`);
+      }
+    } catch (err) {
+      console.warn('Failed to load more stocks:', err);
+      toast.error('Could not load additional stocks. Please try again.');
+    } finally {
+      setIsLoadingMoreStocks(false);
+    }
+  };
+
+  // Switch Sector Filter
+  const handleSelectSector = async (sec) => {
+    setSelectedSector(sec);
+    setSearchQuery('');
+    setSearchResults(null);
+    setStockPage(1);
+    setHasMoreStocks(true);
+    setIsLoading(true);
+    try {
+      const apiBase = env.apiBaseUrl || '';
+      const secParam = sec !== 'all' ? `&sector=${encodeURIComponent(sec)}` : '';
+      const res = await fetch(`${apiBase}/api/markets/catalog?page=1&limit=36${secParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.stocks) && data.stocks.length > 0) {
+          setCatalog(data.stocks);
+          setHasMoreStocks(data.hasMore ?? (data.stocks.length === 36));
+        }
+      }
+    } catch (err) {
+      console.warn('Error filtering sector:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -232,7 +304,7 @@ export default function MarketTrackerTab() {
       }
     } catch {
       setAiBriefing(
-        'Economic indicators demonstrate sustained expansion with headline inflation cooling toward 2.6%. The benchmark Fed Funds Rate sits at 4.75%, preserving attractive liquid cash yields near 4.5% in high-yield accounts while mortgage rates hover near 6.78%. ARCA recommends maintaining 3–6 month emergency fund reserves in high-yield vehicles, eliminating variable-rate card debt, and dollar-cost averaging into broad index envelopes.'
+        'Economic indicators demonstrate sustained expansion with headline inflation near 3.7%. The benchmark Effective Fed Funds Rate sits at 3.88%, preserving attractive liquid cash yields near 4.23% in high-yield accounts while 30-year fixed mortgages average 7.11%. ARCA recommends maintaining 3–6 month emergency fund reserves in high-yield vehicles, eliminating variable-rate card debt averaging 21.19%, and dollar-cost averaging into broad index envelopes.'
       );
       toast.success('AI economic summary updated!');
     } finally {
@@ -249,13 +321,23 @@ export default function MarketTrackerTab() {
     return () => clearInterval(interval);
   }, []);
 
-  // Filter stocks by sector
-  const displayStocks = searchResults || catalog;
+  // Filter stocks by sector (bypass sector filtering when searching)
   const filteredStocks = useMemo(() => {
-    return displayStocks.filter((stock) => {
-      return selectedSector === 'all' || stock.sector.toLowerCase() === selectedSector.toLowerCase();
-    });
-  }, [displayStocks, selectedSector]);
+    if (searchResults) {
+      return searchResults;
+    }
+    const matchesSector = (itemSector, targetSector) => {
+      if (!targetSector || targetSector.toLowerCase() === 'all') return true;
+      if (!itemSector) return false;
+      const is = itemSector.toLowerCase();
+      const ts = targetSector.toLowerCase();
+      if (is === ts) return true;
+      if (ts === 'financials' && is.includes('financial')) return true;
+      if (ts === 'consumer' && is.includes('consumer')) return true;
+      return false;
+    };
+    return catalog.filter((stock) => matchesSector(stock.sector, selectedSector));
+  }, [catalog, searchResults, selectedSector]);
 
   // Sectors list
   const sectors = ['all', 'Technology', 'Financials', 'Healthcare', 'Consumer', 'Energy', 'Industrials', 'ETFs'];
@@ -269,12 +351,7 @@ export default function MarketTrackerTab() {
   };
 
   // Live indices from overview or fallback
-  const liveIndices = overview?.indices || [
-    { symbol: 'SPX', name: 'S&P 500', price: 7619.38, change: 98.45, changePercent: 1.31 },
-    { symbol: 'IXIC', name: 'Nasdaq Composite', price: 25466.19, change: 401.30, changePercent: 1.60 },
-    { symbol: 'DJI', name: 'Dow Jones Industrial', price: 52486.50, change: 257.20, changePercent: 0.49 },
-    { symbol: 'RUT', name: 'Russell 2000', price: 2846.26, change: 24.80, changePercent: 0.88 },
-  ];
+  const liveIndices = overview?.indices || DEFAULT_MARKET_DATA.indices;
 
   return (
     <div className="space-y-6 pb-20">
@@ -563,7 +640,7 @@ export default function MarketTrackerTab() {
                     {sectors.map((sec) => (
                       <button
                         key={sec}
-                        onClick={() => setSelectedSector(sec)}
+                        onClick={() => handleSelectSector(sec)}
                         className={`px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer ${
                           selectedSector === sec
                             ? 'bg-accent/20 text-accent border border-accent/40 font-bold'
@@ -578,7 +655,7 @@ export default function MarketTrackerTab() {
 
                 {/* Stock Cards Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {filteredStocks.slice(0, catalogDisplayLimit).map((stock) => {
+                  {filteredStocks.map((stock) => {
                     const isPos = (stock.change || 0) >= 0;
                     const isOwned = investments.some((i) => i.symbol.toUpperCase() === stock.symbol.toUpperCase());
 
@@ -632,14 +709,16 @@ export default function MarketTrackerTab() {
                   })}
                 </div>
 
-                {filteredStocks.length > catalogDisplayLimit && (
+                {!searchResults && hasMoreStocks && (
                   <div className="pt-2 text-center">
                     <button
                       type="button"
-                      onClick={() => setCatalogDisplayLimit((prev) => prev + 24)}
-                      className="px-4 py-1.5 bg-[#1e1c18] hover:bg-[#282620] text-accent border border-accent/30 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+                      onClick={handleShowMoreStocks}
+                      disabled={isLoadingMoreStocks}
+                      className="px-5 py-2 bg-[#1e1c18] hover:bg-[#282620] text-accent border border-accent/40 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-2"
                     >
-                      Show More Stocks ({filteredStocks.length - catalogDisplayLimit} remaining)
+                      <RefreshCw size={13} className={isLoadingMoreStocks ? 'animate-spin text-accent' : 'text-accent'} />
+                      <span>{isLoadingMoreStocks ? 'Fetching More Live Stocks...' : 'Show More Stocks'}</span>
                     </button>
                   </div>
                 )}
@@ -792,7 +871,7 @@ export default function MarketTrackerTab() {
           {/* 3. BORROWING & INTEREST RATES BENCHMARKS (REAL LIVE YIELDS) */}
           {(activeTabFilter === 'all' || activeTabFilter === 'rates') && (
             <Reveal delay={0.2} y={20}>
-              <div data-tutorial="market-rates-panel" className="bg-card border border-border rounded-2xl p-5 sm:p-6 space-y-4 shadow-md">
+              <div data-tutorial="market-rates-panel" className="bg-card border border-border rounded-2xl p-5 sm:p-6 space-y-5 shadow-md">
                 <div className="flex items-center justify-between border-b border-border/80 pb-3">
                   <div className="flex items-center gap-2">
                     <Percent size={18} className="text-accent" />
@@ -801,32 +880,49 @@ export default function MarketTrackerTab() {
                         Interest Rates & Treasury Benchmarks
                       </h2>
                       <p className="text-[11px] text-zinc-400">
-                        Live benchmark yields influencing consumer borrowing and liquid cash accounts.
+                        Official Federal Reserve FRED series & live US Treasury sovereign debt market yields.
                       </p>
                     </div>
                   </div>
-                  <span className="text-[10px] bg-emerald-500/15 text-emerald-400 font-mono px-2 py-0.5 rounded">
-                    Live Rates
+                  <span className="text-[10px] bg-emerald-500/15 text-emerald-400 font-mono px-2 py-0.5 rounded border border-emerald-500/30">
+                    Official FRED & Treasury
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {(overview?.rates || [
-                    { name: '10-Yr US Treasury', rate: 4.998, desc: 'Global benchmark for long-term borrowing and mortgages.' },
-                    { name: '3-Mo US Treasury', rate: 4.45, desc: 'Leading gauge for risk-free cash returns.' },
-                    { name: 'Fed Funds Target Rate', rate: 4.75, desc: 'Federal Reserve benchmark rate.' },
-                    { name: 'Top HYSA APY', rate: 4.60, desc: 'Top competitive online savings accounts return.' },
-                    { name: '30-Yr Fixed Mortgage', rate: 7.45, desc: 'National average conforming loans.' },
-                    { name: 'Avg Credit Card APR', rate: 21.40, desc: 'Revolving variable consumer credit.' },
-                  ]).map((r, i) => (
-                    <div key={i} className="bg-[#1c1a17] border border-[#33302a] rounded-xl p-3.5 space-y-1">
-                      <div className="text-[11px] text-zinc-400 font-medium">{r.name}</div>
-                      <div className="text-lg font-extrabold text-accent font-mono">
-                        {typeof r.rate === 'number' ? `${r.rate.toFixed(2)}%` : r.rate}
-                      </div>
-                      <p className="text-[10px] text-zinc-500">{r.desc || r.description}</p>
+                {/* Macroeconomic Indicators */}
+                {overview?.economicIndicators && overview.economicIndicators.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
+                      Macroeconomic Anchors
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {overview.economicIndicators.map((ind, i) => (
+                        <div key={ind.name || i} className="bg-[#181614] border border-[#2a2824] rounded-xl p-3 space-y-1">
+                          <span className="text-[10px] text-zinc-400 block truncate">{ind.name}</span>
+                          <span className="text-base font-extrabold text-white font-mono block">{ind.value}</span>
+                          <span className="text-[10px] text-zinc-500 block truncate">{ind.period}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+                )}
+
+                {/* 10 Rate Cards */}
+                <div className="space-y-2">
+                  <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
+                    Benchmark Borrowing & Yields
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {(overview?.rates || DEFAULT_MARKET_DATA.rates).map((r, i) => (
+                      <div key={r.id || i} className="bg-[#1c1a17] border border-[#33302a] rounded-xl p-3.5 space-y-1">
+                        <div className="text-[11px] text-zinc-400 font-medium">{r.name}</div>
+                        <div className="text-lg font-extrabold text-accent font-mono">
+                          {typeof r.rate === 'number' ? `${r.rate.toFixed(2)}%` : r.rate}
+                        </div>
+                        <p className="text-[10px] text-zinc-500">{r.desc || r.description}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </Reveal>
@@ -862,7 +958,7 @@ export default function MarketTrackerTab() {
               <div className="text-xs text-zinc-200 leading-relaxed space-y-2">
                 <p>
                   {aiBriefing || (
-                    'Current monetary indicators show stable GDP growth alongside cooling headline inflation near 2.6%. With Federal Reserve benchmark rates at 4.75%, competitive high-yield cash accounts yield approximately 4.5% risk-free. For ARCA users, this climate strongly favors holding 3–6 month emergency fund reserves in high-yield cash vehicles, eliminating high-APR variable balances, and dollar-cost averaging into long-term equity envelopes.'
+                    'Current monetary indicators show steady growth alongside annual inflation near 3.7%. With the Federal Reserve Effective Funds Rate at 3.88%, competitive high-yield cash accounts yield approximately 4.23% risk-free. For ARCA users, this climate strongly favors holding 3–6 month emergency fund reserves in high-yield cash vehicles, eliminating variable-APR credit card balances averaging 21.19%, and dollar-cost averaging into long-term equity envelopes.'
                   )}
                 </p>
               </div>
@@ -873,35 +969,33 @@ export default function MarketTrackerTab() {
                   Actionable Budget Implications
                 </span>
 
-                <div className="bg-[#1e1c18] border border-[#38342e] rounded-xl p-3 space-y-1">
-                  <div className="flex items-center gap-1.5 text-[#e7b956] font-semibold text-xs">
-                    <CheckCircle2 size={13} />
-                    <span>Cash Savings</span>
+                {(overview?.budgetAdviceHighlights || [
+                  {
+                    title: 'Optimize Liquid Cash in HYSA',
+                    description: 'With the Effective Fed Funds Rate at 3.88%, top high-yield accounts yield ~4.23% APY risk-free. Keep your Emergency Fund actively earning yield.',
+                    tag: 'Savings Strategy',
+                  },
+                  {
+                    title: 'Credit Card & Debt Elimination',
+                    description: 'Average credit card APRs stand near 21.19%. Allocate unassigned budget dollars aggressively toward variable debt before funding discretionary envelopes.',
+                    tag: 'Debt Payoff',
+                  },
+                  {
+                    title: 'Planning Big Purchases',
+                    description: 'Conforming 30-year fixed mortgages average 7.11%. When planning a vehicle or home purchase, prioritize a larger down payment envelope.',
+                    tag: 'Purchase Budgeting',
+                  },
+                ]).map((item, idx) => (
+                  <div key={item.title || idx} className="bg-[#1e1c18] border border-[#38342e] rounded-xl p-3 space-y-1">
+                    <div className="flex items-center gap-1.5 text-accent font-semibold text-xs">
+                      <CheckCircle2 size={13} />
+                      <span>{item.title}</span>
+                    </div>
+                    <p className="text-zinc-400 text-[11px] leading-snug">
+                      {item.description}
+                    </p>
                   </div>
-                  <p className="text-zinc-400 text-[11px] leading-snug">
-                    High-yield cash APYs remain near 4.5%+. Keep liquid cash actively earning interest in your Emergency Fund envelope.
-                  </p>
-                </div>
-
-                <div className="bg-[#1e1c18] border border-[#38342e] rounded-xl p-3 space-y-1">
-                  <div className="flex items-center gap-1.5 text-[#3a7056] font-semibold text-xs">
-                    <CheckCircle2 size={13} />
-                    <span>Debt Elimination</span>
-                  </div>
-                  <p className="text-zinc-400 text-[11px] leading-snug">
-                    Average credit card APRs top 21%. Allocate unassigned budget dollars to revolving balances before discretionary spending.
-                  </p>
-                </div>
-
-                <div className="bg-[#1e1c18] border border-[#38342e] rounded-xl p-3 space-y-1">
-                  <div className="flex items-center gap-1.5 text-zinc-300 font-semibold text-xs">
-                    <CheckCircle2 size={13} />
-                    <span>Dollar-Cost Averaging</span>
-                  </div>
-                  <p className="text-zinc-400 text-[11px] leading-snug">
-                    Broad-market index ETFs (SPY, VOO) remain resilient. Maintain automated regular contributions through your investment envelope.
-                  </p>
-                </div>
+                ))}
               </div>
             </div>
           </Reveal>

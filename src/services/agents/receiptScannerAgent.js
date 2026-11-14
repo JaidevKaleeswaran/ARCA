@@ -40,7 +40,10 @@ export async function scanReceipt(imageFile) {
 
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || `Receipt scan failed (${response.status})`);
+    const error = new Error(errData.message || `Receipt scan failed (${response.status})`);
+    error.status = response.status;
+    error.data = errData;
+    throw error;
   }
 
   const result = await response.json();

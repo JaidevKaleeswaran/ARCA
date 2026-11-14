@@ -44,9 +44,14 @@ export async function answerQuery(question, financialSnapshot) {
       }),
     });
 
+    const providerHeader = res.headers.get('X-AI-Provider');
+
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.message || `Assistant backend responded with status ${res.status}`);
+      const error = new Error(errorData.message || `Assistant backend responded with status ${res.status}`);
+      error.status = res.status;
+      error.data = errorData;
+      throw error;
     }
 
     const data = await res.json();
@@ -57,6 +62,7 @@ export async function answerQuery(question, financialSnapshot) {
     }
 
     const latencyMs = data.latencyMs || (Date.now() - startTime);
+    const provider = providerHeader || data.provider || 'cloud-gemini';
 
     // Record in conversation history
     addToHistory('user', question);
@@ -65,9 +71,10 @@ export async function answerQuery(question, financialSnapshot) {
     return {
       success: true,
       answer: answerText,
+      provider,
       metrics: {
         latencyMs,
-        model: 'gemini-server',
+        model: provider,
         dataPointsUsed: financialSnapshot?.summary?.transactionCount || 0,
         categoriesAnalyzed: financialSnapshot?.categoryBreakdown?.length || 0,
         sources: data.sources || [],
@@ -76,6 +83,16 @@ export async function answerQuery(question, financialSnapshot) {
     };
   } catch (err) {
     console.error('AI Assistant query failed with stack trace:\n', err.stack || err);
+
+    if (err.status === 429 || err?.data?.error === 'UPSTREAM_RATE_LIMIT' || err?.message?.includes('429')) {
+      return {
+        success: false,
+        status: 429,
+        isRateLimit: true,
+        error: err.message,
+        errorData: err.data,
+      };
+    }
 
     // Fallback: try to answer simple questions from the snapshot directly
     const fallbackAnswer = tryFallbackAnswer(question, financialSnapshot);

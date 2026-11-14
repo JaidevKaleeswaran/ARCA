@@ -1,7 +1,9 @@
 import express from 'express';
-import { GoogleGenAI } from '@google/genai';
 import { sanitizeError } from '../utils/sanitize.js';
 import { createRateLimiter, validateChatInput, validateCategorizeInput } from '../middleware/security.js';
+import { getMacroRates } from '../services/macroRates.js';
+import { getAssistantClient, callWithModelCascade, getNextMondayISO } from '../config/aiClients.js';
+import { getGeminiTools, getOllamaTools, executeTool, MAX_TOOL_ITERATIONS } from '../mcp/mcpRegistry.js';
 
 const router = express.Router();
 
@@ -10,93 +12,131 @@ const chatLimiter = createRateLimiter({ windowMs: 60000, max: 30, message: 'Too 
 const categorizeLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 'Too many categorization requests.' });
 const reviewLimiter = createRateLimiter({ windowMs: 60000, max: 30, message: 'Too many review requests.' });
 
-function getAI() {
-  const apiKey = process.env.GEMINI_API_KEY 
-    || process.env.ASSISTANT_API_KEY 
-    || process.env.MANAGER_API_KEY;
+// ── Ollama Qwen 3.5 Auto-Detection & Caching ────────────────────────────────
 
-  if (!apiKey) {
-    throw Object.assign(new Error('No Gemini API key configured on server. Set GEMINI_API_KEY in environment variables.'), {
-      code: 'MISSING_API_KEY',
-    });
+let cachedOllamaStatus = null;
+let lastOllamaCheckTime = 0;
+const OLLAMA_CHECK_TTL = 15000; // 15 seconds
+
+export async function isOllamaQwenAvailable() {
+  if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production') {
+    return false;
   }
 
-  return new GoogleGenAI({ apiKey });
+  const now = Date.now();
+  if (cachedOllamaStatus !== null && (now - lastOllamaCheckTime < OLLAMA_CHECK_TTL)) {
+    return cachedOllamaStatus;
+  }
+
+  try {
+    const res = await fetch('http://localhost:11434/api/tags', {
+      signal: AbortSignal.timeout(250),
+    });
+
+    if (!res.ok) {
+      cachedOllamaStatus = false;
+      lastOllamaCheckTime = now;
+      return false;
+    }
+
+    const data = await res.json();
+    const models = data.models || [];
+    const targetModel = (process.env.OLLAMA_MODEL || 'qwen3.5:9b').toLowerCase();
+
+    const hasModel = models.some(m => {
+      const name = (m.name || m.model || '').toLowerCase();
+      return name === targetModel ||
+        name.startsWith(targetModel + ':') ||
+        name.startsWith('qwen3.5') ||
+        name.includes('qwen');
+    });
+
+    cachedOllamaStatus = hasModel;
+    lastOllamaCheckTime = now;
+    return hasModel;
+  } catch {
+    cachedOllamaStatus = false;
+    lastOllamaCheckTime = now;
+    return false;
+  }
 }
 
 /**
  * System prompt generator for financial Q&A
  */
-function buildSystemPrompt(snapshot) {
+function buildSystemPrompt(snapshot, macroRates = null) {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 
-  return `You are a financial assistant embedded in a personal budgeting app. Your job is to help users understand their finances AND give them real, actionable financial advice — not just report back numbers they can already see on screen.
+  return `You are ARCA, an expert financial intelligence assistant embedded in the StackedBudgeting app. Your job is to help users understand their finances, optimize budgets, build wealth, and provide real, actionable financial guidance.
 
 Today is ${today}.
 
-## How to use the data
+## Capabilities & MCP In-Process Tools
+You have direct access to authoritative real-time financial tools:
+- calculate_budget_metrics: Use this for ALL math over budget, spending, averages, or cashflow. DO NOT perform mental arithmetic.
+- get_stock_quote: Retrieve real-time stock/crypto prices, daily changes, and market caps.
+- get_interest_rates: Retrieve official FRED Federal Reserve rates, mortgage benchmarks, and Treasury yields.
+- search_financial_news: Search verified journalistic reporting from Bloomberg, Reuters, WSJ, CNBC, FT, Barron's, and MarketWatch.
+- search_web: Query the web for specific financial terms, policies, or institutional offerings.
 
-You will be given the user's budget data (income, expenses, categories, savings, goals, etc.) inside <user_budget_data> tags. Treat this as context about this specific person, not as the boundary of what you're allowed to talk about. You should:
-
-- Reference their actual numbers when relevant ("You're spending $420/mo on dining out, which is about 15% of your income")
+## How to use the user data
+Context is provided inside <user_budget_data> and <market_macro_data> tags:
+- Reference their actual numbers when relevant ("You're spending $420/mo on dining out, which is about 15% of your income").
 - Apply general financial knowledge, best practices, and reasoning that goes beyond what's in the data — budgeting frameworks, debt payoff strategies, savings rate benchmarks, emergency fund sizing, etc.
-- Answer general financial questions even if they aren't directly tied to the user's data (e.g. "what's a Roth IRA," "how does the 50/30/20 rule work")
+- Answer general financial questions even if they aren't directly tied to the user's data (e.g. "what's a Roth IRA," "how does the 50/30/20 rule work").
 
-Do not limit yourself to summarizing or restating the data. The data is an input to your reasoning, not a cage around it.
+## Macroeconomic & Market Awareness
+When answering questions about debt payoff, savings, buying a home, vehicle purchases, or investments:
+- Ground your analysis in official interest rates provided in <market_macro_data> or via get_interest_rates.
+- For liquid cash reserves & emergency funds, emphasize high-yield cash yields (~${macroRates?.topHysa ?? 4.23}% APY) that outpace inflation and provide safe liquidity.
+- For debt elimination, highlight the severe drag of credit card rates (~${macroRates?.creditCardApr ?? 21.19}%) and recommend aggressive payoff before discretionary spending.
+- For mortgage or vehicle purchase queries, ground financing calculations in prevailing benchmarks (~${macroRates?.mortgage30 ?? 7.11}% for 30-year mortgages).
 
 ## How to respond
-
 1. Briefly acknowledge what the data shows, if relevant to the question.
 2. Give a clear, direct answer or recommendation — don't hedge into vagueness.
 3. Ground advice in real financial principles rather than generic platitudes.
-4. Where there are multiple reasonable approaches, briefly mention the tradeoff instead of picking one silently.
-5. Keep responses concise and conversational — this is a chat interface, not a report.
+4. Keep responses concise, structured, and conversational.
 
-## Insurance Guidance & Risk Management
-
-You have expert knowledge across personal insurance lines:
-- **Health Insurance**: Compare HMO vs PPO vs HDHP. Explain deductibles, premiums, copays, coinsurance, and out-of-pocket maximums. Recommend pairing HDHP with a Triple-Tax-Advantaged Health Savings Account (HSA) when feasible.
-- **Auto Insurance**: Explain liability coverage limits (100k/300k/100k benchmarks), collision, comprehensive, and uninsured motorist coverage. Explain deductible sizing ($500 vs $1,000) based on their emergency fund.
-- **Renters & Homeowners Insurance**: Emphasize replacement cost coverage over actual cash value, liability limits, and protecting personal property.
-- **Life Insurance**: Recommend affordable Term Life insurance (typically 10-12x annual income) over high-fee Whole/Universal life for individuals with dependents or debt.
-- **Disability Insurance**: Highlight long-term disability protection (covering 60-70% of gross salary) as fundamental risk prevention.
-- Evaluate whether the user's budget allocations and emergency fund can comfortably absorb insurance deductibles.
-
-## Purchase Budgeting & Sinking Fund Planning
-
-When a user asks how to budget for a large purchase (e.g. vehicle, house down payment, computer, vacation, wedding):
-1. **Target Timeline & Sinking Fund Calculation**: Compute the required monthly contribution: Target Amount ÷ Number of Months.
-2. **Current Budget Fit**: Check against their current income and Left to Budget amount.
-3. **Envelope Reallocation**: Pinpoint which existing discretionary categories (Dining, Entertainment, Shopping) they could temporarily trim.
-4. **Total Cost of Ownership (TCO)**: Factor in recurring ownership costs (insurance, fuel, maintenance, taxes).
-5. **Cash vs Financing**: Explain the true interest cost at current borrowing rates versus saving cash.
-
-## Boundaries
-
-- You are not a licensed financial advisor. For anything involving specific investment decisions, tax filing, or legal/estate matters, give general educational information and suggest the user consult a licensed professional for their specific situation.
-- Don't fabricate numbers, account details, or transactions that aren't in the provided data.
+<market_macro_data>
+AS OF: ${macroRates?.asOf || new Date().toISOString()}
+CURRENT INTEREST RATES & BENCHMARKS (Official FRED & US Treasury Market):
+• Federal Funds Effective Rate: ${macroRates?.dff ?? 3.88}%
+• 10-Year US Treasury Yield: ${macroRates?.tenYearYield ?? 5.15}%
+• 3-Month US Treasury Bill Yield: ${macroRates?.threeMonthYield ?? 4.12}%
+• 5-Year US Treasury Yield: ${macroRates?.fiveYearYield ?? 4.98}%
+• 30-Year US Treasury Yield: ${macroRates?.thirtyYearYield ?? 5.48}%
+• 30-Year Fixed Mortgage Average: ${macroRates?.mortgage30 ?? 7.11}%
+• 15-Year Fixed Mortgage Average: ${macroRates?.mortgage15 ?? 6.45}%
+• Bank Prime Loan Rate: ${macroRates?.primeRate ?? 7.00}%
+• Top Competitive High-Yield Savings (HYSA) APY: ~${macroRates?.topHysa ?? 4.23}% (DFF + 0.35%)
+• National Commercial Bank Credit Card APR: ${macroRates?.creditCardApr ?? 21.19}%
+MACROECONOMIC INDICATORS:
+• CPI Inflation (YoY): ${macroRates?.cpiYoY ?? 2.6}%
+• US Civilian Unemployment Rate: ${macroRates?.unemployment ?? 4.1}%
+</market_macro_data>
 
 <user_budget_data>
 SUMMARY:
-• Total Income: $${snapshot?.summary?.totalIncome ?? 0}
-• Total Spent (current cycle): $${snapshot?.summary?.totalSpent ?? 0}
-• Total Budget Allocated: $${snapshot?.summary?.totalAllocated ?? 0}
-• Left to Budget: $${snapshot?.summary?.leftToBudget ?? 0}
-• Net Cash Flow: $${snapshot?.summary?.netBalance ?? 0}
-• Estimated Total Net Worth (Cash Flow + Stocks): $${snapshot?.summary?.netWorth ?? snapshot?.netWorth ?? 0}
-• Total Transactions: ${snapshot?.summary?.transactionCount ?? 0}
-• Budget Cycle: ${snapshot?.summary?.cycleFrequency ?? 'Monthly'}
+• Total Income: $${snapshot?.summary?.totalIncome ?? snapshot?.totalIncome ?? 0}
+• Total Spent (current cycle): $${snapshot?.summary?.totalSpent ?? snapshot?.totalSpent ?? 0}
+• Total Budget Allocated: $${snapshot?.summary?.totalAllocated ?? snapshot?.totalAllocated ?? 0}
+• Left to Budget: $${snapshot?.summary?.leftToBudget ?? snapshot?.leftToBudget ?? 0}
+• Net Cash Flow: $${snapshot?.summary?.netBalance ?? snapshot?.netBalance ?? 0}
+• Estimated Total Net Worth: $${snapshot?.summary?.netWorth ?? snapshot?.netWorth ?? 0}
+• Total Transactions: ${snapshot?.summary?.transactionCount ?? (snapshot?.transactions || []).length}
+• Budget Cycle: ${snapshot?.summary?.cycleFrequency ?? snapshot?.cycleFrequency ?? 'Monthly'}
 
 STOCK PORTFOLIO & INVESTMENTS:
-• Total Stock Value: $${snapshot?.portfolio?.totalValue ?? 0}
-• Total Invested (Cost Basis): $${snapshot?.portfolio?.totalInvested ?? 0}
-• Total Return: $${snapshot?.portfolio?.totalGain ?? 0} (${snapshot?.portfolio?.totalGainPercent ?? 0}%)
-• Holdings Count: ${snapshot?.portfolio?.holdingsCount ?? (snapshot?.portfolio?.holdings || []).length}
-${(snapshot?.portfolio?.holdings || []).length > 0
-    ? (snapshot?.portfolio?.holdings || []).map(h =>
-      `  - ${h.symbol} (${h.name}): ${h.shares} shares @ $${h.currentPrice} | Value: $${h.currentValue} | P/L: $${h.gain} (${h.gainPercent}%)`
+• Total Stock Value: $${snapshot?.portfolio?.totalValue ?? snapshot?.portfolioCurrentValue ?? 0}
+• Total Invested (Cost Basis): $${snapshot?.portfolio?.totalInvested ?? snapshot?.portfolioTotalInvested ?? 0}
+• Total Return: $${snapshot?.portfolio?.totalGain ?? snapshot?.portfolioTotalGain ?? 0} (${snapshot?.portfolio?.totalGainPercent ?? snapshot?.portfolioTotalGainPercent ?? 0}%)
+• Holdings Count: ${(snapshot?.investments || snapshot?.portfolio?.holdings || []).length}
+${(snapshot?.investments || snapshot?.portfolio?.holdings || []).length > 0
+    ? (snapshot?.investments || snapshot?.portfolio?.holdings || []).map(h =>
+      `  - ${h.symbol} (${h.name || h.symbol}): ${h.shares} shares @ $${h.currentPrice} | Value: $${h.currentValue} | P/L: $${h.unrealizedGain ?? h.gain ?? 0} (${h.unrealizedGainPercent ?? h.gainPercent ?? 0}%)`
     ).join('\n')
     : '  - No stock investments added yet'}
 
@@ -106,16 +146,16 @@ ${(snapshot?.incomeSources || []).length > 0
     : '• No income sources configured'}
 
 BUDGET CATEGORIES (Current Cycle):
-${(snapshot?.categoryBreakdown || []).length > 0
-    ? snapshot.categoryBreakdown.map(c =>
-      `• ${c.name}: Spent $${(c.spent || 0).toFixed(2)} of $${c.budgetLimit || 0} limit (${c.status || 'OK'}, $${(c.remaining || 0).toFixed(2)} remaining)`
+${(snapshot?.categoryBreakdown || snapshot?.categories || []).length > 0
+    ? (snapshot?.categoryBreakdown || snapshot?.categories || []).map(c =>
+      `• ${c.name}: Spent $${(c.spent || 0).toFixed(2)} of $${c.budgetLimit || c.limit || 0} limit (${c.remaining !== undefined ? `$${c.remaining.toFixed(2)} remaining` : ''})`
     ).join('\n')
     : '• No categories configured'}
 
-RECENT TRANSACTIONS (up to 50):
-${(snapshot?.recentTransactions || []).length > 0
-    ? snapshot.recentTransactions.map(t =>
-      `• ${t.date} | ${t.description} | $${t.amount} | ${t.category}`
+RECENT TRANSACTIONS (up to 30):
+${(snapshot?.recentTransactions || snapshot?.transactions || []).slice(0, 30).length > 0
+    ? (snapshot?.recentTransactions || snapshot?.transactions || []).slice(0, 30).map(t =>
+      `• ${t.date} | ${t.description} | $${t.amount} | ${t.category || t.categoryName || 'General'}`
     ).join('\n')
     : '• No transactions recorded'}
 </user_budget_data>`;
@@ -123,86 +163,221 @@ ${(snapshot?.recentTransactions || []).length > 0
 
 /**
  * POST /api/assistant/chat
- * Answers user financial queries safely via server-side Gemini
+ * Answers user financial queries safely via local Qwen (if available) or Google Gemini
  */
 router.post('/chat', chatLimiter, validateChatInput, async (req, res) => {
   const startTime = Date.now();
-  const { question, snapshot, history = [] } = req.body;
+  const { question, snapshot = {}, history = [] } = req.body;
 
   try {
-    const ai = getAI();
-    const systemPrompt = buildSystemPrompt(snapshot || {});
+    const macroData = await getMacroRates().catch(() => null);
+    const systemPrompt = buildSystemPrompt(snapshot, macroData?.raw || macroData);
+    const isLocalQwen = await isOllamaQwenAvailable();
 
-    // Build multi-turn contents array
-    const contents = [{ role: 'user', parts: [{ text: systemPrompt }] }];
-
-    for (const msg of history.slice(-10)) {
-      contents.push({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.text }],
-      });
-    }
-
-    contents.push({
-      role: 'user',
-      parts: [{ text: question }],
-    });
-
-    const isWebSearchIntent = /(current|today|latest|news|stock|price|rate|fed|inflation|market|interest|quote|cost of|search|compare insurance)/i.test(question);
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
-    let answerText = null;
-    let lastError = null;
-    let groundedSources = [];
-
-    for (const model of modelsToTry) {
+    // ── Local Path: Ollama Qwen 3.5 ──────────────────────────────────────────
+    if (isLocalQwen) {
       try {
-        const generateOptions = {
-          model,
-          contents,
-        };
+        const targetModel = process.env.OLLAMA_MODEL || 'qwen3.5:9b';
+        const ollamaTools = getOllamaTools();
 
-        // Enable Google Search grounding tool if query has web search intent
-        if (isWebSearchIntent && (model === 'gemini-2.5-flash' || model === 'gemini-2.0-flash')) {
-          generateOptions.config = {
-            tools: [{ googleSearch: {} }],
-          };
+        const messages = [
+          { role: 'system', content: systemPrompt },
+          ...history.slice(-10).map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'assistant',
+            content: msg.text || msg.content || '',
+          })),
+          { role: 'user', content: question },
+        ];
+
+        let finalAnswer = '';
+        const groundedSources = [];
+
+        for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+          const isLastIteration = iteration === MAX_TOOL_ITERATIONS - 1;
+          const ollamaRes = await fetch('http://localhost:11434/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: targetModel,
+              messages,
+              tools: isLastIteration ? undefined : ollamaTools,
+              stream: false,
+            }),
+            signal: AbortSignal.timeout(20000),
+          });
+
+          if (!ollamaRes.ok) {
+            throw new Error(`Ollama chat returned HTTP ${ollamaRes.status}`);
+          }
+
+          const ollamaData = await ollamaRes.json();
+          const assistantMsg = ollamaData.message || {};
+          messages.push(assistantMsg);
+
+          const toolCalls = assistantMsg.tool_calls || [];
+          if (toolCalls.length === 0 || isLastIteration) {
+            finalAnswer = assistantMsg.content || '';
+            break;
+          }
+
+          // Execute requested tools in-process
+          for (const call of toolCalls) {
+            const toolName = call.function?.name;
+            const toolArgs = call.function?.arguments || {};
+            const result = await executeTool(toolName, toolArgs, snapshot);
+
+            if (toolName === 'search_financial_news' && result.articles) {
+              result.articles.forEach(a => groundedSources.push({ title: a.headline, uri: a.url, publisher: a.publisher }));
+            } else if (toolName === 'search_web' && result.results) {
+              result.results.forEach(r => groundedSources.push({ title: r.title, uri: r.url }));
+            }
+
+            messages.push({
+              role: 'tool',
+              name: toolName,
+              tool_call_id: call.id || toolName || 'call_0',
+              content: JSON.stringify(result),
+            });
+          }
         }
 
-        const response = await ai.models.generateContent(generateOptions);
-        answerText = (response.text || '').trim();
-
-        // Extract grounding web search metadata if present
-        const searchChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-        if (searchChunks.length > 0) {
-          groundedSources = searchChunks
-            .filter(c => c.web?.uri)
-            .map(c => ({ title: c.web.title || 'Web Source', uri: c.web.uri }));
-        }
-
-        if (answerText) break;
-      } catch (err) {
-        lastError = err;
-        // Try fallback without search tool if tool calling threw error
-        try {
-          const fallbackRes = await ai.models.generateContent({ model, contents });
-          answerText = (fallbackRes.text || '').trim();
-          if (answerText) break;
-        } catch (_) {}
+        res.setHeader('X-AI-Provider', 'local-qwen');
+        return res.json({
+          answer: finalAnswer,
+          sources: groundedSources,
+          provider: 'local-qwen',
+          isWebGrounded: groundedSources.length > 0,
+          latencyMs: Date.now() - startTime,
+        });
+      } catch (ollamaErr) {
+        console.warn('[Assistant] Local Ollama failed, falling back to Cloud Gemini cascade:', ollamaErr.message);
+        // Seamlessly fall through to Cloud Gemini
       }
     }
 
-    if (!answerText) {
-      throw lastError || new Error('All Gemini model fallbacks failed to respond');
+    // ── Cloud Path: Gemini with Cascade & MCP Tools ──────────────────────────
+    const client = getAssistantClient();
+    if (!client) {
+      return res.status(500).json({
+        error: 'No Gemini API key configured for AI assistant. Set ASSISTANT_API_KEY or GEMINI_API_KEY.',
+      });
     }
 
+    const geminiTools = getGeminiTools();
+
+    // Construct strictly alternating conversation turns for Gemini
+    const contents = [];
+    const conversationTurns = [
+      ...history.slice(-10).map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        text: (msg.text || msg.content || '').trim(),
+      })),
+      { role: 'user', text: question.trim() },
+    ];
+
+    for (const turn of conversationTurns) {
+      if (!turn.text) continue;
+      if (contents.length > 0 && contents[contents.length - 1].role === turn.role) {
+        // Merge consecutive turns of the same role
+        contents[contents.length - 1].parts[0].text += `\n\n${turn.text}`;
+      } else {
+        contents.push({
+          role: turn.role,
+          parts: [{ text: turn.text }],
+        });
+      }
+    }
+
+    // Gemini requires conversations to start with a 'user' turn
+    while (contents.length > 0 && contents[0].role !== 'user') {
+      contents.shift();
+    }
+    if (contents.length === 0) {
+      contents.push({ role: 'user', parts: [{ text: question.trim() }] });
+    }
+
+    let finalAnswer = '';
+    const groundedSources = [];
+
+    for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+      const isLastIteration = iteration === MAX_TOOL_ITERATIONS - 1;
+      const response = await callWithModelCascade(client, 'chat', {
+        contents,
+        config: {
+          systemInstruction: systemPrompt,
+          tools: isLastIteration ? [] : geminiTools,
+        },
+      });
+
+      const candidate = response.candidates?.[0];
+      const parts = candidate?.content?.parts || [];
+
+      // Extract web search grounding metadata if present from Google Search tool
+      const searchChunks = candidate?.groundingMetadata?.groundingChunks || [];
+      if (searchChunks.length > 0) {
+        searchChunks
+          .filter(c => c.web?.uri)
+          .forEach(c => groundedSources.push({ title: c.web.title || 'Web Source', uri: c.web.uri }));
+      }
+
+      // Check for function calls
+      const functionCalls = response.functionCalls || parts.filter(p => p.functionCall).map(p => p.functionCall);
+
+      if (!functionCalls || functionCalls.length === 0 || isLastIteration) {
+        finalAnswer = response.text || parts.map(p => p.text).filter(Boolean).join('\n') || '';
+        break;
+      }
+
+      // Add model's tool request part to contents
+      contents.push({
+        role: 'model',
+        parts,
+      });
+
+      // Execute each function call and construct response parts
+      const functionResponseParts = [];
+      for (const fn of functionCalls) {
+        const result = await executeTool(fn.name, fn.args, snapshot);
+
+        if (fn.name === 'search_financial_news' && result.articles) {
+          result.articles.forEach(a => groundedSources.push({ title: a.headline, uri: a.url, publisher: a.publisher }));
+        } else if (fn.name === 'search_web' && result.results) {
+          result.results.forEach(r => groundedSources.push({ title: r.title, uri: r.url }));
+        }
+
+        functionResponseParts.push({
+          functionResponse: {
+            name: fn.name,
+            response: { result },
+          },
+        });
+      }
+
+      contents.push({
+        role: 'user',
+        parts: functionResponseParts,
+      });
+    }
+
+    res.setHeader('X-AI-Provider', 'cloud-gemini');
     return res.json({
-      answer: answerText,
+      answer: finalAnswer.trim(),
       sources: groundedSources,
+      provider: 'cloud-gemini',
       isWebGrounded: groundedSources.length > 0,
       latencyMs: Date.now() - startTime,
     });
   } catch (err) {
     console.error('Assistant chat error:', err);
+
+    if (err.status === 429 || err.code === 'UPSTREAM_RATE_LIMIT') {
+      return res.status(429).json(err.payload || {
+        error: 'UPSTREAM_RATE_LIMIT',
+        message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+        resetDate: getNextMondayISO(),
+      });
+    }
+
     return res.status(500).json({
       error: 'Failed to generate assistant response',
       message: sanitizeError(err),
@@ -212,13 +387,17 @@ router.post('/chat', chatLimiter, validateChatInput, async (req, res) => {
 
 /**
  * POST /api/assistant/categorize
- * Uses Gemini to classify a transaction description into existing categories
+ * Uses Gemini 2.0 Flash Lite to silently categorize transactions
  */
 router.post('/categorize', categorizeLimiter, validateCategorizeInput, async (req, res) => {
   const { description, amount = 0, categories = [] } = req.body;
 
   try {
-    const ai = getAI();
+    const client = getAssistantClient();
+    if (!client) {
+      return res.status(500).json({ error: 'Categorization client unavailable' });
+    }
+
     const prompt = `You are a financial transaction categorizer for a personal budget.
 Categorize the following transaction into ONE of the user's existing budget categories.
 
@@ -232,25 +411,21 @@ Rules:
 - Choose the most specific matching category from the available list
 - If no good match, return the closest one`;
 
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
-    let category = null;
+    const response = await callWithModelCascade(client, 'categorization', {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    });
 
-    for (const model of modelsToTry) {
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        });
-        category = (response.text || '').trim();
-        if (category) break;
-      } catch (err) {
-        // try next
-      }
-    }
-
+    const category = (response.text || '').trim();
     return res.json({ category: category || null });
   } catch (err) {
     console.error('Assistant categorize error:', err);
+    if (err.status === 429 || err.code === 'UPSTREAM_RATE_LIMIT') {
+      return res.status(429).json(err.payload || {
+        error: 'UPSTREAM_RATE_LIMIT',
+        message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+        resetDate: getNextMondayISO(),
+      });
+    }
     return res.status(500).json({ error: 'Categorization error', message: sanitizeError(err) });
   }
 });
@@ -268,7 +443,11 @@ router.post('/review', reviewLimiter, async (req, res) => {
   }
 
   try {
-    const ai = getAI();
+    const client = getAssistantClient();
+    if (!client) {
+      return res.status(500).json({ error: 'Review client unavailable' });
+    }
+
     const prompt = `You are a financial anomaly detection assistant. Analyze this transaction and determine if it is genuinely suspicious or if it appears to be a normal expense.
 
 Transaction under review:
@@ -285,22 +464,11 @@ Possible reasons it was flagged: duplicate within 24h, amount unusually high vs 
 
 Respond in 2 sentences max. Start with either "Looks normal:" or "Suspicious:" and then explain your reasoning clearly and concisely.`;
 
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
-    let answerText = null;
+    const response = await callWithModelCascade(client, 'categorization', {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    });
 
-    for (const model of modelsToTry) {
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        });
-        answerText = (response.text || '').trim();
-        if (answerText) break;
-      } catch {
-        // try next
-      }
-    }
-
+    const answerText = (response.text || '').trim();
     const isSuspicious = answerText ? answerText.toLowerCase().includes('suspicious') : false;
 
     return res.json({

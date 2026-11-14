@@ -25,10 +25,12 @@ rules_version = '2';
 //   - transactions: list of maps (optional or null, max 10000 items)
 //   - categories: list of maps (optional or null, max 200 items)
 //   - incomeSources: list of maps (optional or null, max 100 items)
+//   - investments: list of maps (optional or null, max 500 items)
 //   - cycleStartDate: string, timestamp, or null (optional, format YYYY-MM-DD or ISO 8601, max 35 chars)
 //   - cycleFrequency: string (optional or null, max 30 chars)
 //   - voiceLogs: list of maps (optional or null, max 1000 items)
 //   - chatMessages: list of maps (optional or null, max 2000 items)
+//   - quotaUsage: map (optional, keys: weekStartDate, receiptsUsed, voiceUsed, assistantUsed)
 //   - updatedAt: string or timestamp (optional or null, max 60 chars)
 //   - createdAt: string or timestamp (optional or null, max 60 chars, immutable on update)
 //   - uid: string (optional, if provided must match userId and request.auth.uid, max 128 chars)
@@ -153,6 +155,22 @@ service cloud.firestore {
                ('createdAt' in request.resource.data && request.resource.data.createdAt == resource.data.createdAt));
     }
 
+    // Validate quotaUsage map schema
+    function isValidQuotaUsage() {
+      return !('quotaUsage' in request.resource.data) ||
+        request.resource.data.quotaUsage == null ||
+        (request.resource.data.quotaUsage is map &&
+         request.resource.data.quotaUsage.keys().hasOnly(['weekStartDate', 'receiptsUsed', 'voiceUsed', 'assistantUsed']) &&
+         (!('weekStartDate' in request.resource.data.quotaUsage) ||
+           (request.resource.data.quotaUsage.weekStartDate is string && request.resource.data.quotaUsage.weekStartDate.size() <= 40)) &&
+         (!('receiptsUsed' in request.resource.data.quotaUsage) ||
+           ((request.resource.data.quotaUsage.receiptsUsed is int || request.resource.data.quotaUsage.receiptsUsed is number) && request.resource.data.quotaUsage.receiptsUsed >= 0)) &&
+         (!('voiceUsed' in request.resource.data.quotaUsage) ||
+           ((request.resource.data.quotaUsage.voiceUsed is int || request.resource.data.quotaUsage.voiceUsed is number) && request.resource.data.quotaUsage.voiceUsed >= 0)) &&
+         (!('assistantUsed' in request.resource.data.quotaUsage) ||
+           ((request.resource.data.quotaUsage.assistantUsed is int || request.resource.data.quotaUsage.assistantUsed is number) && request.resource.data.quotaUsage.assistantUsed >= 0)));
+    }
+
     // Validator for /users/{userId}/budgetData/{docId} documents (applied on both create & update)
     function isValidBudgetData(userId, docId) {
       return docId is string &&
@@ -162,10 +180,12 @@ service cloud.firestore {
           'transactions',
           'categories',
           'incomeSources',
+          'investments',
           'cycleStartDate',
           'cycleFrequency',
           'voiceLogs',
           'chatMessages',
+          'quotaUsage',
           'updatedAt',
           'createdAt',
           'uid',
@@ -174,8 +194,10 @@ service cloud.firestore {
         isValidOptionalList('transactions', 10000) &&
         isValidOptionalList('categories', 200) &&
         isValidOptionalList('incomeSources', 100) &&
+        isValidOptionalList('investments', 500) &&
         isValidOptionalList('voiceLogs', 1000) &&
         isValidOptionalList('chatMessages', 2000) &&
+        isValidQuotaUsage() &&
         isValidOptionalTimestampOrString('cycleStartDate', 35) &&
         isValidOptionalString('cycleFrequency', 0, 30) &&
         isValidOptionalTimestampOrString('updatedAt', 60) &&

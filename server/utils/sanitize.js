@@ -14,6 +14,7 @@ export function sanitizeError(err) {
     'ASSISTANT_API_KEY',
     'MANAGER_API_KEY',
     'RECEIPT_SCANNER_API_KEY',
+    'VOICE_SCANNER_API_KEY',
     'OPENAI_API_KEY',
     'ELEVENLABS_API_KEY',
     'ANTHROPIC_API_KEY',

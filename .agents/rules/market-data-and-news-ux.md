@@ -20,3 +20,17 @@ trigger: always_on
   - **Home Tab**: As an integrated wealth/asset widget (`StocksWidget`) alongside income settings and budget envelopes.
   - **Summary Tab**: Integrated into Net Worth calculations, Financial Health scorecards, and asset allocation visualizations.
   - **AI Assistant**: Injected into the financial snapshot context so conversational agents can accurately report on portfolio valuation and performance.
+
+## 4. Authoritative Interest Rate & Macroeconomic Sourcing
+- Never synthesize or hardcode interest rates, mortgage yields, or Federal Reserve benchmark policy rates.
+- Rates must be sourced from official Federal Reserve Economic Data (FRED) series (`DFF`, `MORTGAGE30US`, `MORTGAGE15US`, `DPRIME`, `TERMCBCCALLNS`, `CPIAUCSL`, `UNRATE`) and live US Treasury sovereign debt market yields via Yahoo Finance (`^TNX`, `^IRX`, `^FVX`, `^TYX`).
+- Competitive cash yields (Top HYSA APYs) must be anchored dynamically to effective Federal Reserve benchmarks (e.g. `DFF + 0.35%`).
+- Provide resilient caching (15-minute TTL) with verified fallback baselines so rate degradation never renders broken UIs.
+
+## 5. Stock Search Hygiene & Directory Quality
+- Enforce strict ticker hygiene on stock search and catalog endpoints:
+  - Strip foreign exchange extensions (`.TO`, `.DE`, `.MX`, `.NE`, etc.) unless specifically handling domestic share classes like `BRK.B` / `BF.B`.
+  - Exclude derivative contracts, futures (`=F`), and leveraged/inverse instruments (`2X`, `3X`, `TSLZ`, `SOXS`, `NVDX`, `Ultra`) from standard company searches unless explicitly requested by the user.
+  - Dynamically preserve sector classification directly from real-time quote feeds rather than falling back to generic placeholders.
+  - Ensure search results bypass any active sector filters in the UI so relevant results are never hidden.
+  - Correctly extract net asset capitalization (`q.netAssets || q.totalAssets`) for ETFs (e.g., `SPY`, `VOO`, `QQQ`) so funds do not display `Cap: N/A`.

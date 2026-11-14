@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Modal } from '../ui/Modal';
 import { useBudget } from '../../contexts/BudgetContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { checkAndIncrementQuota, QUOTA_LIMITS, getNextMondayCountdown } from '../../utils/quotaManager';
 import { processTransaction } from '../../services/agents/managerAgent';
 import { speakTransactionDetails } from '../../services/agents/voiceAgent';
 import { scanReceipt } from '../../services/agents/receiptScannerAgent';
@@ -9,7 +11,8 @@ import { Upload, Sparkles, Loader2, CheckCircle2, FileText, AlertCircle, Bot, Vo
 
 export default function ReceiptScannerModal({ isOpen, onClose }) {
   const budgetState = useBudget();
-  const { categories, dispatch } = budgetState;
+  const { categories, dispatch, quotaUsage, openProModal, updateQuota } = budgetState;
+  const { user } = useAuth();
   
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -73,12 +76,28 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
       return;
     }
 
+    // Pre-validate quota before dispatching API request
+    const quotaCheck = await checkAndIncrementQuota(user?.uid, 'receipts', quotaUsage, { skipIncrement: true });
+    if (!quotaCheck.allowed) {
+      openProModal({
+        reason: 'QUOTA_EXHAUSTED',
+        feature: 'receipts',
+        used: quotaCheck.used,
+        limit: quotaCheck.limit,
+        resetCountdown: quotaCheck.resetCountdown,
+      });
+      return;
+    }
+
     setIsScanning(true);
     setScanError(null);
 
     try {
       // Call Gemini Vision directly in the browser — works on Vercel & localhost
       const result = await scanReceipt(selectedFile);
+
+      // Increment quota on successful scan
+      await updateQuota('receipts');
 
       // result.data is the structured shape the modal expects
       const json = result;
@@ -110,6 +129,16 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
       });
     } catch (err) {
       console.error('Scan error:', err);
+      if (err.status === 429 || err?.data?.error === 'UPSTREAM_RATE_LIMIT' || err?.message?.includes('429')) {
+        openProModal({
+          reason: 'UPSTREAM_RATE_LIMIT',
+          feature: 'receipts',
+          used: quotaUsage?.receiptsUsed ?? QUOTA_LIMITS.receipts,
+          limit: QUOTA_LIMITS.receipts,
+          resetCountdown: getNextMondayCountdown(),
+        });
+        return;
+      }
       setScanError(err.message);
       toast.error(err.message);
     } finally {
