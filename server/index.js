@@ -80,8 +80,12 @@ const healthCheck = (_req, res) => {
 app.get('/api/health', healthCheck);
 app.get('/health', healthCheck);
 
-// Start server (when executed directly, not imported in serverless)
-if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+// Start server (when executed directly, not imported in tests or serverless)
+const isDirectExecution = process.argv[1] && (
+  process.argv[1].endsWith('server/index.js') ||
+  process.argv[1].endsWith('server')
+);
+if (isDirectExecution && !process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`Backend server listening on http://localhost:${PORT}`);
   });

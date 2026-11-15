@@ -795,16 +795,36 @@ Topic focus: ${topic}.
 Tone: Authoritative, clear, accessible, and grounded in real financial principles.
 Format: Return clean plain text paragraphs with no markdown bolding in titles. Include 3 bullet points at the end under "KEY BUDGET TAKEAWAYS:".`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    });
+    let summaryText = '';
+    try {
+      const response = await Promise.race([
+        ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('AI Generation Timeout')), 4000)),
+      ]);
+      summaryText = response.text?.trim() || '';
+    } catch (genErr) {
+      console.warn('AI summary generation timed out or failed, using grounded fallback:', genErr.message);
+    }
 
-    const summaryText = response.text?.trim() || '';
+    if (!summaryText) {
+      return res.json({
+        summary: `Economic conditions are characterized by steady growth, headline CPI inflation near ${cpi}%, and the 10-Year Treasury Yield around ${tenYr.toFixed(2)}%. The Federal Reserve Effective Funds Rate stands at ${dff}%, anchoring top high-yield savings APYs near ${hysa}% while 30-year fixed mortgages average ${m30}%. For everyday household budgeting, this climate strongly favors holding 3–6 month emergency fund reserves in competitive high-yield vehicles while aggressively eliminating high-interest credit card debt averaging ${cc}%.`,
+        keyTakeaways: [
+          `Cash buffers: Top high-yield savings accounts offer ~${hysa}% APY risk-free.`,
+          `Borrowing costs: Conforming 30-year mortgages average ${m30}%; keep down payment envelopes high.`,
+          `Debt payoff: Credit card rates average ${cc}%; prioritize paying variable balances first.`,
+        ],
+        model: 'macro-grounded-baseline',
+        latencyMs: Date.now() - startTime,
+      });
+    }
 
     return res.json({
       summary: summaryText,
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       latencyMs: Date.now() - startTime,
     });
   } catch (err) {

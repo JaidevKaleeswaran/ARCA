@@ -398,11 +398,15 @@ router.post('/categorize', categorizeLimiter, validateCategorizeInput, async (re
       return res.status(500).json({ error: 'Categorization client unavailable' });
     }
 
+    const categoryList = Array.isArray(categories)
+      ? categories.map(c => typeof c === 'string' ? c : c?.name || '').filter(Boolean)
+      : [];
+
     const prompt = `You are a financial transaction categorizer for a personal budget.
 Categorize the following transaction into ONE of the user's existing budget categories.
 
 Available categories:
-${categories.map(c => `- ${c}`).join('\n')}
+${categoryList.map(c => `- ${c}`).join('\n')}
 
 Transaction: "${description}" for $${amount}
 

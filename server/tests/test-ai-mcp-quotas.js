@@ -231,7 +231,7 @@ async function runSuite() {
     const gemini = getGeminiTools();
     assert(Array.isArray(gemini) && gemini[0].functionDeclarations, 'Gemini tools must have functionDeclarations');
     assert.strictEqual(gemini[0].functionDeclarations.length, 5, 'Must export 5 tools');
-    assert(gemini[0].functionDeclarations[0].parametersJsonSchema, 'Must have parametersJsonSchema for OpenAPI compatibility');
+    assert(gemini[0].functionDeclarations[0].parameters || gemini[0].functionDeclarations[0].parametersJsonSchema, 'Must have parameters schema for OpenAPI compatibility');
 
     const ollama = getOllamaTools();
     assert(Array.isArray(ollama), 'Ollama tools must be an array');

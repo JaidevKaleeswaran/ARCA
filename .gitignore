@@ -47,3 +47,7 @@ aws/aws-outputs.*.json
 aws/__pycache__/
 .vercel
 .env*
+
+# Playwright Test Artifacts
+playwright-report/
+test-results/

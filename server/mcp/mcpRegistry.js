@@ -109,7 +109,6 @@ export function getGeminiTools() {
         name: def.name,
         description: def.description,
         parameters: def.parameters,
-        parametersJsonSchema: def.parameters,
       })),
     },
   ];

@@ -1,0 +1,93 @@
+{
+  "incomeSources": [
+    {
+      "id": "inc-salary-1",
+      "name": "Software Engineering Salary",
+      "amount": 6500,
+      "frequency": "monthly",
+      "type": "Salary"
+    },
+    {
+      "id": "inc-side-1",
+      "name": "Consulting & Freelance",
+      "amount": 1200,
+      "frequency": "monthly",
+      "type": "Side Hustle"
+    }
+  ],
+  "cycleStartDate": "2026-11-01T00:00:00.000Z",
+  "cycleFrequency": "monthly",
+  "categories": [
+    {
+      "id": "cat-bills-1",
+      "name": "Bills",
+      "limit": 1800,
+      "color": "#e7b956",
+      "endOfCycleAction": "none"
+    },
+    {
+      "id": "cat-groceries-2",
+      "name": "Groceries",
+      "limit": 800,
+      "color": "#2e5b45",
+      "endOfCycleAction": "none"
+    },
+    {
+      "id": "cat-entertainment-3",
+      "name": "Entertainment",
+      "limit": 400,
+      "color": "#8c6d37",
+      "endOfCycleAction": "none"
+    },
+    {
+      "id": "cat-investments-4",
+      "name": "Investments",
+      "limit": 1500,
+      "color": "#3b82f6",
+      "endOfCycleAction": "none"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "tx-1",
+      "description": "Trader Joe's Groceries",
+      "amount": 124.50,
+      "categoryId": "cat-groceries-2",
+      "date": "2026-11-05",
+      "type": "expense",
+      "notes": "Weekly produce and essentials"
+    },
+    {
+      "id": "tx-2",
+      "description": "Electric & Internet Bill",
+      "amount": 185.00,
+      "categoryId": "cat-bills-1",
+      "date": "2026-11-08",
+      "type": "expense",
+      "notes": "Home utility bills"
+    }
+  ],
+  "investments": [
+    {
+      "symbol": "SPY",
+      "shares": 10,
+      "avgCost": 520.00,
+      "addedAt": "2026-11-01T10:00:00.000Z"
+    },
+    {
+      "symbol": "AAPL",
+      "shares": 15,
+      "avgCost": 210.00,
+      "addedAt": "2026-11-02T14:30:00.000Z"
+    }
+  ],
+  "voiceLogs": [],
+  "chatMessages": [],
+  "quotaUsage": {
+    "weekStartDate": "2026-11-09T00:00:00.000Z",
+    "receiptsUsed": 1,
+    "voiceUsed": 2,
+    "assistantUsed": 3
+  },
+  "updatedAt": "2026-11-13T19:00:00.000Z"
+}
