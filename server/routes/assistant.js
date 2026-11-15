@@ -203,7 +203,7 @@ router.post('/chat', chatLimiter, validateChatInput, async (req, res) => {
               tools: isLastIteration ? undefined : ollamaTools,
               stream: false,
             }),
-            signal: AbortSignal.timeout(20000),
+            signal: AbortSignal.timeout(parseInt(process.env.OLLAMA_TIMEOUT_MS, 10) || 75000),
           });
 
           if (!ollamaRes.ok) {
