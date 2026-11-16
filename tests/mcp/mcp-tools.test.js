@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { executeTool, getGeminiTools, getOllamaTools, MAX_TOOL_ITERATIONS } from '../../server/mcp/mcpRegistry.js';
+import { executeTool, getGeminiTools, MAX_TOOL_ITERATIONS } from '../../server/mcp/mcpRegistry.js';
 import { calculateBudgetMetrics } from '../../server/mcp/tools/budgetCalculator.js';
 import { normalizeTicker, getStockQuote } from '../../server/mcp/tools/stockQuote.js';
 import { getInterestRates } from '../../server/mcp/tools/interestRates.js';
@@ -7,7 +7,7 @@ import { searchFinancialNews } from '../../server/mcp/tools/financialNews.js';
 import { searchWeb } from '../../server/mcp/tools/webSearch.js';
 
 describe('Model Context Protocol (MCP) Tool Suite', () => {
-  it('Tool schema generator produces valid schemas for both Gemini and Ollama', () => {
+  it('Tool schema generator produces valid schema for Gemini function calling', () => {
     const geminiTools = getGeminiTools();
     expect(geminiTools.length).toBe(1);
     expect(geminiTools[0].functionDeclarations.length).toBe(5);
@@ -19,11 +19,6 @@ describe('Model Context Protocol (MCP) Tool Suite', () => {
       expect(fn).toHaveProperty('parameters');
       expect(fn.parametersJsonSchema).toBeUndefined();
     });
-
-    const ollamaTools = getOllamaTools();
-    expect(ollamaTools.length).toBe(5);
-    expect(ollamaTools[0]).toHaveProperty('type', 'function');
-    expect(ollamaTools[0].function).toHaveProperty('name');
   });
 
   it('calculateBudgetMetrics computes totals, largest expenses, and averages', async () => {

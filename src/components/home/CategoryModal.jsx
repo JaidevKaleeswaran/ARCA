@@ -100,7 +100,7 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
             name="name"
             value={formData.name}
             onChange={handleChange}
-            className="w-full bg-[#09090b] border border-zinc-700 rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
+            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
             placeholder="e.g. Groceries"
             required
           />
@@ -113,7 +113,7 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
             name="limit"
             value={formData.limit}
             onChange={handleChange}
-            className="w-full bg-[#09090b] border border-zinc-700 rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
+            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
             placeholder="0.00"
             min="0"
             step="0.01"
@@ -141,7 +141,7 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
             name="endOfCycleAction"
             value={formData.endOfCycleAction}
             onChange={handleChange}
-            className="w-full bg-[#09090b] border border-zinc-700 rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
+            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
           >
             <option value="none">None (Reset)</option>
             <option value="rollover">Rollover Unspent</option>

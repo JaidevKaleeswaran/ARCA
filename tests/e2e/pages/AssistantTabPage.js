@@ -4,7 +4,7 @@ export class AssistantTabPage {
     this.inputQuery = page.locator('input[placeholder*="Ask about your spending"]');
     this.sendButton = page.locator('button[data-tutorial="ai-input-bar"] button').last();
     this.voiceRecordButton = page.locator('button[data-tutorial="ai-voice-mic"]');
-    this.quotaBadge = page.locator('button[title="Weekly AI Assistant Quota"], span:has-text("Local Qwen"), span:has-text("Unlimited")').first();
+    this.quotaBadge = page.locator('button[title="Weekly AI Assistant Quota"], span:has-text("ARCA Pro"), span:has-text("Unlimited")').first();
     this.quickPromptChips = page.locator('div[data-tutorial="ai-quick-questions"] button');
     this.voiceAuditLogButton = page.locator('button:has-text("Voice Logs")');
 

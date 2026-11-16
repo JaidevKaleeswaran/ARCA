@@ -1,13 +1,22 @@
-import React from 'react';
+import { useState, useCallback } from 'react';
 import FinancialHealthCards from './FinancialHealthCards';
 import MainBalanceChart from './MainBalanceChart';
 import CategoryCharts from './CategoryCharts';
 import NotificationHub from './NotificationHub';
 import StocksWidget from '../widgets/StocksWidget';
+import StockHoldingWidget from '../widgets/StockHoldingWidget';
+import InvestStockModal from '../markets/InvestStockModal';
 import MaskedHeading from '../ui/MaskedHeading';
 import Reveal from '../ui/Reveal';
+import { useBudget } from '../../contexts/BudgetContext';
 
 export default function SummaryTab({ onNavigateToMarkets }) {
+  const { investments = [] } = useBudget();
+  const [selectedStockToInvest, setSelectedStockToInvest] = useState(null);
+
+  const handleCloseInvestModal = useCallback(() => {
+    setSelectedStockToInvest(null);
+  }, []);
   return (
     <div className="flex flex-col space-y-6">
       {/* Header */}
@@ -51,11 +60,32 @@ export default function SummaryTab({ onNavigateToMarkets }) {
         </Reveal>
       </div>
 
+      {/* ── Invest in Stock Modal directly accessible from Stock Widgets ── */}
+      <InvestStockModal
+        stock={selectedStockToInvest}
+        isOpen={Boolean(selectedStockToInvest)}
+        onClose={handleCloseInvestModal}
+      />
+
       {/* Bottom section: Stocks Widget & Notification Hub */}
       <Reveal delay={0.28}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-4">
             <StocksWidget onNavigateToMarkets={onNavigateToMarkets} />
+
+            {/* Dedicated Individual Stock Widgets created for each holding */}
+            {investments.length > 0 && (
+              <div className="space-y-4 pt-1">
+                {investments.map((inv) => (
+                  <StockHoldingWidget
+                    key={inv.id || inv.symbol}
+                    holding={inv}
+                    onNavigateToMarkets={onNavigateToMarkets}
+                    onInvestMore={(stock) => setSelectedStockToInvest(stock)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
           <div className="lg:col-span-2" data-tutorial="summary-notifications">
             <NotificationHub />

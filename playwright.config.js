@@ -30,6 +30,6 @@ export default defineConfig({
     command: 'node scripts/dev.js',
     url: 'http://localhost:5173',
     timeout: 30000,
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
   },
 });

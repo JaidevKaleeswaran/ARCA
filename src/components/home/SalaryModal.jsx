@@ -150,7 +150,7 @@ export default function SalaryModal({ isOpen, onClose }) {
             <span className="text-text-muted">
               Est. income for your <strong className="text-text capitalize">{cycleFrequency}</strong> cycle:
             </span>
-            <span className="font-bold text-[#3a7056] text-sm">
+            <span className="font-bold text-emerald-400 text-sm">
               {formatCurrency(getCycleEstimate())}
             </span>
           </div>
@@ -160,7 +160,7 @@ export default function SalaryModal({ isOpen, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="px-4 bg-primary text-text-muted hover:text-text font-medium py-2 rounded-lg hover:bg-[#2b2924] border border-border transition-colors text-sm"
+            className="px-4 bg-primary text-text-muted hover:text-text font-medium py-2 rounded-lg hover:bg-card-hover border border-border transition-colors text-sm"
           >
             Cancel
           </button>

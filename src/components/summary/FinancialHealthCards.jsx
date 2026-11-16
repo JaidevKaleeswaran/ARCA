@@ -111,12 +111,12 @@ export default function FinancialHealthCards() {
       <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
         <div>
           <p className="text-xs font-medium text-text-muted">Subscriptions</p>
-          <p className="text-xl font-bold text-[#a48246] mt-1 font-mono">
+          <p className="text-xl font-bold text-accent mt-1 font-mono">
             {subscriptions.formattedMonthlyTotal}
           </p>
           <p className="text-[11px] text-zinc-500 mt-0.5">{subscriptions.count} Services</p>
         </div>
-        <div className="p-3 bg-[#8c6d37]/15 rounded-lg text-[#a48246]">
+        <div className="p-3 bg-accent/10 rounded-lg text-accent">
           <CreditCard size={20} />
         </div>
       </div>

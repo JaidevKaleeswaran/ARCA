@@ -27,16 +27,19 @@ test.describe('AI Assistant Tab — Chat, Tool Badges, Voice & Quota Indicator',
     await expect(assistantPage.quotaBadge).toBeVisible();
   });
 
-  test('Quick prompt chips send chat queries and append to conversation stream', async ({ page }) => {
+  test('Clean chat input accepts user query and appends to conversation stream', async ({ page }) => {
     const assistantPage = new AssistantTabPage(page);
     await expect(assistantPage.inputQuery).toBeVisible();
 
-    const firstChip = assistantPage.quickPromptChips.first();
-    if (await firstChip.count() > 0) {
-      const chipText = (await firstChip.innerText()).trim();
-      await firstChip.click();
-      await expect(page.locator('p.font-medium').filter({ hasText: chipText })).toBeVisible();
-    }
+    // Verify promotional question chips were removed per Requirement 4
+    await expect(assistantPage.quickPromptChips).toHaveCount(0);
+
+    // Submit custom chat prompt
+    await assistantPage.inputQuery.fill('What is my current grocery budget?');
+    await assistantPage.inputQuery.press('Enter');
+
+    // Confirm user question message was rendered in chat stream
+    await expect(page.locator('p.font-medium').filter({ hasText: 'What is my current grocery budget?' })).toBeVisible();
   });
 
   test('Voice Prompt Recording button and Audit Log Modal function properly', async ({ page }) => {

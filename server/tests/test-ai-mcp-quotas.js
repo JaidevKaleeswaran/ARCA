@@ -10,16 +10,17 @@ import {
 import {
   callWithModelCascade,
   isRateLimitError,
+  geminiKeyPool,
+  GeminiKeyPool,
   INTERACTIVE_MODELS,
   CATEGORIZATION_MODELS,
 } from '../config/aiClients.js';
-import { executeTool, getGeminiTools, getOllamaTools, MAX_TOOL_ITERATIONS } from '../mcp/mcpRegistry.js';
+import { executeTool, getGeminiTools, MAX_TOOL_ITERATIONS } from '../mcp/mcpRegistry.js';
 import { calculateBudgetMetrics } from '../mcp/tools/budgetCalculator.js';
 import { normalizeTicker, getStockQuote } from '../mcp/tools/stockQuote.js';
 import { getInterestRates } from '../mcp/tools/interestRates.js';
 import { searchFinancialNews } from '../mcp/tools/financialNews.js';
 import { searchWeb } from '../mcp/tools/webSearch.js';
-import { isOllamaQwenAvailable } from '../routes/assistant.js';
 
 let passedTests = 0;
 let totalTests = 0;
@@ -51,7 +52,7 @@ async function itAsync(name, fn) {
 }
 
 async function runSuite() {
-  console.log('\n--- Running AI Assistant, Quotas, Local Qwen & MCP Tools Test Suite ---\n');
+  console.log('\n--- Running AI Assistant, Quotas, Multi-Key Pool & MCP Tools Test Suite ---\n');
 
   // ── Test Group 1: Deterministic Quotas & Monday UTC Anchoring ─────────────────
   console.log('Group 1: Deterministic Quotas & Monday Reset');
@@ -79,9 +80,9 @@ async function runSuite() {
   it('Normalizes quota state and resets stale week counts to 0', () => {
     const staleState = {
       weekStartDate: '2020-01-06T00:00:00.000Z',
-      receiptsUsed: 18,
-      voiceUsed: 25,
-      assistantUsed: 35,
+      receiptsUsed: 5,
+      voiceUsed: 5,
+      assistantUsed: 10,
     };
     const normalized = normalizeQuotaState(staleState);
     assert.strictEqual(normalized.receiptsUsed, 0, 'Stale receipts counter must reset to 0');
@@ -93,49 +94,49 @@ async function runSuite() {
   await itAsync('checkAndIncrementQuota blocks when limit reached without incrementing', async () => {
     const atLimitState = {
       weekStartDate: getMondayOfCurrentWeekISO(),
-      receiptsUsed: QUOTA_LIMITS.receipts, // 18
+      receiptsUsed: QUOTA_LIMITS.receipts, // 5
       voiceUsed: 0,
       assistantUsed: 0,
     };
 
     const res = await checkAndIncrementQuota('test_user', 'receipts', atLimitState, { skipIncrement: true });
-    assert.strictEqual(res.allowed, false, 'Must not be allowed when receiptsUsed >= 18');
+    assert.strictEqual(res.allowed, false, 'Must not be allowed when receiptsUsed >= 5');
     assert.strictEqual(res.reason, 'QUOTA_EXHAUSTED', 'Reason must be QUOTA_EXHAUSTED');
-    assert.strictEqual(res.limit, 18, 'Limit must match QUOTA_LIMITS.receipts');
-    assert.strictEqual(res.used, 18, 'Used count must remain 18');
+    assert.strictEqual(res.limit, 5, 'Limit must match QUOTA_LIMITS.receipts');
+    assert.strictEqual(res.used, 5, 'Used count must remain 5');
   });
 
   await itAsync('checkAndIncrementQuota allows execution when below limit', async () => {
     const belowLimitState = {
       weekStartDate: getMondayOfCurrentWeekISO(),
-      receiptsUsed: 5,
-      voiceUsed: 10,
-      assistantUsed: 20,
+      receiptsUsed: 2,
+      voiceUsed: 2,
+      assistantUsed: 4,
     };
 
     const res = await checkAndIncrementQuota('usr_arca_guest', 'assistant', belowLimitState, { skipIncrement: true });
     assert.strictEqual(res.allowed, true, 'Must allow when below limit');
-    assert.strictEqual(res.used, 20);
+    assert.strictEqual(res.used, 4);
   });
 
   await itAsync('checkAndIncrementQuota resets stale week usage count to 1 on new week', async () => {
     const staleState = {
       weekStartDate: '2020-01-06T00:00:00.000Z',
-      receiptsUsed: 18,
-      voiceUsed: 25,
-      assistantUsed: 35,
+      receiptsUsed: 5,
+      voiceUsed: 5,
+      assistantUsed: 10,
     };
     const res = await checkAndIncrementQuota('usr_arca_guest', 'receipts', staleState);
     assert.strictEqual(res.allowed, true, 'Must allow when entering a new week');
-    assert.strictEqual(res.used, 1, 'Used count in new week must start at 1, not 19');
+    assert.strictEqual(res.used, 1, 'Used count in new week must start at 1, not 6');
   });
 
   it('Normalizing quota state in state reducer resets other features on new week', () => {
     const staleState = {
       weekStartDate: '2020-01-06T00:00:00.000Z',
-      receiptsUsed: 18,
-      voiceUsed: 25,
-      assistantUsed: 35,
+      receiptsUsed: 5,
+      voiceUsed: 5,
+      assistantUsed: 10,
     };
     const currentQuota = normalizeQuotaState(staleState);
     const updated = {
@@ -179,12 +180,12 @@ async function runSuite() {
       assert.strictEqual(err.code, 'UPSTREAM_RATE_LIMIT');
       assert.deepStrictEqual(attemptedModels, INTERACTIVE_MODELS, 'Must try all interactive models');
       assert.strictEqual(err.payload.error, 'UPSTREAM_RATE_LIMIT');
-      assert.strictEqual(err.payload.message, 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.');
+      assert.strictEqual(err.payload.message, 'High demand: upgrade to ARCA Pro for priority dedicated bandwidth.');
       assert(err.payload.resetDate, 'Must include resetDate');
     }
   });
 
-  await itAsync('callWithModelCascade restricts categorization strictly to gemini-2.0-flash-lite', async () => {
+  await itAsync('callWithModelCascade restricts categorization strictly to gemini-3.5-flash-lite', async () => {
     const attemptedModels = [];
     const mockClient = {
       models: {
@@ -200,44 +201,111 @@ async function runSuite() {
     assert.strictEqual(res.text, 'Dining');
   });
 
-  // ── Test Group 3: Local Qwen 3.5 Auto-Detection ──────────────────────────────
-  console.log('\nGroup 3: Local Qwen Integration & Vercel Safeguard');
+  // ── Test Group 3: Multi-Key Pool & Instant Failover ───────────────────────────
+  console.log('\nGroup 3: Multi-Key Pool & Instant Failover');
 
-  await itAsync('isOllamaQwenAvailable returns false immediately in Vercel environment with 0ms probe', async () => {
-    const originalVercel = process.env.VERCEL;
-    process.env.VERCEL = '1';
+  it('GeminiKeyPool aggregates and deduplicates multiple API keys', () => {
+    const pool = new GeminiKeyPool(['key-alpha', 'key-beta', 'key-alpha', 'key-gamma']);
+    assert.strictEqual(pool.keyEntries.size, 3, 'Must deduplicate redundant keys');
+    const stats = pool.getKeyPoolStats();
+    assert.strictEqual(stats.total, 3);
+    assert.strictEqual(stats.active, 3);
+    assert.strictEqual(stats.cooldown, 0);
+  });
 
-    // Warm-up call
-    await isOllamaQwenAvailable();
+  await itAsync('callWithModelCascade with GeminiKeyPool immediately rotates to next key when Key A encounters 429 error', async () => {
+    const pool = new GeminiKeyPool([]);
+    const keyA = 'test-gemini-key-alpha-12345';
+    const keyB = 'test-gemini-key-beta-67890';
+    let keyACallCount = 0;
+    let keyBCallCount = 0;
 
-    const start = process.hrtime.bigint();
-    const available = await isOllamaQwenAvailable();
-    const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
+    const mockClientA = {
+      models: {
+        generateContent: async () => {
+          keyACallCount++;
+          const err = new Error('429 RESOURCE_EXHAUSTED: Generate content requests per day limit exceeded');
+          err.status = 429;
+          throw err;
+        },
+      },
+    };
 
-    assert.strictEqual(available, false, 'Must be false when VERCEL=1');
-    assert(durationMs < 2, `Probe overhead should be <2ms in Vercel mode, was ${durationMs.toFixed(3)}ms`);
+    const mockClientB = {
+      models: {
+        generateContent: async () => {
+          keyBCallCount++;
+          return { text: 'Key B Success Response' };
+        },
+      },
+    };
 
-    if (originalVercel !== undefined) {
-      process.env.VERCEL = originalVercel;
-    } else {
-      delete process.env.VERCEL;
+    pool.addKey(keyA, mockClientA);
+    pool.addKey(keyB, mockClientB);
+
+    // Call callWithModelCascade directly with the pool instance
+    const res = await callWithModelCascade(pool, 'chat', { contents: [{ text: 'Hello ARCA' }] });
+
+    assert.strictEqual(keyACallCount, 1, 'Key A must have been attempted once');
+    assert.strictEqual(keyBCallCount, 1, 'Key B must have been invoked immediately upon Key A failure');
+    assert.strictEqual(res?.text, 'Key B Success Response', 'Must return successful response from Key B');
+
+    // Verify Key A entered cooldown and Key B remains active
+    const stats = pool.getKeyPoolStats();
+    assert.strictEqual(stats.cooldown, 1, 'Key A must be in cooldown');
+    assert.strictEqual(stats.active, 1, 'Key B must be active');
+    const cooledKey = stats.keys.find(k => k.status === 'cooldown');
+    assert(cooledKey.cooldownRemainingSec > 0, 'Cooled key must have positive remaining cooldown');
+
+    // Second request: Key A in cooldown must be skipped entirely, routing straight to Key B
+    const res2 = await callWithModelCascade(pool, 'chat', { contents: [{ text: 'Followup question' }] });
+    assert.strictEqual(keyACallCount, 1, 'Key A must NOT be called on subsequent request while in cooldown');
+    assert.strictEqual(keyBCallCount, 2, 'Key B must serve the subsequent request directly');
+    assert.strictEqual(res2?.text, 'Key B Success Response');
+  });
+
+  await itAsync('callWithModelCascade throws normalized 429 when ALL keys in pool are exhausted', async () => {
+    const pool = new GeminiKeyPool([]);
+    const key1 = 'test-gemini-key-1-alpha';
+    const key2 = 'test-gemini-key-2-beta';
+
+    const deadClient = {
+      models: {
+        generateContent: async () => {
+          const err = new Error('429 RESOURCE_EXHAUSTED');
+          err.status = 429;
+          throw err;
+        },
+      },
+    };
+
+    pool.addKey(key1, deadClient);
+    pool.addKey(key2, deadClient);
+
+    try {
+      await callWithModelCascade(pool, 'chat', { contents: [{ text: 'Hi' }] });
+      assert.fail('Should have thrown normalized 429 error');
+    } catch (err) {
+      assert.strictEqual(err.status, 429);
+      assert.strictEqual(err.code, 'UPSTREAM_RATE_LIMIT');
+      assert.strictEqual(err.payload.message, 'High demand: upgrade to ARCA Pro for priority dedicated bandwidth.');
     }
+  });
+
+  it('Default geminiKeyPool singleton parses environment and reports stats', () => {
+    const stats = geminiKeyPool.getKeyPoolStats();
+    assert(typeof stats.total === 'number');
+    assert(Array.isArray(stats.keys));
   });
 
   // ── Test Group 4: In-Process MCP Tool Engine ──────────────────────────────────
   console.log('\nGroup 4: In-Process MCP Tool Engine');
 
-  it('getGeminiTools and getOllamaTools export valid schemas', () => {
+  it('getGeminiTools exports valid OpenAPI/JSON Schema for Gemini function declarations', () => {
     const gemini = getGeminiTools();
     assert(Array.isArray(gemini) && gemini[0].functionDeclarations, 'Gemini tools must have functionDeclarations');
     assert.strictEqual(gemini[0].functionDeclarations.length, 5, 'Must export 5 tools');
-    assert(gemini[0].functionDeclarations[0].parameters || gemini[0].functionDeclarations[0].parametersJsonSchema, 'Must have parameters schema for OpenAPI compatibility');
-
-    const ollama = getOllamaTools();
-    assert(Array.isArray(ollama), 'Ollama tools must be an array');
-    assert.strictEqual(ollama.length, 5, 'Must export 5 Ollama tools');
-    assert.strictEqual(ollama[0].type, 'function');
-    assert(ollama[0].function.name, 'Must have function name');
+    assert(gemini[0].functionDeclarations[0].parameters, 'Must have parameters schema');
   });
 
   await itAsync('calculate_budget_metrics performs deterministic calculations over transactions', async () => {
@@ -325,4 +393,3 @@ runSuite().catch(err => {
   console.error('\nSuite failed:', err);
   process.exit(1);
 });
-

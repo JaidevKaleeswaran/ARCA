@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Stacked Budgeting - Automated Pre-Commit Secret Scanner
+ * ARCA - Automated Pre-Commit Secret Scanner
  * 
  * Scans git staged changes or repository files for leaked secrets:
  * - Google Cloud / Firebase API Keys

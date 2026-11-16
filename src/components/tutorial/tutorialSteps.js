@@ -51,26 +51,20 @@ export const TUTORIAL_STEPS = {
     {
       id: 'ai-header-tools',
       targetSelector: '[data-tutorial="ai-header-tools"]',
-      title: 'AI Multi-Agent Tools',
-      description: 'Access Voice Receipts, camera Receipt Scanning, and audit logs managed by specialized AI agent pipelines.',
-    },
-    {
-      id: 'ai-quick-questions',
-      targetSelector: '[data-tutorial="ai-quick-questions"]',
-      title: 'Quick Questions',
-      description: 'One-click prompts for immediate answers about your budget status, recent spending, or savings strategies.',
+      title: 'AI Financial Advisor',
+      description: 'Monitor your weekly query allowance, view voice audit logs, or clear conversation history.',
     },
     {
       id: 'ai-voice-mic',
       targetSelector: '[data-tutorial="ai-voice-mic"]',
       title: 'Voice Prompting',
-      description: 'Click to speak your questions out loud. ARCA transcribes and answers using your actual financial records.',
+      description: 'Click to speak your questions out loud. Transcribe and query your budget hands-free.',
     },
     {
       id: 'ai-input-bar',
       targetSelector: '[data-tutorial="ai-input-bar"]',
       title: 'Financial Chat Assistant',
-      description: 'Ask anything in natural language about transactions, category balances, or advice on meeting your budget goals.',
+      description: 'Ask anything about your spending, budget envelopes, or financial goals.',
     },
   ],
 
@@ -96,8 +90,8 @@ export const TUTORIAL_STEPS = {
     {
       id: 'market-ai-digest',
       targetSelector: '[data-tutorial="market-ai-digest"]',
-      title: 'AI Macroeconomic Briefing',
-      description: 'Synthesize real-time monetary policy, labor reports, and CPI inflation trends with Gemini AI.',
+      title: 'Macroeconomic Outlook',
+      description: 'Review concise bullet points on benchmark rates, inflation, mortgage yields, and high-yield savings to guide your budgeting.',
     },
     {
       id: 'market-budget-impact',
@@ -158,6 +152,12 @@ export const TUTORIAL_STEPS = {
       targetSelector: '[data-tutorial="expense-table"]',
       title: 'Transaction Ledger & Heuristics',
       description: 'Complete history of expenses. ARCA continuously flags suspicious duplicates and abnormal category spending.',
+    },
+    {
+      id: 'expense-export-btn',
+      targetSelector: '[data-tutorial="expense-export-btn"]',
+      title: 'Export as CSV',
+      description: 'Download your full transaction history and category envelope records as a clean CSV spreadsheet.',
     },
   ],
 };

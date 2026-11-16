@@ -30,6 +30,15 @@ test.describe('Authentication & Onboarding UX Flow', () => {
     await expect(authPage.passwordInput).toHaveAttribute('type', 'password');
   });
 
+  test('Login page presents Google and Email as equals with no "Recommended" badge', async ({ page }) => {
+    // Requirement 3: Ensure "Recommended" badge is removed
+    const recommendedBadge = page.locator('span:has-text("Recommended")');
+    await expect(recommendedBadge).toHaveCount(0);
+
+    const googleBtn = page.locator('button:has-text("Continue with Google")');
+    await expect(googleBtn).toBeVisible();
+  });
+
   test('Forgot password modal opens, validates email, and can be dismissed', async ({ page }) => {
     const authPage = new AuthPage(page);
 
@@ -51,11 +60,18 @@ test.describe('Authentication & Onboarding UX Flow', () => {
     await expect(authPage.guestButton).toBeVisible();
     await authPage.loginAsGuest(false);
 
-    // Verify user is landed on Home tab with Guest badge and Tutorial button
+    // Verify user is landed on Home tab with Guest badge
     await expect(basePage.userBadge).toBeVisible();
     await expect(basePage.userBadge).toContainText('Guest');
-    await expect(basePage.tutorialButton).toBeVisible();
-    await expect(basePage.tutorialButton).toContainText('Tutorial ?');
+
+    // Requirement 7: Header navigation has NO tutorial button next to username
+    const headerTutorialBtn = page.locator('header button:has-text("Tutorial ?")');
+    await expect(headerTutorialBtn).toHaveCount(0);
+
+    // Requirement 7: Tutorial button is strictly anchored in corner launcher
+    const cornerLauncher = page.locator('[data-tutorial="corner-tutorial-launcher"]');
+    await expect(cornerLauncher).toBeVisible();
+    await expect(cornerLauncher).toContainText('Tutorial ?');
 
     // Verify tutorial overlay trigger works
     await basePage.clickTutorial();

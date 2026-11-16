@@ -1,4 +1,3 @@
-import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { useBudget } from '../../contexts/BudgetContext';
 import { Card } from '../ui/Card';
@@ -17,13 +16,13 @@ export default function MainBalanceChart() {
   const isEmpty = totalIncome === 0 && totalSpent === 0;
   
   if (isEmpty) {
-    data[0] = { name: 'No Data', value: 1, color: '#38342e' };
+    data[0] = { name: 'No Data', value: 1, color: '#2c2a24' };
   }
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length && !isEmpty) {
       return (
-        <div className="bg-[#18181b] border border-zinc-800 p-3 rounded-lg shadow-xl">
+        <div className="bg-card border border-border p-3 rounded-lg shadow-xl">
           <p className="text-sm text-text-muted">{payload[0].name}</p>
           <p className="font-semibold text-text" style={{ color: payload[0].payload.color }}>
             {formatCurrency(payload[0].value)}
@@ -39,7 +38,7 @@ export default function MainBalanceChart() {
       <h2 className="text-xl font-semibold text-text absolute top-6 left-6">Balance Overview</h2>
       
       <div className="w-full h-[300px] mt-8">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
           <PieChart>
             <Pie
               data={data}

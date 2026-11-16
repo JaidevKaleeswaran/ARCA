@@ -9,7 +9,7 @@ import { speakTransactionDetails, stopSpeech } from '../../services/agents/voice
 import { processTransaction } from '../../services/agents/managerAgent';
 import { reviewSuspiciousTransaction } from '../../services/agents/assistantAgent';
 import toast from 'react-hot-toast'
-import { Plus, Edit2, Sparkles, Receipt, Volume2, VolumeX, Mic, Loader2, RefreshCw, AlertTriangle, Repeat } from 'lucide-react';
+import { Plus, Edit2, Receipt, Volume2, VolumeX, Mic, Loader2, RefreshCw, AlertTriangle, Repeat, Download } from 'lucide-react';
 import MaskedHeading from '../ui/MaskedHeading';
 import Reveal from '../ui/Reveal';
 
@@ -96,6 +96,39 @@ export default function TransactionsTab() {
     }
   };
 
+  // Export transactions to CSV
+  const handleExportCSV = () => {
+    const rawTxs = budgetState.transactions || [];
+    // Sort transactions by date descending for clean exported ledger
+    const txs = [...rawTxs].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    const headers = ['Date', 'Description', 'Amount', 'Category', 'Source'];
+    const rows = txs.map(tx => {
+      const cat = budgetState.categories?.find(c => c.id === tx.categoryId);
+      return [
+        tx.date || '',
+        tx.description || '',
+        tx.amount,
+        cat?.name || 'Unassigned',
+        tx.source || 'manual'
+      ];
+    });
+
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `ARCA_Expenses_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(rawTxs.length > 0 ? 'CSV export downloaded!' : 'Exported expense template.');
+  };
+
   // Sort transactions by date (newest first)
   const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -165,19 +198,29 @@ export default function TransactionsTab() {
             type="button"
             data-tutorial="expense-scan-btn"
             onClick={() => setIsScannerOpen(true)}
-            className="flex items-center space-x-1.5 text-sm bg-[#8c6d37]/20 text-[#a48246] border border-[#8c6d37]/40 px-3 py-1.5 rounded-lg hover:bg-[#8c6d37]/30 transition-colors font-medium"
+            className="flex items-center space-x-1.5 text-sm bg-card hover:bg-card-hover text-text border border-border hover:border-accent/40 px-3 py-1.5 rounded-lg transition-colors font-medium cursor-pointer"
           >
-            <Sparkles size={16} className="text-[#a48246]" />
+            <Receipt size={16} className="text-text-muted" />
             <span>Scan Receipt</span>
           </button>
           <button
             type="button"
             data-tutorial="expense-add-btn"
             onClick={handleAddClick}
-            className="flex items-center space-x-1 text-sm bg-accent text-primary px-3 py-1.5 rounded-lg hover:bg-accent-hover transition-colors font-medium"
+            className="flex items-center space-x-1 text-sm bg-accent text-primary px-3 py-1.5 rounded-lg hover:bg-accent-hover transition-colors font-medium cursor-pointer"
           >
             <Plus size={16} />
             <span>Add Expense</span>
+          </button>
+          <button
+            type="button"
+            data-tutorial="expense-export-btn"
+            onClick={handleExportCSV}
+            title="Export transactions as CSV"
+            className="flex items-center space-x-1.5 text-sm bg-primary hover:bg-card-hover text-zinc-300 hover:text-white border border-border px-3 py-1.5 rounded-lg transition-colors font-medium cursor-pointer"
+          >
+            <Download size={15} />
+            <span>Export CSV</span>
           </button>
         </div>
       </div>
@@ -191,7 +234,7 @@ export default function TransactionsTab() {
 
       <div data-tutorial="expense-table" className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="text-text-muted border-b border-zinc-800">
+          <thead className="text-text-muted border-b border-border">
             <tr>
               <th className="pb-3 font-medium px-4">Date</th>
               <th className="pb-3 font-medium px-4">Description</th>
@@ -200,7 +243,7 @@ export default function TransactionsTab() {
               <th className="pb-3 font-medium px-4 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800">
+          <tbody className="divide-y divide-border">
             {sortedTransactions.length === 0 && (
               <tr>
                 <td colSpan="5" className="py-8 text-center text-text-muted">
@@ -213,7 +256,7 @@ export default function TransactionsTab() {
               return (
                 <tr
                   key={tx.id}
-                  className={`group hover:bg-[#09090b]/50 transition-colors animate-row ${isSuspicious ? 'bg-orange-500/5' : ''}`}
+                  className={`group hover:bg-card-hover/40 transition-colors animate-row ${isSuspicious ? 'bg-orange-500/5' : ''}`}
                   style={{ animationDelay: `${index * 60}ms` }}
                 >
                   <td className="py-4 px-4 text-text-muted whitespace-nowrap">
@@ -225,7 +268,7 @@ export default function TransactionsTab() {
                       {tx.source === 'receipt_scan' && (
                         <span
                           title="Scanned from receipt"
-                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-[#8c6d37]/15 text-[#a48246] border border-[#8c6d37]/30"
+                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-card text-text-muted border border-border"
                         >
                           <Receipt size={10} className="mr-1" /> Receipt
                         </span>
@@ -241,7 +284,7 @@ export default function TransactionsTab() {
                       {(tx.recurring || tx.isSubscription) && (
                         <span
                           title="Recurring subscription"
-                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-[#2e5b45]/15 text-[#3a7056] border border-[#2e5b45]/30"
+                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                         >
                           <Repeat size={10} className="mr-1" /> Sub
                         </span>
@@ -249,7 +292,7 @@ export default function TransactionsTab() {
                       {isSuspicious && (
                         <span
                           title="Flagged as potentially suspicious"
-                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-[#e7b956]/20 text-[#e7b956] border border-[#e7b956]/40 animate-pulse"
+                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-accent/15 text-accent border border-accent/30"
                         >
                           <AlertTriangle size={10} className="mr-1" /> Review
                         </span>
@@ -276,7 +319,7 @@ export default function TransactionsTab() {
                         className={`p-1.5 rounded-md transition-all ${
                           speakingTxId === tx.id
                             ? 'bg-accent/20 text-accent border border-accent/40 animate-pulse opacity-100'
-                            : 'text-text-muted hover:text-accent opacity-60 group-hover:opacity-100 hover:bg-[#2b2924]'
+                            : 'text-text-muted hover:text-accent opacity-60 group-hover:opacity-100 hover:bg-card-hover'
                         }`}
                       >
                         {speakingTxId === tx.id ? (
@@ -303,7 +346,7 @@ export default function TransactionsTab() {
 
                       <button
                         onClick={() => handleEditClick(tx)}
-                        className="p-1.5 text-zinc-500 hover:text-accent opacity-60 group-hover:opacity-100 transition-all rounded-md hover:bg-zinc-800"
+                        className="p-1.5 text-zinc-500 hover:text-accent opacity-60 group-hover:opacity-100 transition-all rounded-md hover:bg-card-hover"
                       >
                         <Edit2 size={16} />
                       </button>

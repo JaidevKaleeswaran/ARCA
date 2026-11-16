@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-  TrendingUp, TrendingDown, RefreshCw, Sparkles, DollarSign,
+  TrendingUp, TrendingDown, RefreshCw, DollarSign,
   Percent, Newspaper, Activity, ShieldCheck, ArrowUpRight,
   ArrowDownRight, Building2, Flame, Clock, Info, CheckCircle2,
   ExternalLink, Search, Plus, Trash2, PieChart, Globe, AlertCircle
 } from 'lucide-react';
 import Reveal from '../ui/Reveal';
+import NumberTicker from '../ui/reactbits/NumberTicker';
 import { env } from '../../config/env';
 import { useBudget } from '../../contexts/BudgetContext';
 import { formatCurrency } from '../../utils/formatCurrency';
@@ -129,7 +130,7 @@ export default function MarketTrackerTab() {
       }
 
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      if (showToast) toast.success('Live Yahoo Finance quotes & news refreshed!');
+      if (showToast) toast.success('Live quotes & market news refreshed!');
     } catch (err) {
       console.warn('Backend live market fetch failed:', err);
       if (showToast) toast.error('Failed to refresh live market numbers');
@@ -298,7 +299,7 @@ export default function MarketTrackerTab() {
       if (res.ok) {
         const data = await res.json();
         setAiBriefing(data.summary);
-        toast.success('AI economic briefing generated!');
+        toast.success('Market outlook updated!');
       } else {
         throw new Error('Server returned non-200');
       }
@@ -306,7 +307,7 @@ export default function MarketTrackerTab() {
       setAiBriefing(
         'Economic indicators demonstrate sustained expansion with headline inflation near 3.7%. The benchmark Effective Fed Funds Rate sits at 3.88%, preserving attractive liquid cash yields near 4.23% in high-yield accounts while 30-year fixed mortgages average 7.11%. ARCA recommends maintaining 3–6 month emergency fund reserves in high-yield vehicles, eliminating variable-rate card debt averaging 21.19%, and dollar-cost averaging into broad index envelopes.'
       );
-      toast.success('AI economic summary updated!');
+      toast.success('Market outlook updated!');
     } finally {
       setIsGeneratingAi(false);
     }
@@ -353,20 +354,28 @@ export default function MarketTrackerTab() {
   // Live indices from overview or fallback
   const liveIndices = overview?.indices || DEFAULT_MARKET_DATA.indices;
 
+  const handleCloseArticleModal = useCallback(() => {
+    setSelectedArticleToRead(null);
+  }, []);
+
+  const handleCloseInvestModal = useCallback(() => {
+    setSelectedStockToInvest(null);
+  }, []);
+
   return (
     <div className="space-y-6 pb-20">
       {/* ── Article Reader Modal ── */}
       <ArticleReaderModal
         article={selectedArticleToRead}
         isOpen={Boolean(selectedArticleToRead)}
-        onClose={() => setSelectedArticleToRead(null)}
+        onClose={handleCloseArticleModal}
       />
 
       {/* ── Invest in Stock Modal ── */}
       <InvestStockModal
         stock={selectedStockToInvest}
         isOpen={Boolean(selectedStockToInvest)}
-        onClose={() => setSelectedStockToInvest(null)}
+        onClose={handleCloseInvestModal}
       />
 
       {/* ── Brand Header Banner ── */}
@@ -390,7 +399,7 @@ export default function MarketTrackerTab() {
                   </h1>
                   <span className="hidden sm:inline-flex text-[10px] bg-emerald-500/20 text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Live Yahoo Finance API
+                    Live Market Data
                   </span>
                 </div>
                 <p className="text-zinc-300 text-xs mt-1">
@@ -400,7 +409,7 @@ export default function MarketTrackerTab() {
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 bg-[#181816]/80 border border-zinc-800 px-3 py-1.5 rounded-xl text-xs backdrop-blur-md">
+              <div className="flex items-center gap-1.5 bg-card border border-border px-3 py-1.5 rounded-xl text-xs backdrop-blur-md">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-zinc-300 font-medium text-[11px]">
                   {overview?.marketStatus?.statusText || 'US Markets Active'}
@@ -413,7 +422,7 @@ export default function MarketTrackerTab() {
                 type="button"
                 onClick={() => fetchMarketData(true)}
                 disabled={isLoading}
-                className="flex items-center gap-1.5 bg-[#22201d] hover:bg-[#2b2924] text-zinc-200 border border-border px-3 py-1.5 rounded-xl text-xs font-medium transition-all shadow-sm active:scale-95 cursor-pointer"
+                className="flex items-center gap-1.5 bg-card hover:bg-card-hover text-zinc-200 border border-border px-3 py-1.5 rounded-xl text-xs font-medium transition-all shadow-sm active:scale-95 cursor-pointer"
                 title="Refresh live prices"
               >
                 <RefreshCw size={13} className={isLoading ? 'animate-spin text-accent' : 'text-zinc-400'} />
@@ -426,7 +435,7 @@ export default function MarketTrackerTab() {
 
       {/* ── PINNED LIVE UPDATING HOLDINGS TICKER BAR ── */}
       <Reveal delay={0.05} y={20}>
-        <div className="bg-[#1a1815] border border-border rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden">
+        <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3 mb-3.5">
             <div className="flex items-center gap-2.5">
               <div className="p-1.5 bg-accent/15 text-accent rounded-lg">
@@ -450,7 +459,7 @@ export default function MarketTrackerTab() {
                 <div>
                   <span className="text-[10px] text-zinc-400 block">Total Portfolio Value</span>
                   <span className="text-lg sm:text-xl font-black font-mono text-white">
-                    {formatCurrency(portfolioCurrentValue)}
+                    <NumberTicker value={portfolioCurrentValue} prefix="$" />
                   </span>
                 </div>
                 <div>
@@ -464,7 +473,7 @@ export default function MarketTrackerTab() {
           </div>
 
           {investments.length === 0 ? (
-            <div className="py-6 px-4 text-center rounded-xl bg-[#141412] border border-dashed border-border/80 flex flex-col items-center justify-center space-y-2">
+            <div className="py-6 px-4 text-center rounded-xl bg-card border border-dashed border-border flex flex-col items-center justify-center space-y-2">
               <Building2 size={26} className="text-accent/60" />
               <p className="text-xs sm:text-sm font-semibold text-zinc-300">
                 You haven't added any stocks to your portfolio yet.
@@ -483,7 +492,7 @@ export default function MarketTrackerTab() {
                 return (
                   <div
                     key={inv.id}
-                    className="bg-[#141412] border border-border/80 hover:border-accent/40 rounded-xl p-3 flex flex-col justify-between transition-all group relative"
+                    className="bg-card border border-border hover:border-accent/40 rounded-xl p-3 flex flex-col justify-between transition-colors group relative"
                   >
                     <div className="flex items-start justify-between">
                       <div>
@@ -504,7 +513,7 @@ export default function MarketTrackerTab() {
                             setSelectedStockToInvest(found || { symbol: inv.symbol, name: inv.name, price: inv.currentPrice });
                           }}
                           title="Add more to position"
-                          className="p-1 text-zinc-500 hover:text-accent hover:bg-zinc-800 rounded transition-colors"
+                          className="p-1 text-zinc-500 hover:text-accent hover:bg-card-hover rounded transition-colors"
                         >
                           <Plus size={13} />
                         </button>
@@ -512,7 +521,7 @@ export default function MarketTrackerTab() {
                           type="button"
                           onClick={() => handleDeleteHolding(inv.id, inv.symbol)}
                           title="Remove holding"
-                          className="p-1 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded transition-colors"
+                          className="p-1 text-zinc-500 hover:text-red-400 hover:bg-card-hover rounded transition-colors"
                         >
                           <Trash2 size={13} />
                         </button>
@@ -630,7 +639,7 @@ export default function MarketTrackerTab() {
                         )}
                       </h2>
                       <p className="text-[11px] text-zinc-400">
-                        Real-time prices powered directly by Yahoo Finance API.
+                        Real-time equity quotes updating continuously.
                       </p>
                     </div>
                   </div>
@@ -644,7 +653,7 @@ export default function MarketTrackerTab() {
                         className={`px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer ${
                           selectedSector === sec
                             ? 'bg-accent/20 text-accent border border-accent/40 font-bold'
-                            : 'bg-[#181816] text-zinc-400 hover:text-zinc-200 border border-border/60'
+                            : 'bg-card text-zinc-400 hover:text-zinc-200 border border-border/60'
                         }`}
                       >
                         {sec === 'all' ? 'All Sectors' : sec}
@@ -662,7 +671,7 @@ export default function MarketTrackerTab() {
                     return (
                       <div
                         key={stock.symbol}
-                        className="bg-[#1c1a17] border border-[#33302a] hover:border-accent/40 rounded-xl p-3.5 space-y-2.5 transition-all flex flex-col justify-between"
+                        className="bg-card border border-border hover:border-accent/40 rounded-xl p-3.5 space-y-2.5 transition-colors flex flex-col justify-between"
                       >
                         <div>
                           <div className="flex items-start justify-between">
@@ -699,7 +708,7 @@ export default function MarketTrackerTab() {
                         <button
                           type="button"
                           onClick={() => setSelectedStockToInvest(stock)}
-                          className="w-full flex items-center justify-center gap-1.5 bg-[#262420] hover:bg-accent hover:text-primary text-zinc-300 border border-border hover:border-accent text-xs font-semibold py-1.5 rounded-lg transition-all active:scale-98 cursor-pointer mt-1"
+                          className="w-full flex items-center justify-center gap-1.5 bg-card-hover hover:bg-accent hover:text-primary text-zinc-300 border border-border hover:border-accent text-xs font-semibold py-1.5 rounded-lg transition-all active:scale-98 cursor-pointer mt-1"
                         >
                           <Plus size={13} />
                           <span>Invest in {stock.symbol}</span>
@@ -715,7 +724,7 @@ export default function MarketTrackerTab() {
                       type="button"
                       onClick={handleShowMoreStocks}
                       disabled={isLoadingMoreStocks}
-                      className="px-5 py-2 bg-[#1e1c18] hover:bg-[#282620] text-accent border border-accent/40 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-2"
+                      className="px-5 py-2 bg-card hover:bg-card-hover text-accent border border-accent/40 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-2"
                     >
                       <RefreshCw size={13} className={isLoadingMoreStocks ? 'animate-spin text-accent' : 'text-accent'} />
                       <span>{isLoadingMoreStocks ? 'Fetching More Live Stocks...' : 'Show More Stocks'}</span>
@@ -781,7 +790,7 @@ export default function MarketTrackerTab() {
                       className={`px-2.5 py-1 rounded-md font-medium whitespace-nowrap transition-all cursor-pointer text-[11px] ${
                         selectedNewsTopic === t.id
                           ? 'bg-accent/20 text-accent border border-accent/40 font-bold'
-                          : 'bg-[#181816] text-zinc-400 hover:text-zinc-200 border border-border/60'
+                          : 'bg-card text-zinc-400 hover:text-zinc-200 border border-border/60'
                       }`}
                     >
                       {t.label}
@@ -794,7 +803,7 @@ export default function MarketTrackerTab() {
                   {articles.map((art) => (
                     <div
                       key={art.id}
-                      className="bg-[#1c1a17] border border-[#33302a] hover:border-accent/50 rounded-xl p-4 flex flex-col justify-between space-y-3 transition-all group"
+                      className="bg-card border border-border hover:border-accent/40 rounded-xl p-4 flex flex-col justify-between space-y-3 transition-colors group"
                     >
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-[11px]">
@@ -897,7 +906,7 @@ export default function MarketTrackerTab() {
                     </span>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {overview.economicIndicators.map((ind, i) => (
-                        <div key={ind.name || i} className="bg-[#181614] border border-[#2a2824] rounded-xl p-3 space-y-1">
+                        <div key={ind.name || i} className="bg-card border border-border rounded-xl p-3 space-y-1">
                           <span className="text-[10px] text-zinc-400 block truncate">{ind.name}</span>
                           <span className="text-base font-extrabold text-white font-mono block">{ind.value}</span>
                           <span className="text-[10px] text-zinc-500 block truncate">{ind.period}</span>
@@ -914,7 +923,7 @@ export default function MarketTrackerTab() {
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {(overview?.rates || DEFAULT_MARKET_DATA.rates).map((r, i) => (
-                      <div key={r.id || i} className="bg-[#1c1a17] border border-[#33302a] rounded-xl p-3.5 space-y-1">
+                      <div key={r.id || i} className="bg-card border border-border rounded-xl p-3.5 space-y-1">
                         <div className="text-[11px] text-zinc-400 font-medium">{r.name}</div>
                         <div className="text-lg font-extrabold text-accent font-mono">
                           {typeof r.rate === 'number' ? `${r.rate.toFixed(2)}%` : r.rate}
@@ -931,7 +940,7 @@ export default function MarketTrackerTab() {
 
         {/* Right Column (1 Col): Dedicated AI Macro Digest & Takeaways Sidebar */}
         <div className="space-y-6">
-          {/* AI MACRO BRIEFING CARD */}
+          {/* MACROECONOMIC OUTLOOK CARD */}
           <Reveal delay={0.12} y={20}>
             <div
               data-tutorial="market-ai-digest"
@@ -939,32 +948,44 @@ export default function MarketTrackerTab() {
             >
               <div className="flex items-center justify-between border-b border-border/80 pb-3">
                 <div className="flex items-center gap-2 text-accent">
-                  <Sparkles size={18} className="animate-pulse" />
+                  <Activity size={18} />
                   <h2 className="text-sm font-bold text-white tracking-tight">
-                    AI Macroeconomic Digest
+                    <span>Macroeconomic Outlook</span>
                   </h2>
                 </div>
                 <button
                   type="button"
                   onClick={handleGenerateAiBriefing}
                   disabled={isGeneratingAi}
-                  title="Regenerate Gemini Analysis"
+                  title="Refresh Market Outlook"
                   className="p-1.5 text-accent hover:bg-accent/15 rounded-lg border border-accent/30 transition-all cursor-pointer"
                 >
                   <RefreshCw size={13} className={isGeneratingAi ? 'animate-spin' : ''} />
                 </button>
               </div>
 
-              <div className="text-xs text-zinc-200 leading-relaxed space-y-2">
-                <p>
-                  {aiBriefing || (
-                    'Current monetary indicators show steady growth alongside annual inflation near 3.7%. With the Federal Reserve Effective Funds Rate at 3.88%, competitive high-yield cash accounts yield approximately 4.23% risk-free. For ARCA users, this climate strongly favors holding 3–6 month emergency fund reserves in high-yield cash vehicles, eliminating variable-APR credit card balances averaging 21.19%, and dollar-cost averaging into long-term equity envelopes.'
-                  )}
-                </p>
+              {/* Concise bullet points instead of dense paragraph */}
+              <div className="space-y-2.5 pt-1">
+                {(aiBriefing ? (
+                  aiBriefing.split(/(?<=[.!?])\s+|\n+/).map(s => s.trim()).filter(s => s.length > 20).slice(0, 4)
+                ) : [
+                  'Liquid cash yields near 4.23% APY preserve strong real returns in high-yield savings.',
+                  'Credit card borrowing costs average 21.19% APR; prioritize eliminating variable card debt.',
+                  'Conforming 30-year fixed mortgages average 7.11%, rewarding larger down payment allocations.',
+                  'Steady GDP expansion and 3.7% inflation favor disciplined dollar-cost averaging into core index funds.',
+                ]).map((bullet, idx) => (
+                  <div key={idx} className="flex items-start gap-2.5 text-xs text-zinc-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
+                    <span className="leading-relaxed">{bullet}</span>
+                  </div>
+                ))}
               </div>
 
               {/* Actionable Personal Finance Takeaways */}
-              <div className="pt-2 border-t border-border/60 space-y-2.5">
+              <div
+                data-tutorial="market-budget-impact"
+                className="pt-2 border-t border-border/60 space-y-2.5"
+              >
                 <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
                   Actionable Budget Implications
                 </span>
@@ -986,7 +1007,7 @@ export default function MarketTrackerTab() {
                     tag: 'Purchase Budgeting',
                   },
                 ]).map((item, idx) => (
-                  <div key={item.title || idx} className="bg-[#1e1c18] border border-[#38342e] rounded-xl p-3 space-y-1">
+                  <div key={item.title || idx} className="bg-card border border-border rounded-xl p-3 space-y-1">
                     <div className="flex items-center gap-1.5 text-accent font-semibold text-xs">
                       <CheckCircle2 size={13} />
                       <span>{item.title}</span>

@@ -4,7 +4,7 @@ export class BasePage {
     this.header = page.locator('header');
     this.logo = page.locator('header').locator('text=ARCA');
     this.userBadge = page.locator('header div.rounded-full').filter({ hasText: /Guest|User/ });
-    this.tutorialButton = page.locator('header button:has-text("Tutorial ?")');
+    this.tutorialButton = page.locator('button[data-tutorial="corner-tutorial-launcher"]');
     this.logoutButton = page.locator('button[title="Log Out"]');
 
     // Tab navigation buttons

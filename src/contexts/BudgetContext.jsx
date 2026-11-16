@@ -36,6 +36,8 @@ const defaultState = {
     voiceUsed: 0,
     assistantUsed: 0,
   },
+  isSubscribed: false,
+  subscriptionPlan: 'free',
   updatedAt: new Date().toISOString(),
 };
 
@@ -98,6 +100,8 @@ function sanitizeState(state) {
     investments: Array.isArray(state.investments) ? state.investments : [],
     chatMessages: cleanedMessages,
     quotaUsage: normalizeQuotaState(state?.quotaUsage),
+    isSubscribed: Boolean(state?.isSubscribed),
+    subscriptionPlan: state?.subscriptionPlan || 'free',
     updatedAt: state?.updatedAt || new Date().toISOString(),
   };
 }
@@ -300,9 +304,26 @@ function internalBudgetReducer(state, action) {
         updatedInvestments.unshift(newHolding);
       }
 
+      // Ensure an 'Investments' category exists in state.categories if none exists
+      let updatedCategories = [...(state.categories || [])];
+      const hasInvestmentsCat = updatedCategories.some(
+        (c) => c && c.name && (c.name.toLowerCase() === 'investments' || c.name.toLowerCase().startsWith('investment'))
+      );
+
+      if (!hasInvestmentsCat) {
+        updatedCategories.push({
+          id: `cat_investments_${Date.now()}`,
+          name: 'Investments',
+          limit: Math.max(500, Math.round(numInvested)),
+          color: '#3b82f6',
+          endOfCycleAction: 'rollover',
+        });
+      }
+
       return {
         ...state,
         investments: updatedInvestments,
+        categories: updatedCategories,
       };
     }
 
@@ -455,6 +476,13 @@ function internalBudgetReducer(state, action) {
         },
       };
     }
+    case 'UPDATE_SUBSCRIPTION': {
+      return {
+        ...state,
+        isSubscribed: Boolean(action.payload.isSubscribed),
+        subscriptionPlan: action.payload.plan || (action.payload.isSubscribed ? 'pro' : 'free'),
+      };
+    }
     case 'RESET_STATE':
       return sanitizeState(defaultState);
 
@@ -480,13 +508,13 @@ export function BudgetProvider({ children }) {
   const isCloudLoadedRef = useRef(false);
   const saveTimeoutRef = useRef(null);
 
-  // Stacked Pro Modal state
+  // ARCA Pro Modal state
   const [proModalConfig, setProModalConfig] = useState({
     isOpen: false,
     reason: 'QUOTA_EXHAUSTED',
     feature: 'receipts',
-    used: 18,
-    limit: 18,
+    used: 5,
+    limit: 5,
     resetCountdown: getNextMondayCountdown(),
   });
 
@@ -496,8 +524,8 @@ export function BudgetProvider({ children }) {
       isOpen: true,
       reason: config.reason || 'QUOTA_EXHAUSTED',
       feature: feat,
-      used: config.used ?? (state.quotaUsage?.[`${feat}Used`] ?? QUOTA_LIMITS[feat] ?? 18),
-      limit: config.limit ?? (QUOTA_LIMITS[feat] ?? 18),
+      used: config.used ?? (state.quotaUsage?.[`${feat}Used`] ?? QUOTA_LIMITS[feat] ?? 5),
+      limit: config.limit ?? (QUOTA_LIMITS[feat] ?? 5),
       resetCountdown: config.resetCountdown || getNextMondayCountdown(),
     });
   };
@@ -506,9 +534,44 @@ export function BudgetProvider({ children }) {
     setProModalConfig(prev => ({ ...prev, isOpen: false }));
   };
 
+  const subscribeToPro = async (plan = 'pro') => {
+    dispatch({
+      type: 'UPDATE_SUBSCRIPTION',
+      payload: { isSubscribed: true, plan },
+    });
+    if (db && user && user.uid && !user.isGuest) {
+      try {
+        const docRef = doc(db, 'users', user.uid, 'budgetData', 'main');
+        await setDoc(docRef, { isSubscribed: true, subscriptionPlan: plan, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (err) {
+        console.warn('[BudgetContext] Firestore subscribe update failed:', err);
+      }
+    }
+    return { success: true };
+  };
+
+  const cancelProSubscription = async () => {
+    dispatch({
+      type: 'UPDATE_SUBSCRIPTION',
+      payload: { isSubscribed: false, plan: 'free' },
+    });
+    if (db && user && user.uid && !user.isGuest) {
+      try {
+        const docRef = doc(db, 'users', user.uid, 'budgetData', 'main');
+        await setDoc(docRef, { isSubscribed: false, subscriptionPlan: 'free', updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (err) {
+        console.warn('[BudgetContext] Firestore cancel subscription failed:', err);
+      }
+    }
+    return { success: true };
+  };
+
   const updateQuota = async (feature, skipIncrement = false) => {
-    const result = await checkAndIncrementQuota(user?.uid, feature, state.quotaUsage, { skipIncrement });
-    if (!skipIncrement && result.allowed) {
+    const result = await checkAndIncrementQuota(user?.uid, feature, state.quotaUsage, {
+      skipIncrement,
+      isSubscribed: state.isSubscribed,
+    });
+    if (!skipIncrement && result.allowed && !state.isSubscribed) {
       dispatch({
         type: 'UPDATE_QUOTA_USAGE',
         payload: {
@@ -585,6 +648,8 @@ export function BudgetProvider({ children }) {
               voiceLogs: state.voiceLogs || [],
               chatMessages: state.chatMessages || [],
               quotaUsage: normalizeQuotaState(state.quotaUsage),
+              isSubscribed: Boolean(state.isSubscribed),
+              subscriptionPlan: state.subscriptionPlan || 'free',
               uid: user.uid,
               userId: user.uid,
               createdAt: new Date().toISOString(),
@@ -638,6 +703,8 @@ export function BudgetProvider({ children }) {
                   cycleFrequency: state.cycleFrequency || 'monthly',
                   voiceLogs: state.voiceLogs || [],
                   chatMessages: state.chatMessages || [],
+                  isSubscribed: Boolean(state.isSubscribed),
+                  subscriptionPlan: state.subscriptionPlan || 'free',
                   uid: user.uid,
                   userId: user.uid,
                   updatedAt: new Date().toISOString(),
@@ -759,6 +826,10 @@ export function BudgetProvider({ children }) {
     portfolioTotalGain: Number(portfolioTotalGain.toFixed(2)),
     portfolioTotalGainPercent: Number(portfolioTotalGainPercent.toFixed(2)),
     quotaUsage: state.quotaUsage,
+    isSubscribed: Boolean(state.isSubscribed),
+    subscriptionPlan: state.subscriptionPlan || 'free',
+    subscribeToPro,
+    cancelProSubscription,
     proModalConfig,
     openProModal,
     closeProModal,

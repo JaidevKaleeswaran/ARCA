@@ -19,34 +19,34 @@ function AlertCard({ alert, onAction }) {
       badge: 'bg-red-500/20 text-red-300',
     },
     warning: {
-      bg: 'bg-[#e7b956]/15 border-[#e7b956]/30',
-      text: 'text-[#e7b956]',
+      bg: 'bg-accent/10 border-accent/20',
+      text: 'text-accent',
       icon: AlertTriangle,
-      badge: 'bg-[#e7b956]/20 text-[#e7b956]',
+      badge: 'bg-accent/20 text-accent',
     },
     info: {
-      bg: 'bg-[#8c6d37]/15 border-[#8c6d37]/30',
-      text: 'text-[#a48246]',
+      bg: 'bg-card border-border',
+      text: 'text-text-muted',
       icon: Bell,
-      badge: 'bg-[#8c6d37]/20 text-[#a48246]',
+      badge: 'bg-primary border border-border text-text-muted',
     },
     subscription: {
-      bg: 'bg-[#8c6d37]/15 border-[#8c6d37]/30',
-      text: 'text-[#faf4e8]',
+      bg: 'bg-accent/10 border-accent/20',
+      text: 'text-text',
       icon: CreditCard,
-      badge: 'bg-[#8c6d37]/25 text-[#faf4e8]',
+      badge: 'bg-accent/20 text-accent',
     },
     unallocated: {
-      bg: 'bg-[#2e5b45]/15 border-[#2e5b45]/30',
-      text: 'text-[#3a7056]',
+      bg: 'bg-emerald-500/10 border-emerald-500/20',
+      text: 'text-emerald-400',
       icon: Wallet,
-      badge: 'bg-[#2e5b45]/25 text-[#3a7056]',
+      badge: 'bg-emerald-500/20 text-emerald-400',
     },
     large: {
-      bg: 'bg-[#e7b956]/15 border-[#e7b956]/30',
-      text: 'text-[#e7b956]',
+      bg: 'bg-accent/10 border-accent/20',
+      text: 'text-accent',
       icon: TrendingDown,
-      badge: 'bg-[#e7b956]/20 text-[#e7b956]',
+      badge: 'bg-accent/20 text-accent',
     },
   };
 
@@ -300,7 +300,7 @@ export default function NotificationHub() {
         title="Active Subscription Services"
       >
         <div className="space-y-4">
-          <div className="bg-[#8c6d37]/15 border border-[#8c6d37]/30 rounded-xl p-3.5 flex items-center justify-between">
+          <div className="bg-card border border-border rounded-xl p-3.5 flex items-center justify-between">
             <div className="flex items-center space-x-2.5">
               <CreditCard size={20} className="text-accent" />
               <div>
@@ -319,7 +319,7 @@ export default function NotificationHub() {
                 <div>
                   <p className="font-semibold text-sm text-text flex items-center gap-1.5">
                     {sub.description}
-                    <span className="text-[10px] bg-[#2e5b45]/20 text-[#3a7056] px-1.5 py-0.2 rounded border border-[#2e5b45]/30">Active</span>
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">Active</span>
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">{sub.date}</p>
                 </div>

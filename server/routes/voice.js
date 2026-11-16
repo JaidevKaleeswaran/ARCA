@@ -20,7 +20,7 @@ const createAgentLimiter = createRateLimiter({ windowMs: 60000, max: 5, message:
 // Cache the agent ID so we don't recreate it every time
 let cachedAgentId = null;
 
-const RECEIPT_AGENT_PROMPT = `You are a friendly receipt recording assistant for the MyVault personal finance app. Your job is to listen to the user describe their purchases and extract the key details.
+const RECEIPT_AGENT_PROMPT = `You are a friendly receipt recording assistant for the ARCA personal finance app. Your job is to listen to the user describe their purchases and extract the key details.
 
 When the user tells you about a purchase, extract:
 1. WHAT they bought or WHERE they bought it (the merchant/store name or description)
@@ -60,7 +60,7 @@ router.post('/create-agent', createAgentLimiter, async (req, res) => {
     const elevenlabs = new ElevenLabsClient({ apiKey: ELEVENLABS_API_KEY });
 
     const agent = await elevenlabs.conversationalAi.agents.create({
-      name: 'MyVault Receipt Assistant',
+      name: 'ARCA Receipt Assistant',
       conversationConfig: {
         agent: {
           prompt: {
@@ -134,7 +134,7 @@ router.post('/speak', speakLimiter, validateSpeakInput, async (req, res) => {
       if (response.status === 429 || /quota|credit|rate\s*limit|resource_exhausted|429/i.test(errText)) {
         return res.status(429).json({
           error: 'UPSTREAM_RATE_LIMIT',
-          message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+          message: 'High demand: upgrade to ARCA Pro for priority dedicated bandwidth.',
           resetDate: getNextMondayISO(),
         });
       }
@@ -152,7 +152,7 @@ router.post('/speak', speakLimiter, validateSpeakInput, async (req, res) => {
     if (err.status === 429 || /quota|credit|rate\s*limit|resource_exhausted|429/i.test(err.message)) {
       return res.status(429).json({
         error: 'UPSTREAM_RATE_LIMIT',
-        message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+        message: 'High demand: upgrade to ARCA Pro for priority dedicated bandwidth.',
         resetDate: getNextMondayISO(),
       });
     }
@@ -244,7 +244,7 @@ If the year/date is not mentioned, use today's date (${new Date().toISOString().
     if (err.status === 429 || err.code === 'UPSTREAM_RATE_LIMIT') {
       return res.status(429).json(err.payload || {
         error: 'UPSTREAM_RATE_LIMIT',
-        message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+        message: 'High demand: upgrade to ARCA Pro for priority dedicated bandwidth.',
         resetDate: getNextMondayISO(),
       });
     }

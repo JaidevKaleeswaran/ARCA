@@ -1,7 +1,6 @@
-import React from 'react';
 import { useBudget } from '../../contexts/BudgetContext';
-import { formatCurrency } from '../../utils/formatCurrency';
-import { CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
+import NumberTicker from '../ui/reactbits/NumberTicker';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
 
 export default function LeftToBudgetBanner() {
   const { totalIncome, leftToBudget } = useBudget();
@@ -10,9 +9,8 @@ export default function LeftToBudgetBanner() {
     return (
       <div
         data-tutorial="budget-banner"
-        className="w-full rounded-xl border border-zinc-800 bg-[#1c1a17] p-3.5 flex items-center justify-center space-x-2.5 shadow-sm mb-6 text-zinc-400"
+        className="w-full rounded-xl border border-border bg-card p-3.5 flex items-center justify-center space-x-2.5 shadow-sm mb-6 text-text-muted"
       >
-        <Sparkles size={17} className="text-accent shrink-0" />
         <span className="font-medium text-xs sm:text-sm">Set your income sources to calculate your Zero-Based Budget</span>
       </div>
     );
@@ -22,26 +20,34 @@ export default function LeftToBudgetBanner() {
   let textColor = '';
   let borderColor = '';
   let IconComponent = null;
-  let message = '';
+  let message = null;
 
   if (leftToBudget > 0) {
     bgColor = 'bg-[#2e5b45]/20';
     textColor = 'text-[#3a7056]';
     borderColor = 'border-[#2e5b45]/40';
     IconComponent = CheckCircle2;
-    message = `${formatCurrency(leftToBudget)} Left to Budget`;
+    message = (
+      <span>
+        <NumberTicker value={leftToBudget} prefix="$" /> Left to Budget
+      </span>
+    );
   } else if (leftToBudget === 0) {
-    bgColor = 'bg-[#e7b956]/20';
-    textColor = 'text-[#e7b956]';
-    borderColor = 'border-[#e7b956]/40';
+    bgColor = 'bg-accent/15';
+    textColor = 'text-accent';
+    borderColor = 'border-accent/30';
     IconComponent = CheckCircle2;
-    message = 'Perfect! Every dollar has a job.';
+    message = <span>Perfect! Every dollar has a job.</span>;
   } else {
     bgColor = 'bg-[#ef4444]/10';
     textColor = 'text-[#ef4444]';
     borderColor = 'border-[#ef4444]/20';
     IconComponent = AlertTriangle;
-    message = `Over-allocated by ${formatCurrency(Math.abs(leftToBudget))}! Reduce your category limits.`;
+    message = (
+      <span>
+        Over-allocated by <NumberTicker value={Math.abs(leftToBudget)} prefix="$" />! Reduce your category limits.
+      </span>
+    );
   }
 
   return (

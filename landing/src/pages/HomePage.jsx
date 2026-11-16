@@ -1,15 +1,9 @@
 import React, { useState } from 'react';
 import {
-  Sparkles,
   ArrowUpRight,
-  ShieldCheck,
-  CheckCircle2,
-  Brain,
-  Mic,
-  Camera,
   Layers,
   Repeat,
-  ChevronRight,
+  Brain,
   ArrowRight
 } from 'lucide-react';
 
@@ -20,9 +14,9 @@ export default function HomePage({ navigate, appUrl }) {
   const [groceries, setGroceries] = useState(500);
   const [utilities, setUtilities] = useState(300);
   const [savings, setSavings] = useState(1200);
-  const [fun, setFun] = useState(800);
+  const [discretionary, setDiscretionary] = useState(800);
 
-  const totalAllocated = housing + groceries + utilities + savings + fun;
+  const totalAllocated = housing + groceries + utilities + savings + discretionary;
   const leftToBudget = demoIncome - totalAllocated;
 
   const handleNav = (path) => {
@@ -30,162 +24,137 @@ export default function HomePage({ navigate, appUrl }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Percentages for allocation distribution bar
+  const housingPct = Math.min(100, Math.round((housing / demoIncome) * 100));
+  const groceriesPct = Math.min(100, Math.round((groceries / demoIncome) * 100));
+  const utilitiesPct = Math.min(100, Math.round((utilities / demoIncome) * 100));
+  const savingsPct = Math.min(100, Math.round((savings / demoIncome) * 100));
+  const discretionaryPct = Math.min(100, Math.round((discretionary / demoIncome) * 100));
+
   return (
-    <div className="space-y-24 sm:space-y-32 pb-20">
+    <div className="space-y-24 sm:space-y-32 pb-24 bg-primary text-text">
       {/* ── 1. Hero Section ── */}
-      <section className="relative pt-12 sm:pt-20 lg:pt-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center space-y-8">
-        {/* Glow ambient background */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-[#e7b956]/10 blur-[130px] rounded-full pointer-events-none -z-10" />
+      <section className="pt-16 sm:pt-24 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto text-center space-y-8">
+        <div className="space-y-4">
+          <div className="inline-flex items-center space-x-2 border border-accent/40 bg-accent/10 px-3.5 py-1 rounded-full text-xs font-mono text-accent">
+            <span>ZERO-BASED PERSONAL FINANCE</span>
+          </div>
 
-        {/* Badge */}
-        <div className="inline-flex items-center space-x-2 bg-[#22201d] border border-[#38342e] px-4 py-1.5 rounded-full text-xs font-medium text-zinc-300 shadow-sm animate-pulse">
-          <Sparkles size={14} className="text-[#e7b956]" />
-          <span>Next-Generation Zero-Based Budgeting</span>
-          <span className="text-zinc-600">|</span>
-          <span className="text-[#e7b956]">Multi-Agent AI</span>
-        </div>
-
-        {/* Main Headline */}
-        <div className="space-y-4 max-w-4xl mx-auto">
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold text-white tracking-tight leading-[1.1]">
-            Give every dollar a job. <br />
-            Meet <span className="gold-gradient-text">ARCA</span>.
+          <h1 className="text-4xl sm:text-6xl font-semibold text-white tracking-tight leading-[1.15]">
+            Give every dollar a purpose. <br />
+            Meet <span className="text-accent">ARCA</span>.
           </h1>
-          <p className="text-base sm:text-xl text-zinc-300 max-w-2xl mx-auto leading-relaxed">
-            Eliminate financial stress through intentional envelope allocation. Balance your cycle income to exactly $0, track expenses in real time, and converse with multi-agent AI.
+
+          <p className="text-base sm:text-lg text-text-muted max-w-xl mx-auto leading-relaxed pt-1">
+            Assign your income to envelopes before spending begins. Balance your cycle to exactly <span className="text-accent font-mono">$0.00</span> and maintain absolute clarity over your cash flow.
           </p>
         </div>
 
         {/* Primary CTA Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <a
             href={appUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto inline-flex items-center justify-center space-x-2.5 bg-gradient-to-r from-[#e7b956] to-[#cfa143] hover:from-[#f3cb6d] hover:to-[#dfaf4d] text-[#161614] font-bold text-base px-8 py-4 rounded-xl shadow-xl hover:shadow-[#e7b956]/20 transition-all active:scale-95 cursor-pointer"
+            className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 bg-accent hover:bg-accent-hover text-primary font-semibold text-sm px-6 py-3 rounded-lg transition-colors cursor-pointer shadow-sm"
           >
-            <span>Launch ARCA App</span>
-            <ArrowUpRight size={18} />
+            <span>Launch ARCA</span>
+            <ArrowUpRight size={15} />
           </a>
 
           <button
             onClick={() => handleNav('/why-arca')}
-            className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 bg-[#22201d] hover:bg-[#2c2a26] text-zinc-200 border border-[#38342e] font-semibold text-base px-7 py-4 rounded-xl transition-all cursor-pointer"
+            className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 bg-card hover:bg-card-hover text-accent border border-accent/40 hover:border-accent font-medium text-sm px-6 py-3 rounded-lg transition-colors cursor-pointer"
           >
             <span>Why We Made ARCA</span>
-            <ChevronRight size={18} />
+            <ArrowRight size={15} />
           </button>
-        </div>
-
-        {/* App Showcase Card / Mockup */}
-        <div className="pt-8 max-w-5xl mx-auto">
-          <div className="bg-[#181816] border border-[#38342e] rounded-3xl p-4 sm:p-8 shadow-2xl gold-glow-subtle relative overflow-hidden">
-            {/* Mock Header */}
-            <div className="flex items-center justify-between border-b border-[#2e2b26] pb-4 mb-6">
-              <div className="flex items-center space-x-3">
-                <svg viewBox="0 0 36 44" fill="none" className="h-6 w-auto">
-                  <rect x="0" y="2" width="36" height="10" rx="3.5" fill="#8c6d37" />
-                  <rect x="0" y="17" width="36" height="10" rx="3.5" fill="#cfa143" />
-                  <rect x="0" y="32" width="36" height="10" rx="3.5" fill="#e7b956" />
-                </svg>
-                <span className="font-extrabold text-white text-lg tracking-tight">ARCA</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs bg-[#2e5b45]/30 text-[#3a7056] border border-[#2e5b45]/40 px-2.5 py-1 rounded-full font-medium">
-                  Active Master Cycle: Monthly
-                </span>
-              </div>
-            </div>
-
-            {/* Mock Banner */}
-            <div className="bg-[#e7b956]/15 border border-[#e7b956]/30 text-[#e7b956] rounded-xl p-3.5 mb-6 flex items-center justify-center space-x-2 font-semibold text-sm">
-              <CheckCircle2 size={18} />
-              <span>Perfect! Every dollar has a job. Balance: $0.00 Left to Budget</span>
-            </div>
-
-            {/* Mock Envelopes Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
-              <div className="bg-[#201e1a] border border-[#33302a] rounded-xl p-4 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-white text-sm">Rent & Housing</span>
-                  <span className="text-xs font-mono text-[#8c6d37]">$1,400.00</span>
-                </div>
-                <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-[#8c6d37] h-full rounded-full" style={{ width: '100%' }} />
-                </div>
-                <div className="flex justify-between text-[11px] text-zinc-400 pt-1">
-                  <span>Spent: $1,400</span>
-                  <span className="text-[#3a7056] font-medium">Remaining: $0</span>
-                </div>
-              </div>
-
-              <div className="bg-[#201e1a] border border-[#33302a] rounded-xl p-4 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-white text-sm">Groceries & Food</span>
-                  <span className="text-xs font-mono text-[#2e5b45]">$500.00</span>
-                </div>
-                <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-[#2e5b45] h-full rounded-full" style={{ width: '64%' }} />
-                </div>
-                <div className="flex justify-between text-[11px] text-zinc-400 pt-1">
-                  <span>Spent: $320</span>
-                  <span className="text-[#3a7056] font-medium">Remaining: $180</span>
-                </div>
-              </div>
-
-              <div className="bg-[#201e1a] border border-[#33302a] rounded-xl p-4 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-white text-sm">Emergency Savings</span>
-                  <span className="text-xs font-mono text-[#e7b956]">$1,200.00</span>
-                </div>
-                <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-[#e7b956] h-full rounded-full" style={{ width: '100%' }} />
-                </div>
-                <div className="flex justify-between text-[11px] text-zinc-400 pt-1">
-                  <span>Rollover Enabled</span>
-                  <span className="text-[#e7b956] font-medium">Auto-Save</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
-      {/* ── 2. Interactive Zero-Based Budgeting Sandbox ── */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
-        <div className="bg-[#1c1a17] border border-[#38342e] rounded-3xl p-6 sm:p-10 space-y-8">
-          <div className="text-center space-y-2 max-w-xl mx-auto">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
-              Try Zero-Based Allocation Live
-            </h2>
-            <p className="text-xs sm:text-sm text-zinc-400">
-              Adjust the sliders below to see how ARCA ensures every dollar has a dedicated mission.
-            </p>
+      {/* ── 2. Interactive Zero-Based Allocator (Yellow & Black Theme) ── */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
+        <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-5">
+            <div>
+              <h2 className="text-lg font-semibold text-white tracking-tight">
+                Interactive Allocation Console
+              </h2>
+              <p className="text-xs text-text-muted">
+                Adjust values to observe how zero-based budgeting balances income against envelopes.
+              </p>
+            </div>
+            <div className="font-mono text-xs">
+              <span className="text-text-muted">Cycle: </span>
+              <span className="text-accent font-semibold">Monthly</span>
+            </div>
           </div>
 
-          {/* Real-time status banner */}
+          {/* Allocation Breakdown Bar (Disciplined Unified Palette) */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs text-text-muted font-mono">
+              <span className="text-accent">Allocation Distribution</span>
+              <span className="text-accent font-semibold">{Math.round((totalAllocated / demoIncome) * 100)}% allocated</span>
+            </div>
+            <div className="w-full h-2.5 bg-card-hover rounded-full overflow-hidden flex border border-border">
+              <div style={{ width: `${housingPct}%` }} className="bg-accent h-full" title="Housing" />
+              <div style={{ width: `${groceriesPct}%` }} className="bg-forest-light h-full" title="Groceries" />
+              <div style={{ width: `${utilitiesPct}%` }} className="bg-forest h-full" title="Utilities" />
+              <div style={{ width: `${savingsPct}%` }} className="bg-accent-hover h-full" title="Savings" />
+              <div style={{ width: `${discretionaryPct}%` }} className="bg-text-muted h-full" title="Discretionary" />
+            </div>
+            <div className="flex flex-wrap gap-4 text-[11px] text-text-muted pt-1">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-accent" /> Housing (<span className="text-accent font-mono">${housing}</span>)
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-forest-light" /> Groceries (<span className="text-accent font-mono">${groceries}</span>)
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-forest" /> Utilities (<span className="text-accent font-mono">${utilities}</span>)
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-accent-hover" /> Savings (<span className="text-accent font-mono">${savings}</span>)
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-text-muted" /> Discretionary (<span className="text-accent font-mono">${discretionary}</span>)
+              </span>
+            </div>
+          </div>
+
+          {/* Minimalist Status Banner (Yellow & Black, Zero Emojis) */}
           <div
-            className={`rounded-xl p-4 text-center font-bold text-sm sm:text-base border transition-all ${
+            className={`rounded-lg px-4 py-3 flex items-center justify-between text-xs font-mono border transition-colors ${
               leftToBudget === 0
-                ? 'bg-[#e7b956]/20 border-[#e7b956]/40 text-[#e7b956]'
+                ? 'bg-accent/15 border-accent/60 text-accent'
                 : leftToBudget > 0
-                ? 'bg-[#2e5b45]/20 border-[#2e5b45]/40 text-[#3a7056]'
-                : 'bg-red-500/10 border-red-500/30 text-red-400'
+                ? 'bg-card border-accent/30 text-accent'
+                : 'bg-red-950/20 border-red-800/40 text-red-400'
             }`}
           >
-            {leftToBudget === 0
-              ? '🎉 Exact Zero Allocation: Perfect! Every dollar has a job.'
-              : leftToBudget > 0
-              ? `💡 $${leftToBudget.toLocaleString()} Unassigned: Give this remaining money a purpose.`
-              : `⚠️ Overallocated by $${Math.abs(leftToBudget).toLocaleString()}: Reduce envelopes to balance.`}
+            <span>
+              {leftToBudget === 0
+                ? 'Status: Balanced. Every dollar is assigned.'
+                : leftToBudget > 0
+                ? 'Status: Unallocated funds remaining.'
+                : 'Status: Overallocated. Deficit exceeds income.'}
+            </span>
+            <span className="font-semibold text-sm">
+              {leftToBudget === 0
+                ? '$0.00 left to budget'
+                : leftToBudget > 0
+                ? `+$${leftToBudget.toLocaleString()} remaining`
+                : `-$${Math.abs(leftToBudget).toLocaleString()} deficit`}
+            </span>
           </div>
 
-          {/* Sliders grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
-            <div className="space-y-2 bg-[#22201d] p-4 rounded-xl border border-[#33302a]">
-              <div className="flex justify-between text-xs">
-                <span className="text-zinc-400 font-medium">Monthly Income</span>
-                <span className="font-mono text-white font-bold">${demoIncome.toLocaleString()}</span>
+          {/* Controls Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-2">
+            <div className="space-y-2 bg-card-hover p-3.5 rounded-lg border border-border">
+              <div className="flex justify-between">
+                <span className="text-text-muted font-medium">Monthly Income</span>
+                <span className="font-mono text-accent font-bold text-sm">${demoIncome.toLocaleString()}</span>
               </div>
               <input
                 type="range"
@@ -198,10 +167,10 @@ export default function HomePage({ navigate, appUrl }) {
               />
             </div>
 
-            <div className="space-y-2 bg-[#22201d] p-4 rounded-xl border border-[#33302a]">
-              <div className="flex justify-between text-xs">
-                <span className="text-zinc-400 font-medium">Housing & Rent</span>
-                <span className="font-mono text-white font-bold">${housing.toLocaleString()}</span>
+            <div className="space-y-2 bg-card-hover p-3.5 rounded-lg border border-border">
+              <div className="flex justify-between">
+                <span className="text-text-muted font-medium">Housing & Rent</span>
+                <span className="font-mono text-accent font-bold text-sm">${housing.toLocaleString()}</span>
               </div>
               <input
                 type="range"
@@ -210,14 +179,14 @@ export default function HomePage({ navigate, appUrl }) {
                 step="50"
                 value={housing}
                 onChange={(e) => setHousing(Number(e.target.value))}
-                className="w-full accent-[#8c6d37] cursor-pointer"
+                className="w-full accent-[#e7b956] cursor-pointer"
               />
             </div>
 
-            <div className="space-y-2 bg-[#22201d] p-4 rounded-xl border border-[#33302a]">
-              <div className="flex justify-between text-xs">
-                <span className="text-zinc-400 font-medium">Groceries</span>
-                <span className="font-mono text-white font-bold">${groceries.toLocaleString()}</span>
+            <div className="space-y-2 bg-card-hover p-3.5 rounded-lg border border-border">
+              <div className="flex justify-between">
+                <span className="text-text-muted font-medium">Groceries</span>
+                <span className="font-mono text-accent font-bold text-sm">${groceries.toLocaleString()}</span>
               </div>
               <input
                 type="range"
@@ -226,14 +195,14 @@ export default function HomePage({ navigate, appUrl }) {
                 step="50"
                 value={groceries}
                 onChange={(e) => setGroceries(Number(e.target.value))}
-                className="w-full accent-[#2e5b45] cursor-pointer"
+                className="w-full accent-[#e7b956] cursor-pointer"
               />
             </div>
 
-            <div className="space-y-2 bg-[#22201d] p-4 rounded-xl border border-[#33302a]">
-              <div className="flex justify-between text-xs">
-                <span className="text-zinc-400 font-medium">Savings & Investments</span>
-                <span className="font-mono text-white font-bold">${savings.toLocaleString()}</span>
+            <div className="space-y-2 bg-card-hover p-3.5 rounded-lg border border-border">
+              <div className="flex justify-between">
+                <span className="text-text-muted font-medium">Savings & Investments</span>
+                <span className="font-mono text-accent font-bold text-sm">${savings.toLocaleString()}</span>
               </div>
               <input
                 type="range"
@@ -249,113 +218,110 @@ export default function HomePage({ navigate, appUrl }) {
         </div>
       </section>
 
-      {/* ── 3. Core Features ── */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-12">
-        <div className="text-center space-y-3 max-w-2xl mx-auto">
-          <div className="inline-flex items-center space-x-1.5 text-xs font-bold text-[#e7b956] uppercase tracking-wider">
-            <Layers size={14} />
-            <span>Built for Speed & Insight</span>
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-            Everything you need. Nothing you don't.
+      {/* ── 3. Core Architecture ── */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-10">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-widest text-accent font-mono">Architecture</p>
+          <h2 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
+            Designed for precision and discipline.
           </h2>
-          <p className="text-sm sm:text-base text-zinc-400">
-            Engineered from first principles to save time and give you absolute clarity.
-          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="bg-[#1c1a17] border border-[#38342e] rounded-2xl p-6 sm:p-8 space-y-4 hover:border-[#e7b956]/50 transition-all">
-            <div className="w-12 h-12 rounded-xl bg-[#e7b956]/10 text-[#e7b956] flex items-center justify-center border border-[#e7b956]/20">
-              <Layers size={24} />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-card border border-border hover:border-accent/60 rounded-xl p-6 space-y-3 transition-colors">
+            <span className="text-xs font-mono text-accent">01 / METHOD</span>
+            <div className="flex items-center space-x-2">
+              <Layers size={18} className="text-accent" />
+              <h3 className="text-base font-semibold text-white">Intentional Allocation</h3>
             </div>
-            <h3 className="text-xl font-bold text-white">Smart Quick-Fill</h3>
-            <p className="text-sm text-zinc-400 leading-relaxed">
-              Don't want to calculate percentages manually? Tap Quick-Fill to instantly apply 50/30/20, Student, or Aggressive Saver templates across all your envelopes.
+            <p className="text-xs text-text-muted leading-relaxed">
+              Every dollar is assigned to an envelope upon paycheck receipt. Spending occurs from allocated buckets, not ambiguous checking account totals.
             </p>
           </div>
 
-          <div className="bg-[#1c1a17] border border-[#38342e] rounded-2xl p-6 sm:p-8 space-y-4 hover:border-[#e7b956]/50 transition-all">
-            <div className="w-12 h-12 rounded-xl bg-[#2e5b45]/30 text-[#3a7056] flex items-center justify-center border border-[#2e5b45]/40">
-              <Brain size={24} />
+          <div className="bg-card border border-border hover:border-accent/60 rounded-xl p-6 space-y-3 transition-colors">
+            <span className="text-xs font-mono text-accent">02 / SPEED</span>
+            <div className="flex items-center space-x-2">
+              <Brain size={18} className="text-accent" />
+              <h3 className="text-base font-semibold text-white">Frictionless Entry</h3>
             </div>
-            <h3 className="text-xl font-bold text-white">Multi-Agent Intelligence</h3>
-            <p className="text-sm text-zinc-400 leading-relaxed">
-              Chat naturally with your AI financial advisor, dictate expenses with voice, or photograph paper receipts for automated parsing.
+            <p className="text-xs text-text-muted leading-relaxed">
+              Log expenditures instantly through voice dictation, camera receipt capture, or manual input with intelligent category matching.
             </p>
           </div>
 
-          <div className="bg-[#1c1a17] border border-[#38342e] rounded-2xl p-6 sm:p-8 space-y-4 hover:border-[#e7b956]/50 transition-all">
-            <div className="w-12 h-12 rounded-xl bg-[#8c6d37]/25 text-[#a48246] flex items-center justify-center border border-[#8c6d37]/35">
-              <Repeat size={24} />
+          <div className="bg-card border border-border hover:border-accent/60 rounded-xl p-6 space-y-3 transition-colors">
+            <span className="text-xs font-mono text-accent">03 / FLOW</span>
+            <div className="flex items-center space-x-2">
+              <Repeat size={18} className="text-accent" />
+              <h3 className="text-base font-semibold text-white">Deterministic Cycles</h3>
             </div>
-            <h3 className="text-xl font-bold text-white">Automated Cycle Rollover</h3>
-            <p className="text-sm text-zinc-400 leading-relaxed">
-              Whether your pay schedule is weekly, bi-weekly, or monthly, ARCA automatically archives cycles, audits leftovers, and rolls over designated savings envelopes.
+            <p className="text-xs text-text-muted leading-relaxed">
+              Cycles archive automatically on pay schedules. Unspent funds roll over to designated targets or reset for clean new periods.
             </p>
           </div>
         </div>
       </section>
 
-      {/* ── 4. Narrative Teasers: "Why We Made ARCA" & "About Us" ── */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="bg-[#1c1a17] border border-[#38342e] rounded-3xl p-8 sm:p-10 flex flex-col justify-between space-y-6">
-          <div className="space-y-4">
-            <span className="text-xs font-bold text-[#e7b956] uppercase tracking-wider">Origin</span>
-            <h3 className="text-2xl font-bold text-white">Why We Made ARCA</h3>
-            <p className="text-sm text-zinc-300 leading-relaxed">
-              Traditional budgeting apps treat personal finance as an autopsy—analyzing spending when it's too late to change anything. We created ARCA so you can command every paycheck on day one.
+      {/* ── 4. Narrative Teasers ── */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-card border border-border hover:border-accent/60 rounded-xl p-6 sm:p-8 flex flex-col justify-between space-y-6 transition-colors">
+          <div className="space-y-3">
+            <span className="text-xs font-mono uppercase tracking-wider text-accent">Origin</span>
+            <h3 className="text-lg font-semibold text-white">Why We Made ARCA</h3>
+            <p className="text-xs sm:text-sm text-text-muted leading-relaxed">
+              Traditional personal finance software focuses on retroactive autopsy—showing you where money went after it is already spent. ARCA operates prospectively.
             </p>
           </div>
           <div>
             <button
               onClick={() => handleNav('/why-arca')}
-              className="inline-flex items-center space-x-2 text-sm font-semibold text-[#e7b956] hover:text-[#f3cb6d] transition-colors cursor-pointer"
+              className="inline-flex items-center space-x-1.5 text-xs font-medium text-accent hover:text-accent-hover transition-colors cursor-pointer"
             >
-              <span>Read the full story</span>
-              <ArrowRight size={16} />
+              <span>Read the background</span>
+              <ArrowRight size={14} />
             </button>
           </div>
         </div>
 
-        <div className="bg-[#1c1a17] border border-[#38342e] rounded-3xl p-8 sm:p-10 flex flex-col justify-between space-y-6">
-          <div className="space-y-4">
-            <span className="text-xs font-bold text-[#3a7056] uppercase tracking-wider">Mission</span>
-            <h3 className="text-2xl font-bold text-white">About ARCA</h3>
-            <p className="text-sm text-zinc-300 leading-relaxed">
-              We are a dedicated team committed to financial empowerment and uncompromising privacy. We never sell your data to financial advertisers or flood your feed with high-interest loans.
+        <div className="bg-card border border-border hover:border-accent/60 rounded-xl p-6 sm:p-8 flex flex-col justify-between space-y-6 transition-colors">
+          <div className="space-y-3">
+            <span className="text-xs font-mono uppercase tracking-wider text-accent">Principles</span>
+            <h3 className="text-lg font-semibold text-white">About the Team</h3>
+            <p className="text-xs sm:text-sm text-text-muted leading-relaxed">
+              Operated by ARCA Budgeting. Built with strict privacy commitments: we do not sell financial telemetry to advertisers or third-party lead generators.
             </p>
           </div>
           <div>
             <button
               onClick={() => handleNav('/about')}
-              className="inline-flex items-center space-x-2 text-sm font-semibold text-[#3a7056] hover:text-[#529e7b] transition-colors cursor-pointer"
+              className="inline-flex items-center space-x-1.5 text-xs font-medium text-accent hover:text-accent-hover transition-colors cursor-pointer"
             >
-              <span>Meet the co-founders</span>
-              <ArrowRight size={16} />
+              <span>Learn about the team</span>
+              <ArrowRight size={14} />
             </button>
           </div>
         </div>
       </section>
 
-      {/* ── 5. Big Bottom Call-to-Action ── */}
+      {/* ── 5. Bottom Call-to-Action ── */}
       <section className="px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto text-center">
-        <div className="bg-gradient-to-b from-[#22201d] to-[#161614] border border-[#e7b956]/30 rounded-3xl p-8 sm:p-16 space-y-6 gold-glow-subtle">
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-            Ready to take command of your finances?
+        <div className="border border-accent/40 rounded-2xl p-8 sm:p-12 space-y-5 bg-card">
+          <h2 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
+            Ready to balance your first cycle?
           </h2>
-          <p className="text-sm sm:text-base text-zinc-300 max-w-lg mx-auto">
-            Experience modern zero-based envelope budgeting. Free, privacy-respecting, and built for peace of mind.
+          <p className="text-xs sm:text-sm text-text-muted max-w-md mx-auto">
+            Zero-based envelope budgeting. Free, privacy-respecting, and built for intentional money management.
           </p>
           <div className="pt-2">
             <a
               href={appUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center space-x-2 bg-[#e7b956] hover:bg-[#f0c76e] text-[#161614] font-bold text-base px-8 py-4 rounded-xl shadow-xl active:scale-95 cursor-pointer"
+              className="inline-flex items-center space-x-2 bg-accent hover:bg-accent-hover text-primary font-semibold text-sm px-6 py-3 rounded-lg transition-colors cursor-pointer"
             >
-              <span>Launch ARCA Now</span>
-              <ArrowUpRight size={18} />
+              <span>Launch ARCA</span>
+              <ArrowUpRight size={15} />
             </a>
           </div>
         </div>

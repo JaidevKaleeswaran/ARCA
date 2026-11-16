@@ -1,24 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { X, ExternalLink, Clock, Newspaper, Share2, Globe, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function ArticleReaderModal({ article, isOpen, onClose }) {
   const [iframeError, setIframeError] = useState(false);
 
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  useEffect(() => {
+    if (!isOpen) return;
+
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current?.();
     };
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'hidden';
-      setIframeError(false);
-    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+    setIframeError(false);
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen || !article) return null;
 
@@ -45,11 +52,11 @@ export default function ArticleReaderModal({ article, isOpen, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div
-        className="relative w-full max-w-4xl h-[88vh] bg-[#181816] border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-4xl h-[88vh] bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Top Bar */}
-        <div className="px-5 py-3.5 border-b border-border/80 flex items-center justify-between gap-3 bg-[#1e1c18] shrink-0">
+        <div className="px-5 py-3.5 border-b border-border/80 flex items-center justify-between gap-3 bg-card-hover shrink-0">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md border ${getSourceBadgeColor(article.source)}`}>
               {article.source}
@@ -118,10 +125,10 @@ export default function ArticleReaderModal({ article, isOpen, onClose }) {
               />
 
               {/* Informational overlay for publishers that block iframe embedding */}
-              <div className="absolute bottom-4 right-4 bg-[#181816]/95 border border-border p-3 rounded-xl shadow-xl max-w-sm flex items-center justify-between gap-3 text-xs backdrop-blur-md">
+              <div className="absolute bottom-4 right-4 bg-card/95 border border-border p-3 rounded-xl shadow-xl max-w-sm flex items-center justify-between gap-3 text-xs backdrop-blur-md">
                 <div className="flex items-start gap-2">
-                  <AlertCircle size={15} className="text-amber-400 shrink-0 mt-0.5" />
-                  <p className="text-zinc-300 text-[11px] leading-tight">
+                  <AlertCircle size={15} className="text-accent shrink-0 mt-0.5" />
+                  <p className="text-text-muted text-[11px] leading-tight">
                     If {article.source} restricts in-app embedding, open directly in your browser.
                   </p>
                 </div>
@@ -129,7 +136,7 @@ export default function ArticleReaderModal({ article, isOpen, onClose }) {
                   href={articleUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-2.5 py-1 bg-[#282620] hover:bg-accent hover:text-primary text-accent text-[11px] font-bold rounded-lg border border-accent/30 transition-all shrink-0 cursor-pointer"
+                  className="px-2.5 py-1 bg-card-hover hover:bg-accent hover:text-primary text-accent text-[11px] font-bold rounded-lg border border-accent/30 transition-all shrink-0 cursor-pointer"
                 >
                   Direct View ↗
                 </a>

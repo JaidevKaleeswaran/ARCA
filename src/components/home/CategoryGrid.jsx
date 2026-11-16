@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useBudget } from '../../contexts/BudgetContext';
-import { Card } from '../ui/Card';
 import CategoryModal from './CategoryModal';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { Plus, Edit2, Trash2, ChevronDown } from 'lucide-react';
@@ -205,7 +204,7 @@ export default function CategoryGrid() {
           const percentUsed = Math.min(100, Math.round((spent / category.limit) * 100)) || 0;
 
           return (
-            <Card key={category.id} className="group relative overflow-hidden flex flex-col">
+            <div key={category.id} className="bg-card border border-border hover:border-accent/40 transition-colors rounded-xl p-4 sm:p-6 shadow-sm group relative overflow-hidden flex flex-col">
               <div 
                 className="absolute top-0 left-0 w-1 h-full" 
                 style={{ backgroundColor: category.color }}
@@ -221,7 +220,7 @@ export default function CategoryGrid() {
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleEditClick(category); }}
                     title="Edit Category"
-                    className="p-1.5 text-zinc-400 hover:text-accent sm:opacity-0 sm:group-hover:opacity-100 transition-all rounded-md hover:bg-zinc-800 focus:opacity-100"
+                    className="p-1.5 text-zinc-400 hover:text-accent sm:opacity-0 sm:group-hover:opacity-100 transition-all rounded-md hover:bg-card-hover focus:opacity-100"
                   >
                     <Edit2 size={16} />
                   </button>
@@ -245,7 +244,7 @@ export default function CategoryGrid() {
                   <span className="text-text-muted">Spent</span>
                   <span className="font-medium" style={{ color: category.color }}>{formatCurrency(spent)}</span>
                 </div>
-                <div className="flex justify-between text-sm pt-1 border-t border-zinc-800/50 mt-1">
+                <div className="flex justify-between text-sm pt-1 border-t border-border-subtle mt-1">
                   <span className="text-text-muted">Remaining</span>
                   <span className={`font-medium ${remaining < 0 ? 'text-red-400' : 'text-[#3a7056]'}`}>
                     {remaining < 0 ? 'Over: ' : ''}{formatCurrency(Math.abs(remaining))}
@@ -255,7 +254,7 @@ export default function CategoryGrid() {
               
               <div className="pl-2">
                 {/* Progress bar */}
-                <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden flex items-center mb-1">
+                <div className="w-full bg-primary rounded-full h-1.5 overflow-hidden flex items-center mb-1">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${percentUsed > 100 ? 'bg-red-500' : 'bg-accent'}`}
                     style={{ width: `${Math.min(100, percentUsed)}%` }}
@@ -263,7 +262,7 @@ export default function CategoryGrid() {
                 </div>
                 <div className="text-[10px] text-right text-text-muted">{percentUsed}%</div>
               </div>
-            </Card>
+            </div>
           );
         })}
 

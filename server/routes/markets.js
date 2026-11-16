@@ -1,10 +1,10 @@
 import express from 'express';
 import YahooFinance from 'yahoo-finance2';
-import { GoogleGenAI } from '@google/genai';
 import { createRateLimiter } from '../middleware/security.js';
 import { sanitizeError } from '../utils/sanitize.js';
 import { STOCK_CATALOG, REAL_ARTICLES } from '../../src/data/marketData.js';
 import { getMacroRates } from '../services/macroRates.js';
+import { geminiKeyPool, callWithModelCascade } from '../config/aiClients.js';
 
 export { STOCK_CATALOG };
 
@@ -18,12 +18,7 @@ const marketsLimiter = createRateLimiter({
 });
 
 function getAI() {
-  const apiKey = process.env.GEMINI_API_KEY
-    || process.env.ASSISTANT_API_KEY
-    || process.env.MANAGER_API_KEY;
-
-  if (!apiKey) return null;
-  return new GoogleGenAI({ apiKey });
+  return geminiKeyPool.getActiveClient();
 }
 
 // ── In-Memory Caches ──
@@ -798,11 +793,10 @@ Format: Return clean plain text paragraphs with no markdown bolding in titles. I
     let summaryText = '';
     try {
       const response = await Promise.race([
-        ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+        callWithModelCascade(ai, 'chat', {
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('AI Generation Timeout')), 4000)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('AI Generation Timeout')), 8000)),
       ]);
       summaryText = response.text?.trim() || '';
     } catch (genErr) {
@@ -824,7 +818,7 @@ Format: Return clean plain text paragraphs with no markdown bolding in titles. I
 
     return res.json({
       summary: summaryText,
-      model: 'gemini-3.8-flash',
+      model: 'gemini-cascade',
       latencyMs: Date.now() - startTime,
     });
   } catch (err) {

@@ -19,7 +19,9 @@
     "server": "node server/index.js",
     "lint:secrets": "node scripts/scan-secrets.js --all",
     "landing:dev": "npm --prefix landing run dev",
-    "landing:build": "npm --prefix landing run build"
+    "landing:build": "npm --prefix landing run build",
+    "landing:deploy": "npm --prefix landing run build && cd landing && vercel --prod",
+    "landing:link": "cd landing && vercel link"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.60.0",

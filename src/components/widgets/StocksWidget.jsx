@@ -1,5 +1,4 @@
-import React from 'react';
-import { TrendingUp, PieChart, ArrowUpRight, ArrowDownRight, Plus, ExternalLink, ShieldCheck } from 'lucide-react';
+import { TrendingUp, PieChart, ArrowUpRight, ArrowDownRight, Plus } from 'lucide-react';
 import { useBudget } from '../../contexts/BudgetContext';
 import { formatCurrency } from '../../utils/formatCurrency';
 
@@ -97,7 +96,7 @@ export default function StocksWidget({ onNavigateToMarkets }) {
                 return (
                   <div
                     key={inv.id}
-                    className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-[#181816] border border-border/50 text-xs"
+                    className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-card border border-border/50 text-xs"
                   >
                     <div>
                       <span className="font-bold text-white mr-1.5">{inv.symbol}</span>
@@ -118,7 +117,7 @@ export default function StocksWidget({ onNavigateToMarkets }) {
           </div>
         </div>
       ) : (
-        <div className="py-5 px-3 text-center rounded-xl bg-[#141412] border border-dashed border-border/80 flex flex-col items-center justify-center space-y-2">
+        <div className="py-5 px-3 text-center rounded-xl bg-primary border border-dashed border-border/80 flex flex-col items-center justify-center space-y-2">
           <PieChart size={24} className="text-accent/60" />
           <p className="text-xs font-semibold text-zinc-300">
             No stocks added yet.

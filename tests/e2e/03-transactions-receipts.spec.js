@@ -64,4 +64,16 @@ test.describe('Transactions Tab — Manual Logging, Receipt Scanner & Voice Pane
     await txPage.toggleVoicePanel();
     await expect(voicePanel).not.toBeVisible();
   });
+
+  test('Export CSV button downloads valid CSV formatted transactions', async ({ page }) => {
+    const exportBtn = page.locator('button:has-text("Export CSV")');
+    await expect(exportBtn).toBeVisible();
+
+    // Trigger download and verify filename format
+    const downloadPromise = page.waitForEvent('download');
+    await exportBtn.click();
+    const download = await downloadPromise;
+
+    expect(download.suggestedFilename()).toMatch(/^ARCA_Expenses_\d{4}-\d{2}-\d{2}\.csv$/);
+  });
 });

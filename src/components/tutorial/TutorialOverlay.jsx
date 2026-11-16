@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTutorial } from './TutorialContext';
-import { ChevronRight, ChevronLeft, Check, Sparkles } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check } from 'lucide-react';
 
 const TAB_NAMES = {
   home: 'Home Page',
@@ -61,7 +61,7 @@ export default function TutorialOverlay() {
     }
 
     if (targetEl) {
-      targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      targetEl.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
     }
 
     // Small delay to let scroll/animations settle
@@ -94,6 +94,10 @@ export default function TutorialOverlay() {
     if (!isTutorialActive) return;
 
     const handleKeyDown = (e) => {
+      // Do not hijack navigation if an input or editable field is active
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) {
+        return;
+      }
       if (e.key === 'ArrowRight' || e.key === 'Enter') {
         e.preventDefault();
         nextStep();
@@ -237,15 +241,14 @@ export default function TutorialOverlay() {
           left: `${popoverPos.left}px`,
           zIndex: 9999,
         }}
-        className="w-[calc(100vw-32px)] sm:w-[380px] bg-[#1a1815] border border-[#38342e] rounded-2xl p-5 shadow-2xl backdrop-blur-md text-text transition-all duration-200 pointer-events-auto"
+        className="w-[calc(100vw-32px)] sm:w-[380px] bg-card border border-border rounded-2xl p-5 shadow-2xl backdrop-blur-md text-text transition-all duration-200 pointer-events-auto"
       >
         {/* Header: Tab badge + Step Counter */}
-        <div className="flex items-center justify-between mb-3 border-b border-zinc-800/80 pb-2.5">
+        <div className="flex items-center justify-between mb-3 border-b border-border pb-2.5">
           <div className="flex items-center space-x-1.5 text-xs font-semibold text-accent">
-            <Sparkles size={14} className="animate-spin text-accent" style={{ animationDuration: '4s' }} />
             <span>{TAB_NAMES[activeTabId] || 'Page'} Tutorial</span>
           </div>
-          <span className="text-[11px] font-medium bg-[#2a2620] text-zinc-300 px-2 py-0.5 rounded-full border border-zinc-700/50">
+          <span className="text-[11px] font-medium bg-card-hover text-zinc-300 px-2 py-0.5 rounded-full border border-border">
             Step {currentStepIndex + 1} of {totalSteps}
           </span>
         </div>

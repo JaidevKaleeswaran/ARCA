@@ -92,7 +92,7 @@ export default function TransactionModal({ isOpen, onClose, transaction = null }
             name="amount"
             value={formData.amount}
             onChange={handleChange}
-            className="w-full bg-[#09090b] border border-zinc-700 rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
+            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
             placeholder="0.00"
             min="0.01"
             step="0.01"
@@ -106,7 +106,7 @@ export default function TransactionModal({ isOpen, onClose, transaction = null }
             name="categoryId"
             value={formData.categoryId}
             onChange={handleChange}
-            className="w-full bg-[#09090b] border border-zinc-700 rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
+            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
             required
           >
             {categories.length === 0 && <option value="">No categories available</option>}
@@ -123,7 +123,7 @@ export default function TransactionModal({ isOpen, onClose, transaction = null }
             name="description"
             value={formData.description}
             onChange={handleChange}
-            className="w-full bg-[#09090b] border border-zinc-700 rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
+            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
             placeholder="e.g. Weekly groceries"
             required
           />
@@ -136,13 +136,13 @@ export default function TransactionModal({ isOpen, onClose, transaction = null }
             name="date"
             value={formData.date}
             onChange={handleChange}
-            className="w-full bg-[#09090b] border border-zinc-700 rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors [color-scheme:dark]"
+            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors [color-scheme:dark]"
             required
           />
         </div>
 
         {/* Subscription toggle */}
-        <div className="flex items-center justify-between bg-[#09090b] border border-zinc-700 rounded-lg px-3 py-3">
+        <div className="flex items-center justify-between bg-primary border border-border rounded-lg px-3 py-3">
           <div>
             <p className="text-sm text-text font-medium">Mark as Subscription</p>
             <p className="text-xs text-text-muted mt-0.5">Recurring monthly charge (Netflix, gym, etc.)</p>

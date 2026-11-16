@@ -7,11 +7,11 @@ import { processTransaction } from '../../services/agents/managerAgent';
 import { speakTransactionDetails } from '../../services/agents/voiceAgent';
 import { scanReceipt } from '../../services/agents/receiptScannerAgent';
 import toast from 'react-hot-toast';
-import { Upload, Sparkles, Loader2, CheckCircle2, FileText, AlertCircle, Bot, Volume2 } from 'lucide-react';
+import { Upload, Loader2, CheckCircle2, FileText, AlertCircle, Volume2 } from 'lucide-react';
 
 export default function ReceiptScannerModal({ isOpen, onClose }) {
   const budgetState = useBudget();
-  const { categories, dispatch, quotaUsage, openProModal, updateQuota } = budgetState;
+  const { categories, dispatch, quotaUsage, openProModal, updateQuota, isSubscribed } = budgetState;
   const { user } = useAuth();
   
   const fileInputRef = useRef(null);
@@ -76,17 +76,22 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
       return;
     }
 
-    // Pre-validate quota before dispatching API request
-    const quotaCheck = await checkAndIncrementQuota(user?.uid, 'receipts', quotaUsage, { skipIncrement: true });
-    if (!quotaCheck.allowed) {
-      openProModal({
-        reason: 'QUOTA_EXHAUSTED',
-        feature: 'receipts',
-        used: quotaCheck.used,
-        limit: quotaCheck.limit,
-        resetCountdown: quotaCheck.resetCountdown,
+    // Pre-validate quota for non-subscribed users before dispatching API request
+    if (!isSubscribed) {
+      const quotaCheck = await checkAndIncrementQuota(user?.uid, 'receipts', quotaUsage, {
+        skipIncrement: true,
+        isSubscribed: Boolean(isSubscribed),
       });
-      return;
+      if (!quotaCheck.allowed) {
+        openProModal({
+          reason: 'QUOTA_EXHAUSTED',
+          feature: 'receipts',
+          used: quotaCheck.used,
+          limit: quotaCheck.limit,
+          resetCountdown: quotaCheck.resetCountdown,
+        });
+        return;
+      }
     }
 
     setIsScanning(true);
@@ -188,14 +193,14 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Scan Receipt with AI">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Scan Receipt">
       <div className="space-y-5">
         {/* Step 1: Upload File area */}
         {!scanResult ? (
           <div className="space-y-4">
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-zinc-700 hover:border-accent/60 rounded-xl p-6 text-center cursor-pointer transition-colors bg-[#09090b]/50 group"
+              className="border-2 border-dashed border-border hover:border-accent/60 rounded-xl p-6 text-center cursor-pointer transition-colors bg-primary group"
             >
               <input
                 type="file"
@@ -210,9 +215,9 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
                   <img
                     src={previewUrl}
                     alt="Receipt preview"
-                    className="max-h-48 mx-auto rounded-lg object-contain border border-zinc-800"
+                    className="max-h-48 mx-auto rounded-lg object-contain border border-border"
                   />
-                  <p className="text-xs text-zinc-400 font-medium">Click to change image</p>
+                  <p className="text-xs text-text-muted font-medium">Click to change image</p>
                 </div>
               ) : (
                 <div className="py-4 space-y-2">
@@ -220,7 +225,7 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
                     <Upload size={24} />
                   </div>
                   <p className="text-sm font-medium text-text">Click to upload receipt image</p>
-                  <p className="text-xs text-zinc-500">Supports JPG, PNG, WebP up to 10MB</p>
+                  <p className="text-xs text-text-muted">Supports JPG, PNG, WebP up to 10MB</p>
                 </div>
               )}
             </div>
@@ -244,11 +249,11 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
               {isScanning ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  <span>Scanning with Gemini AI...</span>
+                  <span>Scanning receipt...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles size={18} />
+                  <FileText size={18} />
                   <span>Scan Receipt</span>
                 </>
               )}
@@ -262,9 +267,8 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
                 <CheckCircle2 size={18} className="shrink-0" />
                 <div>
                   <p className="font-semibold">Receipt Extracted Successfully</p>
-                  <p className="text-emerald-400/80 flex items-center gap-1">
-                    <Bot size={10} />
-                    Manager Agent will auto-categorize this transaction
+                  <p className="text-emerald-400/80">
+                    Auto-categorized from receipt items
                   </p>
                 </div>
               </div>
@@ -289,14 +293,14 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
 
             {/* Line items preview if available */}
             {scanResult.data?.line_items && scanResult.data.line_items.length > 0 && (
-              <div className="bg-[#09090b] border border-zinc-800 rounded-lg p-3 space-y-2">
+              <div className="bg-primary border border-border rounded-lg p-3 space-y-2">
                 <p className="text-xs font-semibold text-text-muted flex items-center space-x-1">
                   <FileText size={14} />
                   <span>Extracted Line Items ({scanResult.data.line_items.length})</span>
                 </p>
-                <div className="max-h-28 overflow-y-auto divide-y divide-zinc-800/60 text-xs">
+                <div className="max-h-28 overflow-y-auto divide-y divide-border text-xs">
                   {scanResult.data.line_items.map((item, idx) => (
-                    <div key={idx} className="py-1 flex justify-between text-zinc-300">
+                    <div key={idx} className="py-1 flex justify-between text-text">
                       <span className="truncate max-w-[200px]">
                         {item.quantity > 1 ? `${item.quantity}x ` : ''}
                         {item.name}
@@ -316,8 +320,8 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
                 type="text"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className={`w-full bg-[#09090b] border rounded-lg px-3 py-2 text-text focus:outline-none transition-colors ${
-                  scanResult._scanIssues?.includes('merchant') ? 'border-amber-500/50 focus:border-amber-400' : 'border-zinc-700 focus:border-accent'
+                className={`w-full bg-primary border rounded-lg px-3 py-2 text-text focus:outline-none transition-colors ${
+                  scanResult._scanIssues?.includes('merchant') ? 'border-amber-500/50 focus:border-amber-400' : 'border-border focus:border-accent'
                 }`}
                 required
               />
@@ -332,8 +336,8 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
                   type="number"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  className={`w-full bg-[#09090b] border rounded-lg px-3 py-2 text-text focus:outline-none transition-colors ${
-                    scanResult._scanIssues?.includes('amount') ? 'border-amber-500/50 focus:border-amber-400' : 'border-zinc-700 focus:border-accent'
+                  className={`w-full bg-primary border rounded-lg px-3 py-2 text-text focus:outline-none transition-colors ${
+                    scanResult._scanIssues?.includes('amount') ? 'border-amber-500/50 focus:border-amber-400' : 'border-border focus:border-accent'
                   }`}
                   min="0.01"
                   step="0.01"
@@ -346,7 +350,7 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
                 <select
                   value={formData.categoryId}
                   onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                  className="w-full bg-[#09090b] border border-zinc-700 rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
+                  className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
                   required
                 >
                   {categories.map((cat) => (
@@ -364,7 +368,7 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
                 type="date"
                 value={formData.date}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                className="w-full bg-[#09090b] border border-zinc-700 rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors [color-scheme:dark]"
+                className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors [color-scheme:dark]"
                 required
               />
             </div>
@@ -373,7 +377,7 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
               <button
                 type="button"
                 onClick={handleReset}
-                className="px-4 bg-zinc-800 text-zinc-300 font-medium py-2 rounded-lg hover:bg-zinc-700 transition-colors text-sm"
+                className="px-4 bg-card-hover text-text font-medium py-2 rounded-lg hover:bg-card-hover/80 border border-border transition-colors text-sm"
               >
                 Re-scan
               </button>

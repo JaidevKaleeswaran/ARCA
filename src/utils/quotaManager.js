@@ -2,9 +2,9 @@ import { doc, updateDoc, setDoc, increment } from 'firebase/firestore';
 import { db } from '../config/firebase.js';
 
 export const QUOTA_LIMITS = {
-  receipts: 18,
-  voice: 25,
-  assistant: 35,
+  receipts: 5,
+  voice: 5,
+  assistant: 10,
 };
 
 /**
@@ -86,14 +86,26 @@ export function normalizeQuotaState(quotaState = {}) {
  * @param {string} uid - User ID
  * @param {'receipts' | 'voice' | 'assistant'} feature - Feature being used
  * @param {Object} currentQuotaState - State from BudgetContext
- * @param {Object} options - Options ({ skipIncrement: boolean })
- * @returns {Promise<{ allowed: boolean, reason?: string, limit: number, used: number, resetCountdown: string }>}
+ * @param {Object} options - Options ({ skipIncrement: boolean, isSubscribed: boolean })
+ * @returns {Promise<{ allowed: boolean, isSubscribed?: boolean, reason?: string, limit: number, used: number, resetCountdown: string }>}
  */
-export async function checkAndIncrementQuota(uid, feature, currentQuotaState = {}, { skipIncrement = false } = {}) {
+export async function checkAndIncrementQuota(uid, feature, currentQuotaState = {}, { skipIncrement = false, isSubscribed = false } = {}) {
+  const hasSubscription = isSubscribed === true || currentQuotaState?.isSubscribed === true;
+  if (hasSubscription) {
+    return {
+      allowed: true,
+      isSubscribed: true,
+      feature,
+      limit: Infinity,
+      used: currentQuotaState?.[`${feature}Used`] || 0,
+      resetCountdown: '',
+    };
+  }
+
   const normalized = normalizeQuotaState(currentQuotaState);
   const currentMondayISO = normalized.weekStartDate;
   const isStale = !currentQuotaState || currentQuotaState.weekStartDate !== currentMondayISO;
-  const limit = QUOTA_LIMITS[feature] ?? 35;
+  const limit = QUOTA_LIMITS[feature] ?? 10;
   const fieldKey = `${feature}Used`;
   const used = normalized[fieldKey] || 0;
   const resetCountdown = getNextMondayCountdown();

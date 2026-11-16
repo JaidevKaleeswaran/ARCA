@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBudget } from '../../contexts/BudgetContext';
 import { Card } from '../ui/Card';
-import { Edit2, Plus, DollarSign, Briefcase, Sparkles } from 'lucide-react';
+import { Edit2, Plus, DollarSign, Briefcase } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatCurrency';
 import IncomeSourceModal from './IncomeSourceModal';
 import SalaryModal from './SalaryModal';

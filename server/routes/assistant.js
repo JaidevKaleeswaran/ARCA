@@ -3,7 +3,7 @@ import { sanitizeError } from '../utils/sanitize.js';
 import { createRateLimiter, validateChatInput, validateCategorizeInput } from '../middleware/security.js';
 import { getMacroRates } from '../services/macroRates.js';
 import { getAssistantClient, callWithModelCascade, getNextMondayISO } from '../config/aiClients.js';
-import { getGeminiTools, getOllamaTools, executeTool, MAX_TOOL_ITERATIONS } from '../mcp/mcpRegistry.js';
+import { getGeminiTools, executeTool, MAX_TOOL_ITERATIONS } from '../mcp/mcpRegistry.js';
 
 const router = express.Router();
 
@@ -11,55 +11,6 @@ const router = express.Router();
 const chatLimiter = createRateLimiter({ windowMs: 60000, max: 30, message: 'Too many assistant queries. Please wait a moment.' });
 const categorizeLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 'Too many categorization requests.' });
 const reviewLimiter = createRateLimiter({ windowMs: 60000, max: 30, message: 'Too many review requests.' });
-
-// ── Ollama Qwen 3.5 Auto-Detection & Caching ────────────────────────────────
-
-let cachedOllamaStatus = null;
-let lastOllamaCheckTime = 0;
-const OLLAMA_CHECK_TTL = 15000; // 15 seconds
-
-export async function isOllamaQwenAvailable() {
-  if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production') {
-    return false;
-  }
-
-  const now = Date.now();
-  if (cachedOllamaStatus !== null && (now - lastOllamaCheckTime < OLLAMA_CHECK_TTL)) {
-    return cachedOllamaStatus;
-  }
-
-  try {
-    const res = await fetch('http://localhost:11434/api/tags', {
-      signal: AbortSignal.timeout(250),
-    });
-
-    if (!res.ok) {
-      cachedOllamaStatus = false;
-      lastOllamaCheckTime = now;
-      return false;
-    }
-
-    const data = await res.json();
-    const models = data.models || [];
-    const targetModel = (process.env.OLLAMA_MODEL || 'qwen3.5:9b').toLowerCase();
-
-    const hasModel = models.some(m => {
-      const name = (m.name || m.model || '').toLowerCase();
-      return name === targetModel ||
-        name.startsWith(targetModel + ':') ||
-        name.startsWith('qwen3.5') ||
-        name.includes('qwen');
-    });
-
-    cachedOllamaStatus = hasModel;
-    lastOllamaCheckTime = now;
-    return hasModel;
-  } catch {
-    cachedOllamaStatus = false;
-    lastOllamaCheckTime = now;
-    return false;
-  }
-}
 
 /**
  * System prompt generator for financial Q&A
@@ -69,7 +20,7 @@ function buildSystemPrompt(snapshot, macroRates = null) {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 
-  return `You are ARCA, an expert financial intelligence assistant embedded in the StackedBudgeting app. Your job is to help users understand their finances, optimize budgets, build wealth, and provide real, actionable financial guidance.
+  return `You are ARCA, an expert financial intelligence assistant embedded in the ARCA app. Your job is to help users understand their finances, optimize budgets, build wealth, and provide real, actionable financial guidance.
 
 Today is ${today}.
 
@@ -163,7 +114,7 @@ ${(snapshot?.recentTransactions || snapshot?.transactions || []).slice(0, 30).le
 
 /**
  * POST /api/assistant/chat
- * Answers user financial queries safely via local Qwen (if available) or Google Gemini
+ * Answers user financial queries strictly via Google Gemini with in-process MCP tools & key failover
  */
 router.post('/chat', chatLimiter, validateChatInput, async (req, res) => {
   const startTime = Date.now();
@@ -172,90 +123,7 @@ router.post('/chat', chatLimiter, validateChatInput, async (req, res) => {
   try {
     const macroData = await getMacroRates().catch(() => null);
     const systemPrompt = buildSystemPrompt(snapshot, macroData?.raw || macroData);
-    const isLocalQwen = await isOllamaQwenAvailable();
 
-    // ── Local Path: Ollama Qwen 3.5 ──────────────────────────────────────────
-    if (isLocalQwen) {
-      try {
-        const targetModel = process.env.OLLAMA_MODEL || 'qwen3.5:9b';
-        const ollamaTools = getOllamaTools();
-
-        const messages = [
-          { role: 'system', content: systemPrompt },
-          ...history.slice(-10).map(msg => ({
-            role: msg.role === 'user' ? 'user' : 'assistant',
-            content: msg.text || msg.content || '',
-          })),
-          { role: 'user', content: question },
-        ];
-
-        let finalAnswer = '';
-        const groundedSources = [];
-
-        for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-          const isLastIteration = iteration === MAX_TOOL_ITERATIONS - 1;
-          const ollamaRes = await fetch('http://localhost:11434/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: targetModel,
-              messages,
-              tools: isLastIteration ? undefined : ollamaTools,
-              stream: false,
-            }),
-            signal: AbortSignal.timeout(parseInt(process.env.OLLAMA_TIMEOUT_MS, 10) || 75000),
-          });
-
-          if (!ollamaRes.ok) {
-            throw new Error(`Ollama chat returned HTTP ${ollamaRes.status}`);
-          }
-
-          const ollamaData = await ollamaRes.json();
-          const assistantMsg = ollamaData.message || {};
-          messages.push(assistantMsg);
-
-          const toolCalls = assistantMsg.tool_calls || [];
-          if (toolCalls.length === 0 || isLastIteration) {
-            finalAnswer = assistantMsg.content || '';
-            break;
-          }
-
-          // Execute requested tools in-process
-          for (const call of toolCalls) {
-            const toolName = call.function?.name;
-            const toolArgs = call.function?.arguments || {};
-            const result = await executeTool(toolName, toolArgs, snapshot);
-
-            if (toolName === 'search_financial_news' && result.articles) {
-              result.articles.forEach(a => groundedSources.push({ title: a.headline, uri: a.url, publisher: a.publisher }));
-            } else if (toolName === 'search_web' && result.results) {
-              result.results.forEach(r => groundedSources.push({ title: r.title, uri: r.url }));
-            }
-
-            messages.push({
-              role: 'tool',
-              name: toolName,
-              tool_call_id: call.id || toolName || 'call_0',
-              content: JSON.stringify(result),
-            });
-          }
-        }
-
-        res.setHeader('X-AI-Provider', 'local-qwen');
-        return res.json({
-          answer: finalAnswer,
-          sources: groundedSources,
-          provider: 'local-qwen',
-          isWebGrounded: groundedSources.length > 0,
-          latencyMs: Date.now() - startTime,
-        });
-      } catch (ollamaErr) {
-        console.warn('[Assistant] Local Ollama failed, falling back to Cloud Gemini cascade:', ollamaErr.message);
-        // Seamlessly fall through to Cloud Gemini
-      }
-    }
-
-    // ── Cloud Path: Gemini with Cascade & MCP Tools ──────────────────────────
     const client = getAssistantClient();
     if (!client) {
       return res.status(500).json({
@@ -373,7 +241,7 @@ router.post('/chat', chatLimiter, validateChatInput, async (req, res) => {
     if (err.status === 429 || err.code === 'UPSTREAM_RATE_LIMIT') {
       return res.status(429).json(err.payload || {
         error: 'UPSTREAM_RATE_LIMIT',
-        message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+        message: 'High demand: upgrade to ARCA Pro for priority dedicated bandwidth.',
         resetDate: getNextMondayISO(),
       });
     }
@@ -387,7 +255,7 @@ router.post('/chat', chatLimiter, validateChatInput, async (req, res) => {
 
 /**
  * POST /api/assistant/categorize
- * Uses Gemini 2.0 Flash Lite to silently categorize transactions
+ * Uses Gemini Flash Lite to silently categorize transactions
  */
 router.post('/categorize', categorizeLimiter, validateCategorizeInput, async (req, res) => {
   const { description, amount = 0, categories = [] } = req.body;
@@ -426,7 +294,7 @@ Rules:
     if (err.status === 429 || err.code === 'UPSTREAM_RATE_LIMIT') {
       return res.status(429).json(err.payload || {
         error: 'UPSTREAM_RATE_LIMIT',
-        message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+        message: 'High demand: upgrade to ARCA Pro for priority dedicated bandwidth.',
         resetDate: getNextMondayISO(),
       });
     }
@@ -482,6 +350,13 @@ Respond in 2 sentences max. Start with either "Looks normal:" or "Suspicious:" a
     });
   } catch (err) {
     console.error('Assistant review error:', err);
+    if (err.status === 429 || err.code === 'UPSTREAM_RATE_LIMIT') {
+      return res.status(429).json(err.payload || {
+        error: 'UPSTREAM_RATE_LIMIT',
+        message: 'High demand: upgrade to ARCA Pro for priority dedicated bandwidth.',
+        resetDate: getNextMondayISO(),
+      });
+    }
     return res.status(500).json({ error: 'Review error', message: sanitizeError(err) });
   }
 });

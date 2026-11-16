@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #161614;
-  --color-primary-light: #201f1c;
-  --color-card: #22201d;
-  --color-card-hover: #2b2924;
+  --color-primary: #141412;
+  --color-primary-light: #1b1b18;
+  --color-card: #1b1b18;
+  --color-card-hover: #22221e;
 
   --color-gold: #e7b956;
   --color-gold-hover: #d5a643;
@@ -12,30 +12,39 @@
   --color-forest: #2e5b45;
   --color-forest-light: #3a7056;
 
-  --color-cream: #faf4e8;
-  --color-cream-muted: #c9c1b3;
-
-  --color-bronze: #8c6d37;
-  --color-bronze-light: #a48246;
+  --color-cream: #f5f4ef;
+  --color-cream-muted: #9e9b91;
 
   --color-accent: #e7b956;
   --color-accent-hover: #d5a643;
-  --color-text: #faf4e8;
-  --color-text-muted: #c9c1b3;
-  --color-border: #38342e;
+  --color-text: #f5f4ef;
+  --color-text-muted: #9e9b91;
+  --color-border: #2c2a24;
+  --color-border-subtle: #22211d;
+
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
 @layer base {
   :root {
     background-color: var(--color-primary);
     color: var(--color-text);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.02em;
   }
   
   body {
     margin: 0;
     min-height: 100vh;
-    background-color: #161614;
+    background-color: #141412;
+    color: var(--color-text);
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   }
   
   /* Scrollbar styles for a sleek look */
@@ -51,17 +60,8 @@
     border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-bronze);
+    background: var(--color-card-hover);
   }
-}
-
-/* ── Neon gradient text ──────────────────────────────────────────────────────
-   Apply to primary section headings for vibrant palette gradient effect.
-   Usage: className="text-neon"
-*/
-.text-neon {
-  color: var(--color-text);
-  display: inline-block;
 }
 
 /* ── Expense table row fade-in ───────────────────────────────────────────────

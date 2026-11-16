@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Mic, MicOff, Loader2, CheckCircle2, X, Volume2, Send, Sparkles, AlertCircle } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Mic, MicOff, Loader2, CheckCircle2, X, Volume2, Send, AlertCircle } from 'lucide-react';
 import { parseSpokenReceipt, createWebSpeechRecognition, speakTransactionDetails } from '../../services/agents/voiceAgent';
 import { env } from '../../config/env';
 import { useBudget } from '../../contexts/BudgetContext';
@@ -15,7 +15,7 @@ import { checkAndIncrementQuota, QUOTA_LIMITS, getNextMondayCountdown } from '..
  * 3. Direct natural language text entry
  */
 export default function VoiceInputPanel({ onTransactionReady, onClose }) {
-  const { quotaUsage, openProModal, updateQuota } = useBudget();
+  const { quotaUsage, openProModal, updateQuota, isSubscribed } = useBudget();
   const { user } = useAuth();
 
   const [inputText, setInputText] = useState('');
@@ -173,17 +173,22 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
 
   // Start voice recording (MediaRecorder + WebSpeech fallback)
   const startListening = useCallback(async () => {
-    // Pre-validate quota before opening mic
-    const quotaCheck = await checkAndIncrementQuota(user?.uid, 'voice', quotaUsage, { skipIncrement: true });
-    if (!quotaCheck.allowed) {
-      openProModal({
-        reason: 'QUOTA_EXHAUSTED',
-        feature: 'voice',
-        used: quotaCheck.used,
-        limit: quotaCheck.limit,
-        resetCountdown: quotaCheck.resetCountdown,
+    // Pre-validate quota for non-subscribed users before opening mic
+    if (!isSubscribed) {
+      const quotaCheck = await checkAndIncrementQuota(user?.uid, 'voice', quotaUsage, {
+        skipIncrement: true,
+        isSubscribed: Boolean(isSubscribed),
       });
-      return;
+      if (!quotaCheck.allowed) {
+        openProModal({
+          reason: 'QUOTA_EXHAUSTED',
+          feature: 'voice',
+          used: quotaCheck.used,
+          limit: quotaCheck.limit,
+          resetCountdown: quotaCheck.resetCountdown,
+        });
+        return;
+      }
     }
 
     setError(null);
@@ -288,8 +293,6 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 space-y-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-[#8c6d37]/5 pointer-events-none" />
-      
       {/* Close button */}
       <button
         onClick={onClose}
@@ -300,8 +303,7 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
 
       {/* Header */}
       <div className="text-center relative z-10">
-        <h3 className="text-sm font-semibold text-text flex items-center justify-center gap-2">
-          <Sparkles size={16} className="text-accent" />
+        <h3 className="text-sm font-semibold text-text">
           Voice & Quick Receipt Entry
         </h3>
         <p className="text-xs text-text-muted mt-1">
@@ -360,7 +362,7 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
                   setInputText(example);
                   processText(example);
                 }}
-                className="text-[11px] px-2.5 py-1 bg-primary hover:bg-[#2b2924] text-text-muted hover:text-text rounded-full border border-border transition-all"
+                className="text-[11px] px-2.5 py-1 bg-primary hover:bg-card-hover text-text-muted hover:text-text rounded-full border border-border transition-all"
               >
                 {example}
               </button>
@@ -376,7 +378,7 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
             {Array.from({ length: barCount }).map((_, i) => (
               <div
                 key={i}
-                className="w-[2.5px] rounded-full bg-gradient-to-t from-accent to-[#8c6d37]"
+                className="w-[2.5px] rounded-full bg-accent"
                 style={{
                   height: `${getBarHeight(i)}px`,
                   transition: 'height 0.1s ease',
@@ -385,7 +387,7 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
               />
             ))}
           </div>
-          <p className="text-xs text-accent flex items-center justify-center gap-1.5 animate-pulse">
+          <p className="text-xs text-accent flex items-center justify-center gap-1.5">
             <Loader2 size={12} className="animate-spin" />
             Recording voice... tap mic when done
           </p>
@@ -402,8 +404,8 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
 
       {/* Parsed Receipt Summary */}
       {parsedData && !isProcessing && (
-        <div className="bg-[#2e5b45]/10 border border-[#2e5b45]/30 rounded-xl p-4 space-y-3 relative z-10 animate-in fade-in duration-300">
-          <div className="flex items-center justify-between text-[#3a7056]">
+        <div className="bg-card border border-border rounded-xl p-4 space-y-3 relative z-10 animate-in fade-in duration-300">
+          <div className="flex items-center justify-between text-emerald-400">
             <div className="flex items-center gap-2">
               <CheckCircle2 size={16} />
               <span className="text-xs font-semibold">Extracted Receipt Data</span>
@@ -439,7 +441,7 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
             </div>
             <div className={`rounded-lg p-2.5 ${parsedData._confidenceIssues?.includes('amount') ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-primary border border-border'}`}>
               <p className="text-[10px] text-text-muted uppercase">Amount</p>
-              <p className={`text-sm font-semibold mt-0.5 ${parsedData._confidenceIssues?.includes('amount') ? 'text-amber-400' : 'text-[#3a7056]'}`}>${Number(parsedData.amount).toFixed(2)}</p>
+              <p className={`text-sm font-semibold mt-0.5 ${parsedData._confidenceIssues?.includes('amount') ? 'text-amber-400' : 'text-emerald-400'}`}>${Number(parsedData.amount).toFixed(2)}</p>
               {parsedData._confidenceIssues?.includes('amount') && <p className="text-[9px] text-amber-500 mt-0.5">Needs Review</p>}
             </div>
             <div className={`rounded-lg p-2.5 ${parsedData._confidenceIssues?.includes('date') ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-primary border border-border'}`}>
@@ -452,7 +454,7 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
           <div className="flex gap-2 pt-1">
             <button
               onClick={handleReset}
-              className="flex-1 px-3 py-2 text-xs font-medium bg-primary hover:bg-[#2b2924] text-text rounded-lg border border-border transition-colors"
+              className="flex-1 px-3 py-2 text-xs font-medium bg-primary hover:bg-card-hover text-text rounded-lg border border-border transition-colors"
             >
               Start Over
             </button>

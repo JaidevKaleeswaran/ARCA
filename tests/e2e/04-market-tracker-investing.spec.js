@@ -57,10 +57,11 @@ test.describe('Market Tracker Tab — Rates, Search Hygiene, Investing & Authent
     await marketPage.dollarsModeButton.click();
     await expect(marketPage.dollarsModeButton).toHaveClass(/bg-accent/);
 
-    // Enter investment amount
+    // Enter investment amount and verify it persists without disappearing due to background sync / re-renders
     await marketPage.amountInput.fill('100');
+    await page.waitForTimeout(1200); // Allow background quote sync and re-renders to settle
     const val = await marketPage.amountInput.inputValue();
-    expect(Number(val)).toBeGreaterThanOrEqual(100);
+    expect(val).toBe('100');
 
     // Add to portfolio
     await marketPage.addToPortfolioButton.click();
@@ -84,8 +85,19 @@ test.describe('Market Tracker Tab — Rates, Search Hygiene, Investing & Authent
     }
   });
 
-  test('AI Macro Economic Digest provides personal finance takeaways', async ({ page }) => {
+  test('Market Outlook provides concise personal finance takeaways without technical strings or AI badges', async ({ page }) => {
     const marketPage = new MarketTrackerTabPage(page);
     await expect(marketPage.aiDigestCard).toBeVisible();
+
+    // Requirement 8: Ensure technical provider string "Live Yahoo Finance API" is removed
+    const technicalString = page.locator('text=Live Yahoo Finance API');
+    await expect(technicalString).toHaveCount(0);
+
+    // Requirement 9: Renamed to Macroeconomic Outlook
+    await expect(page.locator('text=Macroeconomic Outlook')).toBeVisible();
+
+    // Verify concise bullet points are rendered
+    const bulletItems = marketPage.aiDigestCard.locator('div.text-xs.text-zinc-300');
+    expect(await bulletItems.count()).toBeGreaterThanOrEqual(2);
   });
 });

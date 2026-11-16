@@ -342,7 +342,7 @@ router.post('/scan', scanLimiter, (req, res, next) => {
         if (geminiErr.status === 429 || geminiErr.code === 'UPSTREAM_RATE_LIMIT') {
           return res.status(429).json(geminiErr.payload || {
             error: 'UPSTREAM_RATE_LIMIT',
-            message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+            message: 'High demand: upgrade to ARCA Pro for priority dedicated bandwidth.',
             resetDate: getNextMondayISO(),
           });
         }
@@ -409,7 +409,7 @@ router.post('/scan', scanLimiter, (req, res, next) => {
       if (apiErr.status === 429 || apiErr.code === 'UPSTREAM_RATE_LIMIT') {
         return res.status(429).json(apiErr.payload || {
           error: 'UPSTREAM_RATE_LIMIT',
-          message: 'High demand: upgrade to Stacked Pro for priority dedicated bandwidth.',
+          message: 'High demand: upgrade to ARCA Pro for priority dedicated bandwidth.',
           resetDate: getNextMondayISO(),
         });
       }

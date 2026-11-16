@@ -36,11 +36,17 @@ test.describe('Universal Cross-Tab Asset Reactivity & State Store Consistency', 
     await marketPage.addToPortfolioButton.click();
     await expect(marketPage.investModal).not.toBeVisible();
 
-    // 2. Navigate back to Home Tab and verify StocksWidget has registered the investment
+    // 2. Navigate back to Home Tab and verify StocksWidget and newly created Stock Holding Widget exist
     await basePage.selectTab('home');
     await expect(homePage.stocksWidget).toBeVisible();
     const widgetText = await homePage.stocksWidget.innerText();
     expect(widgetText).toMatch(/\$\d+/);
+
+    // Verify a dedicated Stock Holding Widget was created on the Home Tab
+    const holdingWidget = page.locator('[data-widget="stock-holding"]').first();
+    await expect(holdingWidget).toBeVisible();
+    await expect(holdingWidget).toContainText('Holding Widget');
+    await expect(holdingWidget).toContainText('Invest More');
 
     // 3. Navigate to Summary Tab and verify Net Worth includes the holding
     await basePage.selectTab('summary');

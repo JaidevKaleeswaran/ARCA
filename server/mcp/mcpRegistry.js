@@ -115,20 +115,6 @@ export function getGeminiTools() {
 }
 
 /**
- * Returns tools formatted for Ollama / OpenAI tool schema
- */
-export function getOllamaTools() {
-  return TOOL_DEFINITIONS.map(def => ({
-    type: 'function',
-    function: {
-      name: def.name,
-      description: def.description,
-      parameters: def.parameters,
-    },
-  }));
-}
-
-/**
  * Executes a tool in-process with a strict 3,500ms timeout
  *
  * @param {string} name - Tool name

@@ -9,6 +9,12 @@ import {
 } from '../../src/utils/quotaManager.js';
 
 describe('Quota Engine & Deterministic Reset', () => {
+  it('Verifies correct free tier quota limits (10 assistant, 5 voice, 5 receipts)', () => {
+    expect(QUOTA_LIMITS.assistant).toBe(10);
+    expect(QUOTA_LIMITS.voice).toBe(5);
+    expect(QUOTA_LIMITS.receipts).toBe(5);
+  });
+
   it('Calculates deterministic current Monday at 00:00:00 UTC', () => {
     const mondayISO = getMondayOfCurrentWeekISO();
     const date = new Date(mondayISO);
@@ -35,9 +41,9 @@ describe('Quota Engine & Deterministic Reset', () => {
   it('Normalizes quota state and resets stale week counts to 0', () => {
     const staleState = {
       weekStartDate: '2020-01-06T00:00:00.000Z',
-      receiptsUsed: 15,
-      voiceUsed: 20,
-      assistantUsed: 30,
+      receiptsUsed: 5,
+      voiceUsed: 5,
+      assistantUsed: 10,
     };
 
     const normalized = normalizeQuotaState(staleState);
@@ -50,7 +56,7 @@ describe('Quota Engine & Deterministic Reset', () => {
   it('checkAndIncrementQuota blocks when limit is reached without incrementing', async () => {
     const maxedState = {
       weekStartDate: getMondayOfCurrentWeekISO(),
-      receiptsUsed: QUOTA_LIMITS.receipts,
+      receiptsUsed: QUOTA_LIMITS.receipts, // 5
       voiceUsed: 0,
       assistantUsed: 0,
     };
@@ -64,13 +70,46 @@ describe('Quota Engine & Deterministic Reset', () => {
   it('checkAndIncrementQuota allows execution when below limit', async () => {
     const activeState = {
       weekStartDate: getMondayOfCurrentWeekISO(),
-      receiptsUsed: 5,
-      voiceUsed: 2,
-      assistantUsed: 10,
+      receiptsUsed: 2,
+      voiceUsed: 1,
+      assistantUsed: 4,
     };
 
     const res = await checkAndIncrementQuota('guest_user', 'assistant', activeState, { skipIncrement: true });
     expect(res.allowed).toBe(true);
-    expect(res.used).toBe(10);
+    expect(res.used).toBe(4);
+  });
+
+  it('checkAndIncrementQuota grants unlimited access when isSubscribed is true across all features', async () => {
+    const maxedState = {
+      weekStartDate: getMondayOfCurrentWeekISO(),
+      receiptsUsed: 50,
+      voiceUsed: 50,
+      assistantUsed: 50,
+    };
+
+    const resAssistant = await checkAndIncrementQuota('sub_user', 'assistant', maxedState, {
+      skipIncrement: true,
+      isSubscribed: true,
+    });
+    expect(resAssistant.allowed).toBe(true);
+    expect(resAssistant.isSubscribed).toBe(true);
+    expect(resAssistant.limit).toBe(Infinity);
+
+    const resVoice = await checkAndIncrementQuota('sub_user', 'voice', maxedState, {
+      skipIncrement: true,
+      isSubscribed: true,
+    });
+    expect(resVoice.allowed).toBe(true);
+    expect(resVoice.isSubscribed).toBe(true);
+    expect(resVoice.limit).toBe(Infinity);
+
+    const resReceipts = await checkAndIncrementQuota('sub_user', 'receipts', maxedState, {
+      skipIncrement: true,
+      isSubscribed: true,
+    });
+    expect(resReceipts.allowed).toBe(true);
+    expect(resReceipts.isSubscribed).toBe(true);
+    expect(resReceipts.limit).toBe(Infinity);
   });
 });

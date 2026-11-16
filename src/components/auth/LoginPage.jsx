@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card } from '../ui/Card';
 import toast from 'react-hot-toast';
-import { Lock, Mail, User, ArrowRight, Eye, EyeOff, KeyRound, HelpCircle, Sparkles, X, CheckCircle2 } from 'lucide-react';
+import { Lock, Mail, User, ArrowRight, Eye, EyeOff, KeyRound, HelpCircle, X, CheckCircle2 } from 'lucide-react';
 
 import Logo from '../ui/Logo';
 
@@ -115,9 +115,9 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <Card className="backdrop-blur-xl bg-[#18181b]/80 border-zinc-700/60 shadow-2xl ring-1 ring-white/5 p-6">
+        <Card className="backdrop-blur-xl bg-card/90 border-border shadow-2xl ring-1 ring-white/5 p-6">
           {/* Tab Switcher */}
-          <div className="flex bg-[#09090b] p-1 rounded-lg mb-6 border border-zinc-800">
+          <div className="flex bg-primary p-1 rounded-lg mb-6 border border-border">
             <button
               type="button"
               onClick={() => setIsSignUp(false)}
@@ -152,7 +152,7 @@ export default function LoginPage() {
                     value={formData.name}
                     onChange={handleChange}
                     placeholder="John Doe"
-                    className="w-full bg-[#09090b] border border-zinc-800 rounded-lg pl-10 pr-4 py-2.5 text-text focus:outline-none focus:border-accent transition-colors text-sm"
+                    className="w-full bg-primary border border-border rounded-lg pl-10 pr-4 py-2.5 text-text focus:outline-none focus:border-accent transition-colors text-sm"
                     required={isSignUp}
                   />
                 </div>
@@ -171,7 +171,7 @@ export default function LoginPage() {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="name@example.com"
-                  className="w-full bg-[#09090b] border border-zinc-800 rounded-lg pl-10 pr-4 py-2.5 text-text focus:outline-none focus:border-accent transition-colors text-sm"
+                  className="w-full bg-primary border border-border rounded-lg pl-10 pr-4 py-2.5 text-text focus:outline-none focus:border-accent transition-colors text-sm"
                   required
                 />
               </div>
@@ -204,7 +204,7 @@ export default function LoginPage() {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="••••••••"
-                  className="w-full bg-[#09090b] border border-zinc-800 rounded-lg pl-10 pr-11 py-2.5 text-text focus:outline-none focus:border-accent transition-colors text-sm"
+                  className="w-full bg-primary border border-border rounded-lg pl-10 pr-11 py-2.5 text-text focus:outline-none focus:border-accent transition-colors text-sm"
                   required
                 />
                 <button
@@ -230,9 +230,9 @@ export default function LoginPage() {
           </form>
 
           <div className="my-6 flex items-center">
-            <div className="flex-1 border-t border-zinc-800"></div>
+            <div className="flex-1 border-t border-border"></div>
             <span className="px-3 text-xs text-text-muted uppercase tracking-wider">Or continue with</span>
-            <div className="flex-1 border-t border-zinc-800"></div>
+            <div className="flex-1 border-t border-border"></div>
           </div>
 
           <div className="space-y-3">
@@ -240,7 +240,7 @@ export default function LoginPage() {
               type="button"
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full bg-[#09090b] hover:bg-zinc-900 border border-zinc-700 hover:border-accent/60 text-text font-medium py-2.5 rounded-lg transition-all flex items-center justify-center space-x-2 text-sm disabled:opacity-60 cursor-pointer shadow-sm group"
+              className="w-full bg-card hover:bg-card-hover border border-border hover:border-accent/60 text-text font-medium py-2.5 rounded-lg transition-all flex items-center justify-center space-x-2 text-sm disabled:opacity-60 cursor-pointer shadow-sm group"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path
@@ -261,7 +261,6 @@ export default function LoginPage() {
                 />
               </svg>
               <span>Continue with Google</span>
-              <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.2 rounded font-normal">Recommended</span>
             </button>
 
             {/* Prominent Guest Mode & Tutorial Button */}
@@ -269,7 +268,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={handleGuestLogin}
-                className="w-full bg-[#1c1a17] hover:bg-[#26231f] border border-accent/30 hover:border-accent text-accent font-semibold py-2.5 px-3 rounded-lg transition-all flex items-center justify-center space-x-2 text-xs shadow-sm cursor-pointer"
+                className="w-full bg-card hover:bg-card-hover border border-accent/30 hover:border-accent text-accent font-semibold py-2.5 px-3 rounded-lg transition-all flex items-center justify-center space-x-2 text-xs shadow-sm cursor-pointer"
               >
                 <HelpCircle size={15} className="text-accent shrink-0" />
                 <span>Skip sign in & launch Tutorial as Guest →</span>
@@ -339,7 +338,7 @@ export default function LoginPage() {
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
                       placeholder="name@example.com"
-                      className="w-full bg-[#09090b] border border-zinc-800 rounded-lg pl-10 pr-4 py-2.5 text-text focus:outline-none focus:border-accent transition-colors text-sm"
+                      className="w-full bg-primary border border-border rounded-lg pl-10 pr-4 py-2.5 text-text focus:outline-none focus:border-accent transition-colors text-sm"
                       required
                       autoFocus
                     />

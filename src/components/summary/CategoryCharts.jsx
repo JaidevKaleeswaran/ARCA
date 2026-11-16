@@ -1,4 +1,3 @@
-import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useBudget } from '../../contexts/BudgetContext';
 import { Card } from '../ui/Card';
@@ -18,7 +17,7 @@ export default function CategoryCharts() {
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-[#18181b] border border-zinc-800 p-2 rounded-lg shadow-xl text-sm">
+        <div className="bg-card border border-border p-2 rounded-lg shadow-xl text-sm">
           <p className="text-text-muted">{payload[0].name}</p>
           <p className="font-semibold" style={{ color: payload[0].payload.color }}>
             {formatCurrency(payload[0].value)}
@@ -45,18 +44,18 @@ export default function CategoryCharts() {
 
           const data = [
             { name: 'Spent', value: spent, color: spentColor },
-            { name: 'Remaining', value: remaining, color: '#38342e' }, // Dark bronze track for unused
+            { name: 'Remaining', value: remaining, color: '#2c2a24' }, // Subtle border track for unused
           ];
 
           // If totally empty, avoid rechart rendering bug
           if (spent === 0 && remaining === 0) {
-             data[0] = { name: 'Empty', value: 1, color: '#38342e' };
+             data[0] = { name: 'Empty', value: 1, color: '#2c2a24' };
           }
 
           return (
             <div key={category.id} className="flex flex-col items-center">
               <div className="w-24 h-24 relative">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <PieChart>
                     <Pie
                       data={data}

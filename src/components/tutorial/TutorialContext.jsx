@@ -50,12 +50,29 @@ export function TutorialProvider({ children }) {
   }, [user, getStorageKey]);
 
   const startTutorial = useCallback((tabId, force = false) => {
-    if (!tabId || !TUTORIAL_STEPS[tabId]) return;
-    if (!force && hasSeenTab(tabId)) return;
+    if (!tabId || !TUTORIAL_STEPS[tabId]) {
+      setActiveTabId(null);
+      setCurrentStepIndex(0);
+      return;
+    }
+
+    // If tutorial is already running on this tab and not forced, keep it running
+    if (!force && activeTabId === tabId) {
+      return;
+    }
+
+    // If tab has already been seen and not forced, dismiss any tutorial from another tab
+    if (!force && hasSeenTab(tabId)) {
+      if (activeTabId && activeTabId !== tabId) {
+        setActiveTabId(null);
+        setCurrentStepIndex(0);
+      }
+      return;
+    }
 
     setActiveTabId(tabId);
     setCurrentStepIndex(0);
-  }, [hasSeenTab]);
+  }, [activeTabId, hasSeenTab]);
 
   const endTutorial = useCallback((tabIdToMark) => {
     const tabToMark = tabIdToMark || activeTabId;

@@ -77,7 +77,7 @@ export default function IncomeSourceModal({ isOpen, onClose, source = null }) {
             name="name"
             value={formData.name}
             onChange={handleChange}
-            className="w-full bg-[#09090b] border border-zinc-700 rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
+            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
             placeholder="e.g. Primary Job"
             required
           />
@@ -90,7 +90,7 @@ export default function IncomeSourceModal({ isOpen, onClose, source = null }) {
             name="amount"
             value={formData.amount}
             onChange={handleChange}
-            className="w-full bg-[#09090b] border border-zinc-700 rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
+            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
             placeholder="0.00"
             min="0"
             step="0.01"
@@ -104,7 +104,7 @@ export default function IncomeSourceModal({ isOpen, onClose, source = null }) {
             name="frequency"
             value={formData.frequency}
             onChange={handleChange}
-            className="w-full bg-[#09090b] border border-zinc-700 rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
+            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
           >
             <option value="weekly">Weekly</option>
             <option value="bi-weekly">Bi-weekly</option>
@@ -120,7 +120,7 @@ export default function IncomeSourceModal({ isOpen, onClose, source = null }) {
             name="isBorrowed"
             checked={formData.isBorrowed}
             onChange={handleChange}
-            className="w-4 h-4 rounded border-zinc-700 text-accent bg-[#09090b] focus:ring-accent focus:ring-offset-[#18181b]"
+            className="w-4 h-4 rounded border-border text-accent bg-primary focus:ring-accent focus:ring-offset-primary"
           />
           <label htmlFor="isBorrowedModal" className="text-sm text-text-muted select-none cursor-pointer">
             Is this money borrowed? (Needs to be paid back)

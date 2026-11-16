@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import TabNavigation from './components/layout/TabNavigation';
 import HomeTab from './components/home/HomeTab';
@@ -10,7 +10,8 @@ import LoginPage from './components/auth/LoginPage';
 import VerifyEmailPage from './components/auth/VerifyEmailPage';
 import { useCycleCheck } from './hooks/useCycleCheck';
 import { useFirebaseSync } from './hooks/useFirebaseSync';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useAuth } from './contexts/AuthContext';
+import { useBudget } from './contexts/BudgetContext';
 import { LogOut, HelpCircle } from 'lucide-react';
 import Logo from './components/ui/Logo';
 import { TutorialProvider, useTutorial } from './components/tutorial/TutorialContext';
@@ -20,6 +21,7 @@ function MainApp() {
   useCycleCheck();
   useFirebaseSync();
   const { user, logout } = useAuth();
+  const { isSubscribed, openProModal } = useBudget();
   const { startTutorial } = useTutorial();
   const [activeTab, setActiveTab] = useState('home');
 
@@ -45,7 +47,7 @@ function MainApp() {
           <VerifyEmailPage />
         ) : (
           <>
-            <header className="py-3 px-4 sm:px-6 border-b border-border/60 flex items-center justify-between max-w-6xl mx-auto backdrop-blur-md bg-[#161614]/40">
+            <header className="py-3 px-4 sm:px-6 border-b border-border/60 flex items-center justify-between max-w-6xl mx-auto backdrop-blur-md bg-primary/80">
               <div className="flex items-center space-x-2 shrink-0">
                 <Logo size="md" />
               </div>
@@ -61,25 +63,30 @@ function MainApp() {
                   )}
                   <span className="font-medium text-text truncate max-w-[110px] sm:max-w-none">{user.displayName || user.email}</span>
                   {user.isGuest && (
-                    <span className="text-[9px] sm:text-[10px] bg-[#2b2924] text-zinc-400 px-1.5 py-0.2 rounded shrink-0">Guest</span>
+                    <span className="text-[9px] sm:text-[10px] bg-card-hover text-zinc-400 px-1.5 py-0.2 rounded shrink-0">Guest</span>
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => startTutorial(activeTab, true)}
-                  title="Start Interactive Page Tutorial"
-                  className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-accent bg-accent/15 hover:bg-accent/25 border border-accent/40 hover:border-accent rounded-full transition-all shadow-sm shrink-0 cursor-pointer"
-                >
-                  <HelpCircle size={15} className="text-accent shrink-0" />
-                  <span className="font-semibold text-[11px] sm:text-xs">Tutorial ?</span>
-                </button>
+                {isSubscribed ? (
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-accent/20 text-accent border border-accent/40 px-2.5 py-1 rounded-full flex items-center shadow-sm shrink-0">
+                    PRO
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openProModal({ reason: 'UPGRADE' })}
+                    className="text-[10px] font-bold uppercase tracking-wider bg-accent/15 hover:bg-accent/25 text-accent border border-accent/30 px-2.5 py-1 rounded-full transition-colors flex items-center shrink-0 cursor-pointer"
+                    title="Upgrade to ARCA Pro"
+                  >
+                    Upgrade
+                  </button>
+                )}
 
                 <button
                   type="button"
                   onClick={logout}
                   title="Log Out"
-                  className="p-1.5 sm:p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20 shrink-0"
+                  className="p-1.5 sm:p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20 shrink-0 cursor-pointer"
                 >
                   <LogOut size={16} />
                 </button>
@@ -98,12 +105,13 @@ function MainApp() {
               </div>
             </main>
 
-            {/* Floating Tutorial quick launcher always visible regardless of scroll depth */}
+            {/* Floating Tutorial quick launcher strictly anchored in the corner, always discoverable regardless of scroll depth */}
             <button
               type="button"
+              data-tutorial="corner-tutorial-launcher"
               onClick={() => startTutorial(activeTab, true)}
               title="Start interactive tutorial for this page"
-              className="fixed bottom-5 right-5 z-40 bg-[#1e1c18]/95 hover:bg-[#2b2721] border border-accent/40 hover:border-accent text-accent font-semibold text-xs px-3.5 py-2 rounded-full shadow-2xl flex items-center gap-2 transition-all hover:scale-105 backdrop-blur-md cursor-pointer group"
+              className="fixed bottom-6 right-6 z-40 bg-[#1e1c18]/95 hover:bg-[#2b2721] border border-accent/40 hover:border-accent text-accent font-semibold text-xs px-3.5 py-2 rounded-full shadow-2xl flex items-center gap-2 transition-all hover:scale-105 backdrop-blur-md cursor-pointer group"
             >
               <HelpCircle size={16} className="text-accent group-hover:rotate-12 transition-transform shrink-0" />
               <span>Tutorial ?</span>
@@ -122,14 +130,14 @@ export default function App() {
         position="bottom-right"
         toastOptions={{
           style: {
-            background: '#22201d',
-            color: '#faf4e8',
-            border: '1px solid #38342e',
+            background: '#1b1b18',
+            color: '#f5f4ef',
+            border: '1px solid #2c2a24',
           },
           success: {
             iconTheme: {
               primary: '#e7b956',
-              secondary: '#22201d',
+              secondary: '#1b1b18',
             },
           },
         }}
