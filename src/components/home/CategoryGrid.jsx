@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useBudget } from '../../contexts/BudgetContext';
+import SpotlightCard from '../ui/reactbits/SpotlightCard';
 import CategoryModal from './CategoryModal';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { Plus, Edit2, Trash2, ChevronDown } from 'lucide-react';
@@ -204,7 +205,7 @@ export default function CategoryGrid() {
           const percentUsed = Math.min(100, Math.round((spent / category.limit) * 100)) || 0;
 
           return (
-            <div key={category.id} className="bg-card border border-border hover:border-accent/40 transition-colors rounded-xl p-4 sm:p-6 shadow-sm group relative overflow-hidden flex flex-col">
+            <SpotlightCard key={category.id} className="p-4 sm:p-6 shadow-sm group relative overflow-hidden flex flex-col">
               <div 
                 className="absolute top-0 left-0 w-1 h-full" 
                 style={{ backgroundColor: category.color }}
@@ -262,7 +263,7 @@ export default function CategoryGrid() {
                 </div>
                 <div className="text-[10px] text-right text-text-muted">{percentUsed}%</div>
               </div>
-            </div>
+            </SpotlightCard>
           );
         })}
 

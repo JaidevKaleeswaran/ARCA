@@ -1,6 +1,7 @@
 import { TrendingUp, PieChart, ArrowUpRight, ArrowDownRight, Plus } from 'lucide-react';
 import { useBudget } from '../../contexts/BudgetContext';
 import { formatCurrency } from '../../utils/formatCurrency';
+import SpotlightCard from '../ui/reactbits/SpotlightCard';
 
 export default function StocksWidget({ onNavigateToMarkets }) {
   const {
@@ -14,7 +15,7 @@ export default function StocksWidget({ onNavigateToMarkets }) {
   const isPos = portfolioTotalGain >= 0;
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-md flex flex-col justify-between space-y-4">
+    <SpotlightCard className="p-4 sm:p-5 shadow-md flex flex-col justify-between space-y-4">
       {/* Widget Header */}
       <div className="flex items-center justify-between border-b border-border/70 pb-3">
         <div className="flex items-center gap-2.5">
@@ -149,6 +150,6 @@ export default function StocksWidget({ onNavigateToMarkets }) {
           <ArrowUpRight size={13} className="text-accent" />
         </button>
       )}
-    </div>
+    </SpotlightCard>
   );
 }

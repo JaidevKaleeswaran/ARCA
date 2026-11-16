@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import Reveal from '../ui/Reveal';
 import NumberTicker from '../ui/reactbits/NumberTicker';
+import SpotlightCard from '../ui/reactbits/SpotlightCard';
 import { env } from '../../config/env';
 import { useBudget } from '../../contexts/BudgetContext';
 import { formatCurrency } from '../../utils/formatCurrency';
@@ -490,9 +491,9 @@ export default function MarketTrackerTab() {
                 const isPos = gain >= 0;
 
                 return (
-                  <div
+                  <SpotlightCard
                     key={inv.id}
-                    className="bg-card border border-border hover:border-accent/40 rounded-xl p-3 flex flex-col justify-between transition-colors group relative"
+                    className="p-3 flex flex-col justify-between group relative"
                   >
                     <div className="flex items-start justify-between">
                       <div>
@@ -542,7 +543,7 @@ export default function MarketTrackerTab() {
                         </span>
                       </div>
                     </div>
-                  </div>
+                  </SpotlightCard>
                 );
               })}
             </div>
@@ -669,9 +670,9 @@ export default function MarketTrackerTab() {
                     const isOwned = investments.some((i) => i.symbol.toUpperCase() === stock.symbol.toUpperCase());
 
                     return (
-                      <div
+                      <SpotlightCard
                         key={stock.symbol}
-                        className="bg-card border border-border hover:border-accent/40 rounded-xl p-3.5 space-y-2.5 transition-colors flex flex-col justify-between"
+                        className="p-3.5 space-y-2.5 flex flex-col justify-between"
                       >
                         <div>
                           <div className="flex items-start justify-between">
@@ -713,7 +714,7 @@ export default function MarketTrackerTab() {
                           <Plus size={13} />
                           <span>Invest in {stock.symbol}</span>
                         </button>
-                      </div>
+                      </SpotlightCard>
                     );
                   })}
                 </div>

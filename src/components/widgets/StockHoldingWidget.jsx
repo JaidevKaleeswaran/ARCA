@@ -5,6 +5,7 @@ import {
 import { useBudget } from '../../contexts/BudgetContext';
 import { formatCurrency } from '../../utils/formatCurrency';
 import NumberTicker from '../ui/reactbits/NumberTicker';
+import SpotlightCard from '../ui/reactbits/SpotlightCard';
 import { toast } from 'react-hot-toast';
 
 export default function StockHoldingWidget({ holding, onNavigateToMarkets, onInvestMore }) {
@@ -30,10 +31,10 @@ export default function StockHoldingWidget({ holding, onNavigateToMarkets, onInv
   };
 
   return (
-    <div
+    <SpotlightCard
       data-widget="stock-holding"
       data-symbol={holding.symbol}
-      className="bg-card border border-border hover:border-accent/40 rounded-2xl p-4 sm:p-5 shadow-md flex flex-col justify-between space-y-3.5 transition-colors group relative overflow-hidden"
+      className="p-4 sm:p-5 shadow-md flex flex-col justify-between space-y-3.5 group relative overflow-hidden"
     >
       {/* Clean status accent indicator on top */}
       <div className={`absolute top-0 left-0 right-0 h-0.5 ${isPos ? 'bg-emerald-500/50' : 'bg-red-500/50'}`} />
@@ -150,6 +151,6 @@ export default function StockHoldingWidget({ holding, onNavigateToMarkets, onInv
           </button>
         )}
       </div>
-    </div>
+    </SpotlightCard>
   );
 }

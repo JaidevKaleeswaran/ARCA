@@ -20,7 +20,7 @@ export default function App() {
   // App redirect URL: points to the main ARCA webapp
   const appUrl = (typeof window !== 'undefined' && window.location.hostname === 'localhost')
     ? 'http://localhost:5173'
-    : (import.meta.env.VITE_APP_URL || 'https://arca-budgeting.vercel.app');
+    : 'https://arca-budgeting.web.app';
 
   const navigate = (path) => {
     setCurrentPath(path);
@@ -40,7 +40,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-primary text-text">
+    <div className="min-h-screen flex flex-col bg-[#161614] text-[#faf4e8]">
       <Navbar currentPath={currentPath} navigate={navigate} appUrl={appUrl} />
 
       <main className="flex-1">
