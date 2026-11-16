@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card } from '../ui/Card';
 import toast from 'react-hot-toast';
-import { Lock, Mail, User, ArrowRight, Eye, EyeOff, KeyRound, HelpCircle, X, CheckCircle2 } from 'lucide-react';
+import { Lock, Mail, User, ArrowRight, ArrowLeft, ArrowUpRight, Eye, EyeOff, KeyRound, HelpCircle, X, CheckCircle2 } from 'lucide-react';
+import { env } from '../../config/env';
 
 import Logo from '../ui/Logo';
 
@@ -108,6 +109,18 @@ export default function LoginPage() {
 
       {/* ── Login card ── */}
       <div className="w-full max-w-md relative" style={{ zIndex: 2 }}>
+        <div className="mb-4 flex items-center justify-between">
+          <a
+            href={env.onboardingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-accent font-medium transition-colors"
+          >
+            <ArrowLeft size={14} />
+            <span>Back to Onboarding Site</span>
+          </a>
+        </div>
+
         <div className="text-center mb-8 flex flex-col items-center">
           <Logo size="lg" className="mb-3" />
           <p className="text-zinc-400 mt-1 text-sm">

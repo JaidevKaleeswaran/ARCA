@@ -12,8 +12,9 @@ import { useCycleCheck } from './hooks/useCycleCheck';
 import { useFirebaseSync } from './hooks/useFirebaseSync';
 import { useAuth } from './contexts/AuthContext';
 import { useBudget } from './contexts/BudgetContext';
-import { LogOut, HelpCircle } from 'lucide-react';
+import { LogOut, HelpCircle, ExternalLink } from 'lucide-react';
 import Logo from './components/ui/Logo';
+import { env } from './config/env';
 import { TutorialProvider, useTutorial } from './components/tutorial/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
 
@@ -48,8 +49,18 @@ function MainApp() {
         ) : (
           <>
             <header className="py-3 px-4 sm:px-6 border-b border-border/60 flex items-center justify-between max-w-6xl mx-auto backdrop-blur-md bg-primary/80">
-              <div className="flex items-center space-x-2 shrink-0">
+              <div className="flex items-center space-x-3 shrink-0">
                 <Logo size="md" />
+                <a
+                  href={env.onboardingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hidden sm:inline-flex items-center gap-1 text-[11px] text-text-muted hover:text-accent font-medium px-2 py-1 rounded-md hover:bg-card-hover transition-colors"
+                  title="View Onboarding Website"
+                >
+                  <span>Onboarding Site</span>
+                  <ExternalLink size={11} className="text-accent" />
+                </a>
               </div>
 
               <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">

@@ -35,6 +35,9 @@ export const env = {
 
   // Backend API Base URL (empty string = relative /api for local proxy or Vercel)
   apiBaseUrl: metaEnv.VITE_API_BASE_URL || '',
+
+  // Onboarding / Landing website URL
+  onboardingUrl: metaEnv.VITE_ONBOARDING_URL || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:5174' : 'https://arca-onboarding-six.vercel.app'),
 };
 
 export default env;

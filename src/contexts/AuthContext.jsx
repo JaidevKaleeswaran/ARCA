@@ -89,25 +89,9 @@ export function AuthProvider({ children }) {
     try {
       const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (saved) return JSON.parse(saved);
-      const defaultUser = {
-        uid: 'usr_arca_guest',
-        email: 'guest@arca.app',
-        displayName: 'Guest User',
-        photoURL: null,
-        emailVerified: true,
-        isGuest: true,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultUser));
-      return defaultUser;
-    } catch (e) {
-      return {
-        uid: 'usr_arca_guest',
-        email: 'guest@arca.app',
-        displayName: 'Guest User',
-        photoURL: null,
-        emailVerified: true,
-        isGuest: true,
-      };
+      return null;
+    } catch {
+      return null;
     }
   });
 
