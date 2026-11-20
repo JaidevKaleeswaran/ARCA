@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import CursorGleam from './components/CursorGleam';
 import HomePage from './pages/HomePage';
 import WhyPage from './pages/WhyPage';
 import AboutPage from './pages/AboutPage';
@@ -41,6 +42,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-primary text-text">
+      <CursorGleam />
       <Navbar currentPath={currentPath} navigate={navigate} appUrl={appUrl} />
 
       <main className="flex-1">
