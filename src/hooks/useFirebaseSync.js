@@ -3,6 +3,10 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useBudget } from '../contexts/BudgetContext';
+import {
+  buildFirestoreBudgetPayload,
+  getTimestampMs,
+} from '../utils/budgetStorage';
 
 export function useFirebaseSync() {
   const { user } = useAuth();
@@ -19,14 +23,20 @@ export function useFirebaseSync() {
     quotaUsage,
     isSubscribed,
     subscriptionPlan,
-    dispatch
+    updatedAt,
+    _sessionKey,
+    dispatch,
   } = budgetState;
 
-  const [isHydrated, setIsHydrated] = useState(!user || user.isGuest || !db);
-  const isLocalUpdateRef = useRef(false);
+  const [hydratedUid, setHydratedUid] = useState(null);
+  const hydratedUidRef = useRef(null);
+  const lastCloudSyncMsRef = useRef(0);
   const saveTimeoutRef = useRef(null);
 
-  // Keep a ref to the latest state payload to prevent stale closure issues
+  const userRef = useRef(user);
+  userRef.current = user;
+
+  // Keep a ref to the latest state snapshot to prevent stale closure writes
   const stateRef = useRef();
   stateRef.current = {
     transactions,
@@ -40,65 +50,93 @@ export function useFirebaseSync() {
     quotaUsage: quotaUsage || null,
     isSubscribed: Boolean(isSubscribed),
     subscriptionPlan: subscriptionPlan || (isSubscribed ? 'pro' : 'free'),
-    updatedAt: new Date().toISOString(),
+    updatedAt: updatedAt || null,
   };
 
-  // Store active user UID and sync to user-scoped localStorage
-  useEffect(() => {
-    if (user && user.uid && !user.isGuest) {
-      try {
-        localStorage.setItem('arca_last_active_user', user.uid);
-        const userStorageKey = `arca_budget_state_${user.uid}`;
-        localStorage.setItem(userStorageKey, JSON.stringify(stateRef.current));
-      } catch (e) {
-        console.warn('Could not cache user budget state to localStorage:', e);
-      }
-    }
-  }, [user?.uid, transactions, categories, incomeSources, investments, cycleStartDate, cycleFrequency, voiceLogs, chatMessages, quotaUsage, isSubscribed, subscriptionPlan]);
+  const activeUid = user && !user.isGuest ? user.uid : null;
+  const isHydrated = Boolean(activeUid && db && hydratedUid === activeUid && _sessionKey === activeUid);
 
-  // 1. Realtime Firestore listener: Sync data from Firestore to local state across all devices
+  // Helper to perform the save to Firestore using the freshest stateRef
+  const performSaveRef = useRef();
+  performSaveRef.current = async (targetUid = userRef.current?.uid, { includeCreatedAt = false } = {}) => {
+    if (!targetUid || userRef.current?.isGuest || !db) return;
+    try {
+      const docRef = doc(db, 'users', targetUid, 'budgetData', 'main');
+      const payload = buildFirestoreBudgetPayload(stateRef.current, targetUid, { includeCreatedAt });
+      lastCloudSyncMsRef.current = Math.max(
+        lastCloudSyncMsRef.current,
+        getTimestampMs(payload.updatedAt)
+      );
+      await setDoc(docRef, payload, { merge: true });
+    } catch (error) {
+      console.warn('[Firestore] Error syncing budget data:', error);
+    }
+  };
+
+  // 1. Realtime Firestore listener: hydrate from cloud on login/rejoin and listen for remote updates
   useEffect(() => {
-    if (!user || user.isGuest || !db) {
+    if (!activeUid || !db || _sessionKey !== activeUid) {
+      hydratedUidRef.current = null;
+      lastCloudSyncMsRef.current = 0;
       return;
     }
 
     let isMounted = true;
-    const docRef = doc(db, 'users', user.uid, 'budgetData', 'main');
+    const docRef = doc(db, 'users', activeUid, 'budgetData', 'main');
 
-    // Subscribe to realtime updates from Firestore
     const unsubscribe = onSnapshot(
       docRef,
       async (docSnap) => {
         if (!isMounted) return;
 
-        // Ignore local pending writes to avoid feedback echo loops
-        if (docSnap.metadata?.hasPendingWrites) {
-          setIsHydrated(true);
+        const isFirstHydration = hydratedUidRef.current !== activeUid;
+
+        // Ignore local pending write echoes once initial hydration has completed
+        if (!isFirstHydration && docSnap.metadata?.hasPendingWrites) {
           return;
         }
 
         if (docSnap.exists()) {
           const remoteData = docSnap.data();
-          // If update came from server (another device or remote update), hydrate local state
-          if (!isLocalUpdateRef.current) {
-            dispatch({ type: 'SET_FULL_STATE', payload: remoteData });
+          const remoteTime = getTimestampMs(remoteData?.updatedAt);
+          const localTime = getTimestampMs(stateRef.current?.updatedAt);
+          const hasNoLocalSavedData = !stateRef.current?.updatedAt;
+
+          if ((isFirstHydration && (remoteTime > localTime || hasNoLocalSavedData)) || (!isFirstHydration && remoteTime > localTime)) {
+            lastCloudSyncMsRef.current = remoteTime;
+            dispatch({
+              type: 'LOAD_USER_STATE',
+              payload: remoteData,
+              meta: { sessionKey: activeUid },
+            });
+          } else if (isFirstHydration && localTime > remoteTime) {
+            // Preserve unflushed local edits (e.g., offline edits or rapid tab close) and sync up to Firestore
+            await performSaveRef.current?.(activeUid);
+          } else if (isFirstHydration) {
+            lastCloudSyncMsRef.current = Math.max(remoteTime, localTime);
           }
+
+          hydratedUidRef.current = activeUid;
+          setHydratedUid(activeUid);
         } else {
-          // If no document exists in Firestore yet for this logged in user, initialize Firestore doc from current state
-          try {
-            isLocalUpdateRef.current = true;
-            await setDoc(docRef, stateRef.current, { merge: true });
-            console.log("Initialized new Firestore budget document for user:", user.uid);
-          } catch (e) {
-            console.error("Error creating initial Firestore budget document:", e);
+          const hasLocalSavedData = Boolean(stateRef.current?.updatedAt);
+
+          // If offline cache reports missing doc without local data, wait for server confirmation before seeding
+          if (docSnap.metadata?.fromCache && !hasLocalSavedData) {
+            return;
           }
+
+          await performSaveRef.current?.(activeUid, { includeCreatedAt: true });
+          hydratedUidRef.current = activeUid;
+          setHydratedUid(activeUid);
         }
-        setIsHydrated(true);
-        isLocalUpdateRef.current = false;
       },
       (error) => {
-        console.error("Error listening to Firestore budget data:", error);
-        if (isMounted) setIsHydrated(true);
+        console.error('[Firestore] Error listening to budget data:', error);
+        if (isMounted) {
+          hydratedUidRef.current = activeUid;
+          setHydratedUid(activeUid);
+        }
       }
     );
 
@@ -106,67 +144,56 @@ export function useFirebaseSync() {
       isMounted = false;
       unsubscribe();
     };
-  }, [user, dispatch]);
+  }, [activeUid, _sessionKey, dispatch]);
 
-  // Reset state on signout
+  // Flush any pending debounced write immediately when leaving tab/page or unmounting
   useEffect(() => {
-    if (!user) {
-      dispatch({ type: 'RESET_STATE' });
-    }
-  }, [user, dispatch]);
-
-  // Helper to perform the save to Firestore using the freshest stateRef
-  const performSaveRef = useRef();
-  performSaveRef.current = async () => {
-    if (!user || !user.uid || user.isGuest || !db) return;
-    try {
-      isLocalUpdateRef.current = true;
-      const docRef = doc(db, 'users', user.uid, 'budgetData', 'main');
-      await setDoc(docRef, stateRef.current, { merge: true });
-      console.log("Budget data synced to Firestore for user:", user.uid);
-    } catch (error) {
-      console.error("Error syncing budget data to Firestore:", error);
-    }
-  };
-
-  // Mount/unmount & window beforeunload handler: flush pending save only on true unmount or page exit
-  useEffect(() => {
-    const handleBeforeUnload = () => {
+    const flushPendingSave = () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
         performSaveRef.current?.();
       }
     };
-    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushPendingSave();
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', flushPendingSave);
+    window.addEventListener('beforeunload', flushPendingSave);
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Flush any pending in-flight debounce timer on component unmount
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-        performSaveRef.current?.();
-      }
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', flushPendingSave);
+      window.removeEventListener('beforeunload', flushPendingSave);
+      flushPendingSave();
     };
   }, []);
 
-  // 2. Sync local changes back to Firestore (debounced save 1000ms using latest stateRef)
+  // 2. Debounced auto-save to Firestore whenever user-owned budget state mutates
   useEffect(() => {
-    if (!isHydrated || !user || user.isGuest || !db) return;
+    if (!isHydrated || !activeUid || hydratedUidRef.current !== activeUid) {
+      return;
+    }
 
-    // Clear any previous debounce timer on new state change
+    const currentUpdatedMs = getTimestampMs(updatedAt);
+    if (!updatedAt || currentUpdatedMs <= lastCloudSyncMsRef.current) {
+      return;
+    }
+
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    // Debounce save by 1000ms of user inactivity
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
-      performSaveRef.current?.();
-    }, 1000);
+      performSaveRef.current?.(activeUid);
+    }, 600);
 
-    // Cancel timer on next state change so writes are truly debounced
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -185,7 +212,8 @@ export function useFirebaseSync() {
     quotaUsage,
     isSubscribed,
     subscriptionPlan,
-    user?.uid,
-    isHydrated
+    updatedAt,
+    activeUid,
+    isHydrated,
   ]);
 }

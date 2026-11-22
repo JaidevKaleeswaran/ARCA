@@ -123,7 +123,7 @@ export async function checkAndIncrementQuota(uid, feature, currentQuotaState = {
 
   if (!skipIncrement) {
     // Atomically increment quota counter in Cloud Firestore if authenticated
-    if (db && uid && uid !== 'usr_arca_guest') {
+    if (db && uid && uid !== 'usr_arca_guest' && !String(uid).startsWith('guest_')) {
       try {
         const budgetDocRef = doc(db, 'users', uid, 'budgetData', 'main');
         if (isStale) {

@@ -96,7 +96,10 @@ function MainApp() {
 
                 <button
                   type="button"
-                  onClick={logout}
+                  onClick={async () => {
+                    await logout();
+                    setActiveTab('home');
+                  }}
                   title="Log Out"
                   className="p-1.5 sm:p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20 shrink-0 cursor-pointer"
                 >

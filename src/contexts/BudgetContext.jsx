@@ -1,9 +1,19 @@
-import React, { createContext, useReducer, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useReducer, useContext, useEffect, useState } from 'react';
 import { normalizeToMasterCycle, getCycleWindow, isWithinCycle } from '../utils/cycleUtils';
 import { useAuth } from './AuthContext';
 import { env } from '../config/env';
 import { db } from '../config/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
+import {
+  STORAGE_KEY,
+  LEGACY_STORAGE_KEY,
+  LAST_ACTIVE_USER_KEY,
+  USER_SESSION_KEY,
+  LEGACY_USER_SESSION_KEY,
+  getSessionKey,
+  getStorageKey,
+  stripInternalState,
+} from '../utils/budgetStorage';
 import {
   QUOTA_LIMITS,
   getMondayOfCurrentWeekISO,
@@ -13,8 +23,7 @@ import {
 } from '../utils/quotaManager';
 import StackedProModal from '../components/ui/StackedProModal';
 
-const STORAGE_KEY = 'arca_budget_state';
-const LEGACY_STORAGE_KEY = 'stacked_budget_state';
+export { getStorageKey };
 
 // Default fallback state
 const defaultState = {
@@ -38,7 +47,8 @@ const defaultState = {
   },
   isSubscribed: false,
   subscriptionPlan: 'free',
-  updatedAt: new Date().toISOString(),
+  updatedAt: null,
+  _sessionKey: null,
 };
 
 // Helper to eliminate duplicate categories by name & preserve transaction links
@@ -102,33 +112,55 @@ function sanitizeState(state) {
     quotaUsage: normalizeQuotaState(state?.quotaUsage),
     isSubscribed: Boolean(state?.isSubscribed),
     subscriptionPlan: state?.subscriptionPlan || 'free',
-    updatedAt: state?.updatedAt || new Date().toISOString(),
+    updatedAt: state?.updatedAt || null,
   };
 }
 
-export function getStorageKey(uid) {
-  if (!uid || uid === 'usr_arca_guest') return 'arca_budget_state_guest';
-  return `arca_budget_state_${uid}`;
-}
-
-// Initial state loaded from localStorage if available
-const getInitialState = () => {
+function readSavedStateForSession(sessionKey) {
+  if (!sessionKey) return null;
   try {
-    const savedKey = localStorage.getItem('arca_last_active_user');
-    const storageKey = getStorageKey(savedKey);
-    const saved = localStorage.getItem(storageKey) || localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+    const storageKey = getStorageKey(sessionKey);
+    let saved = localStorage.getItem(storageKey);
+
+    // Fallback to legacy un-scoped storage only for guest sessions when no guest-scoped state exists yet
+    if (!saved && sessionKey === 'guest') {
+      const lastActive = localStorage.getItem(LAST_ACTIVE_USER_KEY);
+      if (!lastActive || lastActive === 'guest') {
+        saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+      }
+    }
+
     if (saved) {
-      const parsed = JSON.parse(saved);
-      return sanitizeState({
-        ...defaultState,
-        ...parsed,
-        categories: parsed.categories && parsed.categories.length > 0 ? parsed.categories : defaultState.categories,
-      });
+      return JSON.parse(saved);
     }
   } catch (e) {
     console.warn('Failed to load budget state from localStorage:', e);
   }
-  return sanitizeState(defaultState);
+  return null;
+}
+
+// Initial state loaded from localStorage if an active user session is present
+const getInitialState = () => {
+  try {
+    const savedSessionRaw = localStorage.getItem(USER_SESSION_KEY) || localStorage.getItem(LEGACY_USER_SESSION_KEY);
+    if (savedSessionRaw) {
+      const parsedSession = JSON.parse(savedSessionRaw);
+      const sessionKey = getSessionKey(parsedSession);
+      const parsed = readSavedStateForSession(sessionKey);
+      if (parsed) {
+        return sanitizeState({
+          ...defaultState,
+          ...parsed,
+          categories: Array.isArray(parsed.categories) ? parsed.categories : defaultState.categories,
+          _sessionKey: sessionKey,
+        });
+      }
+      return sanitizeState({ ...defaultState, _sessionKey: sessionKey });
+    }
+  } catch (e) {
+    console.warn('Failed to load budget state from localStorage:', e);
+  }
+  return sanitizeState({ ...defaultState, _sessionKey: null });
 };
 
 const BudgetContext = createContext();
@@ -466,6 +498,25 @@ function internalBudgetReducer(state, action) {
         quotaUsage: normalizeQuotaState(incoming.quotaUsage || state.quotaUsage),
       });
     }
+    case 'LOAD_USER_STATE': {
+      const incoming = action.payload || {};
+      const sessionKey = action.meta?.sessionKey !== undefined ? action.meta.sessionKey : state._sessionKey;
+      return sanitizeState({
+        ...defaultState,
+        ...incoming,
+        categories: Array.isArray(incoming.categories) ? incoming.categories : defaultState.categories,
+        transactions: Array.isArray(incoming.transactions) ? incoming.transactions : [],
+        incomeSources: Array.isArray(incoming.incomeSources) ? incoming.incomeSources : [],
+        investments: Array.isArray(incoming.investments) ? incoming.investments : [],
+        voiceLogs: Array.isArray(incoming.voiceLogs) ? incoming.voiceLogs : [],
+        chatMessages: Array.isArray(incoming.chatMessages) ? incoming.chatMessages : [],
+        quotaUsage: normalizeQuotaState(incoming.quotaUsage),
+        isSubscribed: Boolean(incoming.isSubscribed),
+        subscriptionPlan: incoming.subscriptionPlan || (incoming.isSubscribed ? 'pro' : 'free'),
+        updatedAt: incoming.updatedAt || null,
+        _sessionKey: sessionKey,
+      });
+    }
     case 'UPDATE_QUOTA_USAGE': {
       const currentQuota = normalizeQuotaState(state.quotaUsage);
       return {
@@ -484,16 +535,27 @@ function internalBudgetReducer(state, action) {
       };
     }
     case 'RESET_STATE':
-      return sanitizeState(defaultState);
+      return sanitizeState({
+        ...defaultState,
+        updatedAt: null,
+        _sessionKey: action.meta?.sessionKey !== undefined ? action.meta.sessionKey : null,
+      });
 
     default:
       return state;
   }
 }
 
+const NON_MUTATING_ACTIONS = new Set([
+  'SET_FULL_STATE',
+  'LOAD_USER_STATE',
+  'RESET_STATE',
+  'REFRESH_PORTFOLIO_PRICES',
+]);
+
 function budgetReducer(state, action) {
   const nextState = internalBudgetReducer(state, action);
-  if (nextState !== state && action.type !== 'SET_FULL_STATE') {
+  if (nextState !== state && !NON_MUTATING_ACTIONS.has(action.type)) {
     return {
       ...nextState,
       updatedAt: new Date().toISOString(),
@@ -505,8 +567,7 @@ function budgetReducer(state, action) {
 export function BudgetProvider({ children }) {
   const [state, dispatch] = useReducer(budgetReducer, null, getInitialState);
   const { user } = useAuth();
-  const isCloudLoadedRef = useRef(false);
-  const saveTimeoutRef = useRef(null);
+  const activeSessionKey = getSessionKey(user);
 
   // ARCA Pro Modal state
   const [proModalConfig, setProModalConfig] = useState({
@@ -583,153 +644,42 @@ export function BudgetProvider({ children }) {
     return result;
   };
 
-  // Load user-specific budget state: localStorage first, then Cloud Firestore source-of-truth
+  // Load user-scoped budget state from localStorage whenever the active session changes
   useEffect(() => {
-    isCloudLoadedRef.current = false;
-    let isCancelled = false;
-
-    if (user && user.uid && !user.isGuest) {
-      const userStorageKey = `arca_budget_state_${user.uid}`;
-
-      // 1. Instant local cache load
-      let localState = null;
-      try {
-        const saved = localStorage.getItem(userStorageKey);
-        if (saved) {
-          localState = JSON.parse(saved);
-          dispatch({ type: 'SET_FULL_STATE', payload: localState });
-        }
-      } catch (e) {
-        console.warn('Failed to load user state from localStorage:', e);
+    if (!activeSessionKey) {
+      if (state._sessionKey !== null) {
+        dispatch({ type: 'RESET_STATE', meta: { sessionKey: null } });
       }
-
-      // 2. Cloud Firestore synchronization (cross-device & persistent)
-      const fetchFromFirestore = async () => {
-        if (!db) {
-          isCloudLoadedRef.current = true;
-          return;
-        }
-        try {
-          const docRef = doc(db, 'users', user.uid, 'budgetData', 'main');
-          const docSnap = await getDoc(docRef);
-
-          if (isCancelled) return;
-
-          if (docSnap.exists()) {
-            const cloudData = docSnap.data();
-            const localUpdatedAt = localState?.updatedAt ? new Date(localState.updatedAt).getTime() : 0;
-            const cloudUpdatedAt = cloudData?.updatedAt ? new Date(cloudData.updatedAt).getTime() : 0;
-
-            // Preserve unflushed local edits if local is strictly newer, while syncing authoritative quotaUsage
-            const baseData = (localUpdatedAt > cloudUpdatedAt && localState)
-              ? { ...localState, quotaUsage: cloudData.quotaUsage || localState.quotaUsage }
-              : { ...cloudData, quotaUsage: cloudData.quotaUsage };
-
-            const merged = sanitizeState({
-              ...defaultState,
-              ...baseData,
-              categories: baseData.categories && baseData.categories.length > 0
-                ? baseData.categories
-                : defaultState.categories,
-            });
-
-            dispatch({ type: 'SET_FULL_STATE', payload: merged });
-            localStorage.setItem(userStorageKey, JSON.stringify(merged));
-            localStorage.setItem('arca_last_active_user', user.uid);
-          } else {
-            // First-time cloud user: seed their initial document to Firestore
-            const initialDoc = {
-              transactions: state.transactions || [],
-              categories: state.categories || defaultState.categories,
-              incomeSources: state.incomeSources || [],
-              investments: state.investments || [],
-              cycleStartDate: state.cycleStartDate || null,
-              cycleFrequency: state.cycleFrequency || 'monthly',
-              voiceLogs: state.voiceLogs || [],
-              chatMessages: state.chatMessages || [],
-              quotaUsage: normalizeQuotaState(state.quotaUsage),
-              isSubscribed: Boolean(state.isSubscribed),
-              subscriptionPlan: state.subscriptionPlan || 'free',
-              uid: user.uid,
-              userId: user.uid,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            await setDoc(docRef, initialDoc, { merge: true });
-          }
-        } catch (cloudErr) {
-          console.warn('[Firestore] Cloud sync error:', cloudErr);
-        } finally {
-          if (!isCancelled) {
-            isCloudLoadedRef.current = true;
-          }
-        }
-      };
-
-      fetchFromFirestore();
-
-      return () => {
-        isCancelled = true;
-      };
-    } else {
-      isCloudLoadedRef.current = true;
+      return;
     }
-  }, [user?.uid]);
 
-  // Sync state to localStorage immediately and debounce sync to Cloud Firestore
+    if (state._sessionKey === activeSessionKey) {
+      return;
+    }
+
+    const saved = readSavedStateForSession(activeSessionKey);
+    dispatch({
+      type: 'LOAD_USER_STATE',
+      payload: saved || { ...defaultState, updatedAt: null },
+      meta: { sessionKey: activeSessionKey },
+    });
+  }, [activeSessionKey, state._sessionKey]);
+
+  // Persist budget state immediately to user-scoped localStorage (never overwriting during logout/user switch)
   useEffect(() => {
-    try {
-      if (user && user.uid && !user.isGuest) {
-        const userStorageKey = `arca_budget_state_${user.uid}`;
-        localStorage.setItem(userStorageKey, JSON.stringify(state));
-        localStorage.setItem('arca_last_active_user', user.uid);
+    if (!activeSessionKey || state._sessionKey !== activeSessionKey) {
+      return;
+    }
 
-        // Debounced Firestore Cloud Save (1.2s delay to avoid excessive write operations)
-        if (db && isCloudLoadedRef.current) {
-          if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-          }
-          saveTimeoutRef.current = setTimeout(async () => {
-            try {
-              const docRef = doc(db, 'users', user.uid, 'budgetData', 'main');
-              await setDoc(
-                docRef,
-                {
-                  transactions: state.transactions || [],
-                  categories: state.categories || [],
-                  incomeSources: state.incomeSources || [],
-                  investments: state.investments || [],
-                  cycleStartDate: state.cycleStartDate || null,
-                  cycleFrequency: state.cycleFrequency || 'monthly',
-                  voiceLogs: state.voiceLogs || [],
-                  chatMessages: state.chatMessages || [],
-                  isSubscribed: Boolean(state.isSubscribed),
-                  subscriptionPlan: state.subscriptionPlan || 'free',
-                  uid: user.uid,
-                  userId: user.uid,
-                  updatedAt: new Date().toISOString(),
-                },
-                { merge: true }
-              );
-            } catch (err) {
-              console.warn('[Firestore] Background auto-save failed:', err);
-            }
-          }, 1200);
-        }
-      } else {
-        localStorage.setItem('arca_budget_state_guest', JSON.stringify(state));
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    try {
+      const persistable = stripInternalState(state);
+      localStorage.setItem(getStorageKey(activeSessionKey), JSON.stringify(persistable));
+      localStorage.setItem(LAST_ACTIVE_USER_KEY, activeSessionKey);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
     } catch (e) {
       console.warn('Failed to save budget state to localStorage:', e);
     }
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [state, user]);
+  }, [state, activeSessionKey]);
 
   // Continuously refresh user stock holdings with accurate live market prices
   useEffect(() => {

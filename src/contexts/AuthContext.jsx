@@ -2,6 +2,13 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db } from '../config/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import {
+  USER_SESSION_KEY,
+  LEGACY_USER_SESSION_KEY,
+  LAST_ACTIVE_USER_KEY,
+  getStorageKey,
+  buildFirestoreBudgetPayload,
+} from '../utils/budgetStorage';
+import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
@@ -17,8 +24,44 @@ import {
 
 const AuthContext = createContext();
 
-const STORAGE_KEY = 'arca_user_session';
-const LEGACY_STORAGE_KEY = 'stacked_user_session';
+const STORAGE_KEY = USER_SESSION_KEY;
+const LEGACY_STORAGE_KEY = LEGACY_USER_SESSION_KEY;
+
+function getLocalFallbackUid(email) {
+  const normalized = (email || 'user').trim().toLowerCase();
+  return `local_${normalized.replace(/[^a-z0-9]/g, '_')}`;
+}
+
+function getActivationPendingKey(uid) {
+  return `arca_activation_pending_${uid}`;
+}
+
+function buildFirebaseUserData(firebaseUser, fallbackName = null) {
+  const pendingKey = getActivationPendingKey(firebaseUser.uid);
+  let isDeferred = false;
+  try {
+    if (firebaseUser.emailVerified) {
+      localStorage.removeItem(pendingKey);
+    } else {
+      isDeferred = localStorage.getItem(pendingKey) === 'true';
+    }
+  } catch {
+    // ignore storage access issues
+  }
+
+  return {
+    uid: firebaseUser.uid,
+    email: firebaseUser.email,
+    displayName:
+      firebaseUser.displayName ||
+      fallbackName ||
+      (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'ARCA User'),
+    photoURL: firebaseUser.photoURL || null,
+    emailVerified: firebaseUser.emailVerified || isDeferred,
+    activationPending: !firebaseUser.emailVerified && isDeferred,
+    isGuest: false,
+  };
+}
 
 function formatAuthError(error) {
   if (!error) return new Error('Authentication failed. Please try again.');
@@ -103,14 +146,7 @@ export function AuthProvider({ children }) {
       getRedirectResult(auth)
         .then((result) => {
           if (result && result.user) {
-            const userData = {
-              uid: result.user.uid,
-              email: result.user.email,
-              displayName: result.user.displayName || (result.user.email ? result.user.email.split('@')[0] : 'Google User'),
-              photoURL: result.user.photoURL || null,
-              emailVerified: result.user.emailVerified,
-              isGuest: false,
-            };
+            const userData = buildFirebaseUserData(result.user, 'Google User');
             setUser(userData);
             try {
               localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
@@ -123,23 +159,34 @@ export function AuthProvider({ children }) {
 
       const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
         if (firebaseUser) {
-          const userData = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-            photoURL: firebaseUser.photoURL || null,
-            emailVerified: firebaseUser.emailVerified,
-            isGuest: false,
-          };
+          const userData = buildFirebaseUserData(firebaseUser);
           setUser(userData);
           try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
           } catch (e) { }
         } else {
-          setUser(null);
+          // Preserve active Guest sessions across page reloads until explicit logout
+          let activeGuestSession = null;
           try {
-            localStorage.removeItem(STORAGE_KEY);
-          } catch (e) { }
+            const existingRaw = localStorage.getItem(STORAGE_KEY);
+            if (existingRaw) {
+              const parsed = JSON.parse(existingRaw);
+              if (parsed?.isGuest) {
+                activeGuestSession = parsed;
+              }
+            }
+          } catch {
+            // ignore parse errors
+          }
+
+          if (activeGuestSession) {
+            setUser(activeGuestSession);
+          } else {
+            setUser(null);
+            try {
+              localStorage.removeItem(STORAGE_KEY);
+            } catch (e) { }
+          }
         }
       });
       return () => unsubscribe();
@@ -155,21 +202,14 @@ export function AuthProvider({ children }) {
         throw formatAuthError(err);
       }
 
-      const userData = {
-        uid: cred.user.uid,
-        email: cred.user.email,
-        displayName: cred.user.displayName || cred.user.email.split('@')[0],
-        photoURL: cred.user.photoURL || null,
-        emailVerified: cred.user.emailVerified,
-        isGuest: false,
-      };
+      const userData = buildFirebaseUserData(cred.user);
 
       setUser(userData);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
       return userData;
     } else {
       const userData = {
-        uid: 'user_' + Date.now(),
+        uid: getLocalFallbackUid(email),
         email: email,
         displayName: email.split('@')[0],
         photoURL: null,
@@ -241,7 +281,7 @@ export function AuthProvider({ children }) {
       return { email, requiresActivation: true };
     } else {
       const userData = {
-        uid: 'user_' + Date.now(),
+        uid: getLocalFallbackUid(email),
         email: email,
         displayName: name || email.split('@')[0],
         photoURL: null,
@@ -259,14 +299,7 @@ export function AuthProvider({ children }) {
       const provider = new GoogleAuthProvider();
       try {
         const cred = await signInWithPopup(auth, provider);
-        const userData = {
-          uid: cred.user.uid,
-          email: cred.user.email,
-          displayName: cred.user.displayName || (cred.user.email ? cred.user.email.split('@')[0] : 'Google User'),
-          photoURL: cred.user.photoURL || null,
-          emailVerified: cred.user.emailVerified,
-          isGuest: false,
-        };
+        const userData = buildFirebaseUserData(cred.user, 'Google User');
         setUser(userData);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
         return userData;
@@ -307,7 +340,7 @@ export function AuthProvider({ children }) {
 
   const loginAsGuest = () => {
     const guestUser = {
-      uid: 'guest_' + Date.now(),
+      uid: 'usr_arca_guest',
       email: 'guest@arca.app',
       displayName: 'Guest User',
       photoURL: null,
@@ -335,14 +368,7 @@ export function AuthProvider({ children }) {
     if (auth && auth.currentUser) {
       await auth.currentUser.reload();
       const updatedUser = auth.currentUser;
-      const userData = {
-        uid: updatedUser.uid,
-        email: updatedUser.email,
-        displayName: updatedUser.displayName || updatedUser.email.split('@')[0],
-        photoURL: updatedUser.photoURL || null,
-        emailVerified: updatedUser.emailVerified,
-        isGuest: false,
-      };
+      const userData = buildFirebaseUserData(updatedUser);
       setUser(userData);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
       return updatedUser.emailVerified;
@@ -356,14 +382,17 @@ export function AuthProvider({ children }) {
 
     if (currentUid && !user?.isGuest && db) {
       try {
-        const userStorageKey = `arca_budget_state_${currentUid}`;
-        const saved = localStorage.getItem(userStorageKey) || localStorage.getItem('arca_budget_state');
+        const userStorageKey = getStorageKey(currentUid);
+        const saved = localStorage.getItem(userStorageKey);
         if (saved) {
           const parsed = JSON.parse(saved);
-          const docRef = doc(db, 'users', currentUid, 'budgetData', 'main');
-          const savePromise = setDoc(docRef, { ...parsed, updatedAt: new Date().toISOString() }, { merge: true });
-          const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 800));
-          await Promise.race([savePromise, timeoutPromise]);
+          if (parsed?.updatedAt) {
+            const docRef = doc(db, 'users', currentUid, 'budgetData', 'main');
+            const payload = buildFirestoreBudgetPayload(parsed, currentUid);
+            const savePromise = setDoc(docRef, payload, { merge: true });
+            const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 2500));
+            await Promise.race([savePromise, timeoutPromise]);
+          }
         }
       } catch (e) {
         console.warn("Pre-logout save error:", e);
@@ -382,7 +411,7 @@ export function AuthProvider({ children }) {
     try {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(LEGACY_STORAGE_KEY);
-      localStorage.removeItem('arca_last_active_user');
+      localStorage.removeItem(LAST_ACTIVE_USER_KEY);
     } catch (e) { }
   };
 

@@ -17,6 +17,9 @@ export default function VerifyEmailPage() {
       activationPending: true,
     };
     try {
+      if (user.uid) {
+        localStorage.setItem(`arca_activation_pending_${user.uid}`, 'true');
+      }
       localStorage.setItem('arca_user_session', JSON.stringify(updated));
     } catch (e) {}
     toast.success(`Welcome to ARCA, ${user.displayName || user.email}!`);

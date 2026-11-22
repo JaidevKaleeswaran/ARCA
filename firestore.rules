@@ -31,6 +31,8 @@ rules_version = '2';
 //   - voiceLogs: list of maps (optional or null, max 1000 items)
 //   - chatMessages: list of maps (optional or null, max 2000 items)
 //   - quotaUsage: map (optional, keys: weekStartDate, receiptsUsed, voiceUsed, assistantUsed)
+//   - isSubscribed: bool (optional or null)
+//   - subscriptionPlan: string (optional or null, max 30 chars)
 //   - updatedAt: string or timestamp (optional or null, max 60 chars)
 //   - createdAt: string or timestamp (optional or null, max 60 chars, immutable on update)
 //   - uid: string (optional, if provided must match userId and request.auth.uid, max 128 chars)
@@ -186,6 +188,8 @@ service cloud.firestore {
           'voiceLogs',
           'chatMessages',
           'quotaUsage',
+          'isSubscribed',
+          'subscriptionPlan',
           'updatedAt',
           'createdAt',
           'uid',
@@ -198,6 +202,8 @@ service cloud.firestore {
         isValidOptionalList('voiceLogs', 1000) &&
         isValidOptionalList('chatMessages', 2000) &&
         isValidQuotaUsage() &&
+        isValidOptionalBool('isSubscribed') &&
+        isValidOptionalString('subscriptionPlan', 0, 30) &&
         isValidOptionalTimestampOrString('cycleStartDate', 35) &&
         isValidOptionalString('cycleFrequency', 0, 30) &&
         isValidOptionalTimestampOrString('updatedAt', 60) &&

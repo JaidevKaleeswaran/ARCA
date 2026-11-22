@@ -1,6 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import { env } from './env.js';
 
@@ -23,14 +28,25 @@ let analytics = null;
 if (firebaseConfig.apiKey) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = getFirestore(app);
 
   if (typeof window !== 'undefined') {
+    try {
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+      });
+    } catch {
+      db = getFirestore(app);
+    }
+
     isSupported().then((supported) => {
       if (supported) {
         analytics = getAnalytics(app);
       }
     }).catch((err) => console.warn('Firebase Analytics check error:', err));
+  } else {
+    db = getFirestore(app);
   }
 }
 
