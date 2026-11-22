@@ -112,22 +112,25 @@ router.post('/speak', speakLimiter, validateSpeakInput, async (req, res) => {
   }
 
   try {
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        text,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`,
+      {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': apiKey,
         },
-      }),
-    });
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75,
+          },
+        }),
+      }
+    );
 
     if (!response.ok) {
       const errText = await response.text();
@@ -179,7 +182,23 @@ router.post('/transcribe', transcribeLimiter, uploadMemory.single('audio'), asyn
     }
 
     const base64Audio = req.file.buffer.toString('base64');
-    const mimeType = req.file.mimetype || 'audio/webm';
+    // Normalize MIME type for Gemini: strip codec parameters (e.g. "audio/mp4;codecs=mp4a.40.2" -> "audio/mp4")
+    // and infer from filename if browser sent application/octet-stream
+    const rawMime = (req.file.mimetype || '').split(';')[0].trim().toLowerCase();
+    const ext = (req.file.originalname || '').split('.').pop()?.toLowerCase();
+    const extToMime = {
+      m4a: 'audio/mp4',
+      mp4: 'audio/mp4',
+      aac: 'audio/aac',
+      webm: 'audio/webm',
+      ogg: 'audio/ogg',
+      wav: 'audio/wav',
+      mp3: 'audio/mpeg',
+    };
+    const mimeType =
+      rawMime && rawMime !== 'application/octet-stream' && rawMime.startsWith('audio/')
+        ? (rawMime === 'audio/x-m4a' ? 'audio/mp4' : rawMime)
+        : (extToMime[ext] || 'audio/webm');
 
     const mode = req.body.mode || 'receipt';
     const isPromptMode = mode === 'prompt';

@@ -63,7 +63,7 @@ test.describe('Universal Cross-Tab Asset Reactivity & State Store Consistency', 
 
     // 2. Switch back to Home Tab and verify Category Card reflects $100 spent
     await basePage.selectTab('home');
-    const spentText = page.locator('span:has-text("$100.00")');
+    const spentText = page.locator('span:has-text("$100.00")').first();
     await expect(spentText).toBeVisible();
   });
 });

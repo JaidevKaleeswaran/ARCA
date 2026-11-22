@@ -184,32 +184,32 @@ export default function TransactionsTab() {
           align="left"
           className="text-xl font-semibold"
         />
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             data-tutorial="expense-speak-btn"
             onClick={() => setShowVoicePanel(!showVoicePanel)}
-            className="flex items-center space-x-1.5 text-sm bg-accent/15 text-accent border border-accent/30 px-3 py-1.5 rounded-lg hover:bg-accent/25 transition-colors font-medium"
+            className="flex items-center space-x-1.5 text-xs sm:text-sm bg-accent/15 text-accent border border-accent/30 px-2.5 sm:px-3 py-1.5 rounded-lg hover:bg-accent/25 transition-colors font-medium"
           >
-            <Mic size={16} className="text-accent" />
+            <Mic size={16} className="text-accent shrink-0" />
             <span>Speak Receipt</span>
           </button>
           <button
             type="button"
             data-tutorial="expense-scan-btn"
             onClick={() => setIsScannerOpen(true)}
-            className="flex items-center space-x-1.5 text-sm bg-card hover:bg-card-hover text-text border border-border hover:border-accent/40 px-3 py-1.5 rounded-lg transition-colors font-medium cursor-pointer"
+            className="flex items-center space-x-1.5 text-xs sm:text-sm bg-card hover:bg-card-hover text-text border border-border hover:border-accent/40 px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors font-medium cursor-pointer"
           >
-            <Receipt size={16} className="text-text-muted" />
+            <Receipt size={16} className="text-text-muted shrink-0" />
             <span>Scan Receipt</span>
           </button>
           <button
             type="button"
             data-tutorial="expense-add-btn"
             onClick={handleAddClick}
-            className="flex items-center space-x-1 text-sm bg-accent text-primary px-3 py-1.5 rounded-lg hover:bg-accent-hover transition-colors font-medium cursor-pointer"
+            className="flex items-center space-x-1 text-xs sm:text-sm bg-accent text-primary px-2.5 sm:px-3 py-1.5 rounded-lg hover:bg-accent-hover transition-colors font-medium cursor-pointer"
           >
-            <Plus size={16} />
+            <Plus size={16} className="shrink-0" />
             <span>Add Expense</span>
           </button>
           <button
@@ -217,9 +217,9 @@ export default function TransactionsTab() {
             data-tutorial="expense-export-btn"
             onClick={handleExportCSV}
             title="Export transactions as CSV"
-            className="flex items-center space-x-1.5 text-sm bg-primary hover:bg-card-hover text-zinc-300 hover:text-white border border-border px-3 py-1.5 rounded-lg transition-colors font-medium cursor-pointer"
+            className="flex items-center space-x-1.5 text-xs sm:text-sm bg-primary hover:bg-card-hover text-zinc-300 hover:text-white border border-border px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors font-medium cursor-pointer"
           >
-            <Download size={15} />
+            <Download size={15} className="shrink-0" />
             <span>Export CSV</span>
           </button>
         </div>
@@ -319,7 +319,7 @@ export default function TransactionsTab() {
                         className={`p-1.5 rounded-md transition-all ${
                           speakingTxId === tx.id
                             ? 'bg-accent/20 text-accent border border-accent/40 animate-pulse opacity-100'
-                            : 'text-text-muted hover:text-accent opacity-60 group-hover:opacity-100 hover:bg-card-hover'
+                            : 'text-text-muted hover:text-accent opacity-80 sm:opacity-60 sm:group-hover:opacity-100 hover:bg-card-hover'
                         }`}
                       >
                         {speakingTxId === tx.id ? (
@@ -335,7 +335,7 @@ export default function TransactionsTab() {
                           onClick={() => handleAIReview(tx)}
                           disabled={reviewingTxId === tx.id}
                           title="Run AI review on this suspicious expense"
-                          className="p-1.5 rounded-md transition-all text-orange-400 hover:bg-orange-500/10 opacity-70 group-hover:opacity-100 disabled:opacity-40"
+                          className="p-1.5 rounded-md transition-all text-orange-400 hover:bg-orange-500/10 opacity-85 sm:opacity-70 sm:group-hover:opacity-100 disabled:opacity-40"
                         >
                           {reviewingTxId === tx.id
                             ? <Loader2 size={16} className="animate-spin" />
@@ -346,7 +346,7 @@ export default function TransactionsTab() {
 
                       <button
                         onClick={() => handleEditClick(tx)}
-                        className="p-1.5 text-zinc-500 hover:text-accent opacity-60 group-hover:opacity-100 transition-all rounded-md hover:bg-card-hover"
+                        className="p-1.5 text-zinc-400 sm:text-zinc-500 hover:text-accent opacity-80 sm:opacity-60 sm:group-hover:opacity-100 transition-all rounded-md hover:bg-card-hover"
                       >
                         <Edit2 size={16} />
                       </button>

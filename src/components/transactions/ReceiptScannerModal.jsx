@@ -351,8 +351,9 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
                   value={formData.categoryId}
                   onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
                   className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
-                  required
+                  required={categories.length > 0}
                 >
+                  {categories.length === 0 && <option value="">General (Auto-created)</option>}
                   {categories.map((cat) => (
                     <option key={cat.id} value={cat.id}>
                       {cat.name}

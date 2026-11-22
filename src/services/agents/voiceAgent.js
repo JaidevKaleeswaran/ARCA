@@ -219,13 +219,127 @@ export function createWebSpeechRecognition(onResult, onError, onEnd) {
 }
 
 /**
- * Currently active Audio instance for stopping previous speech
+ * Currently active Audio instance & object URL for stopping previous speech
  */
 let activeAudio = null;
+let activeAudioUrl = null;
+let sharedAudioElement = null;
+
+/**
+ * Tiny valid silent WAV data URI used to synchronously unlock HTMLAudioElement
+ * inside a mobile Safari/Chrome tap gesture before awaiting network TTS audio.
+ */
+const SILENT_AUDIO_DATA_URI =
+  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+
+function getOrUnlockAudioElement() {
+  if (typeof Audio === 'undefined') return null;
+
+  if (!sharedAudioElement) {
+    sharedAudioElement = new Audio();
+    sharedAudioElement.preload = 'auto';
+    sharedAudioElement.setAttribute('playsinline', 'true');
+  }
+
+  // Synchronously unlock playback within the current user tap gesture (iOS Safari / mobile Chrome)
+  try {
+    sharedAudioElement.pause();
+    sharedAudioElement.src = SILENT_AUDIO_DATA_URI;
+    sharedAudioElement.muted = true;
+    const unlockPromise = sharedAudioElement.play();
+    if (unlockPromise && typeof unlockPromise.then === 'function') {
+      unlockPromise
+        .then(() => {
+          if (sharedAudioElement && sharedAudioElement.src === SILENT_AUDIO_DATA_URI) {
+            sharedAudioElement.pause();
+            sharedAudioElement.muted = false;
+          }
+        })
+        .catch(() => {
+          if (sharedAudioElement) sharedAudioElement.muted = false;
+        });
+    } else {
+      sharedAudioElement.pause();
+      sharedAudioElement.muted = false;
+    }
+  } catch {
+    if (sharedAudioElement) sharedAudioElement.muted = false;
+  }
+
+  return sharedAudioElement;
+}
+
+/**
+ * Detect mobile / touch devices where simultaneous MediaRecorder + WebSpeech API
+ * causes hardware microphone contention and audio quality degradation.
+ */
+export function isMobileDevice() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const isTouchMac = typeof document !== 'undefined' && /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || isTouchMac;
+}
+
+/**
+ * Pick the best supported MediaRecorder MIME type & matching filename extension
+ * across iOS Safari (audio/mp4), Android/Desktop Chrome (audio/webm), and Firefox (audio/ogg).
+ */
+export function getPreferredRecordingFormat() {
+  const fallback = { mimeType: 'audio/webm', cleanMimeType: 'audio/webm', extension: 'webm' };
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+    return fallback;
+  }
+
+  const candidates = [
+    { mimeType: 'audio/mp4;codecs=mp4a.40.2', cleanMimeType: 'audio/mp4', extension: 'm4a' },
+    { mimeType: 'audio/mp4', cleanMimeType: 'audio/mp4', extension: 'm4a' },
+    { mimeType: 'audio/webm;codecs=opus', cleanMimeType: 'audio/webm', extension: 'webm' },
+    { mimeType: 'audio/webm', cleanMimeType: 'audio/webm', extension: 'webm' },
+    { mimeType: 'audio/ogg;codecs=opus', cleanMimeType: 'audio/ogg', extension: 'ogg' },
+  ];
+
+  // Prefer webm/opus on non-Safari browsers, mp4/aac on iOS/Safari
+  const isSafari =
+    typeof navigator !== 'undefined' &&
+    /^((?!chrome|android).)*safari/i.test(navigator.userAgent || '');
+
+  const ordered = isSafari
+    ? candidates
+    : [...candidates.slice(2), ...candidates.slice(0, 2)];
+
+  for (const candidate of ordered) {
+    try {
+      if (MediaRecorder.isTypeSupported(candidate.mimeType)) {
+        return candidate;
+      }
+    } catch {
+      // ignore unsupported check errors
+    }
+  }
+
+  return fallback;
+}
+
+/**
+ * High-quality microphone constraints that avoid aggressive telephony narrowband
+ * filtering while keeping speech clear on phones and desktops.
+ */
+export function getHighQualityAudioConstraints() {
+  return {
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      channelCount: { ideal: 1 },
+      sampleRate: { ideal: 44100 },
+    },
+  };
+}
 
 /**
  * Speak text aloud using ElevenLabs Text-to-Speech API
- * Fallback to Web Speech Synthesis if ElevenLabs fails or offline
+ * Unlocks mobile audio synchronously inside the user tap gesture so iOS/Android
+ * always plays studio ElevenLabs audio instead of falling back to robotic Web Speech.
  */
 export async function speakTextWithElevenLabs(text, options = {}) {
   const {
@@ -238,13 +352,11 @@ export async function speakTextWithElevenLabs(text, options = {}) {
   if (!text) return;
 
   // Stop any currently playing speech
-  if (activeAudio) {
-    activeAudio.pause();
-    activeAudio = null;
-  }
-  if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-    window.speechSynthesis.cancel();
-  }
+  stopSpeech();
+
+  // Synchronously unlock shared Audio element BEFORE any await so mobile Safari/Chrome
+  // preserves the user-gesture media playback permission after the fetch resolves.
+  const audioEl = getOrUnlockAudioElement();
 
   if (onStart) onStart();
 
@@ -266,33 +378,54 @@ export async function speakTextWithElevenLabs(text, options = {}) {
 
     if (response && response.ok) {
       const blob = await response.blob();
-      audioUrl = URL.createObjectURL(blob);
+      if (blob && blob.size > 0) {
+        audioUrl = URL.createObjectURL(blob);
+      }
     }
 
     // 2. Play ElevenLabs Audio if URL was created successfully
-    if (audioUrl) {
-      const audio = new Audio(audioUrl);
-      activeAudio = audio;
+    if (audioUrl && audioEl) {
+      activeAudio = audioEl;
+      activeAudioUrl = audioUrl;
 
       return new Promise((resolve) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          activeAudio = null;
+        const cleanup = () => {
+          audioEl.onended = null;
+          audioEl.onerror = null;
+          if (activeAudioUrl === audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+            activeAudioUrl = null;
+          }
+          if (activeAudio === audioEl) {
+            activeAudio = null;
+          }
+        };
+
+        audioEl.onended = () => {
+          cleanup();
           if (onEnd) onEnd();
           resolve();
         };
 
-        audio.onerror = (e) => {
+        audioEl.onerror = (e) => {
           console.warn('ElevenLabs audio play error, falling back to Web Speech:', e);
-          URL.revokeObjectURL(audioUrl);
-          activeAudio = null;
+          cleanup();
           fallbackWebSpeech(text, onEnd, onError, resolve);
         };
 
-        audio.play().catch((err) => {
-          console.warn('Audio play blocked/failed, falling back to Web Speech:', err);
-          fallbackWebSpeech(text, onEnd, onError, resolve);
-        });
+        audioEl.muted = false;
+        audioEl.volume = 1.0;
+        audioEl.src = audioUrl;
+        audioEl.load();
+
+        const playPromise = audioEl.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch((err) => {
+            console.warn('Audio play blocked/failed, falling back to Web Speech:', err);
+            cleanup();
+            fallbackWebSpeech(text, onEnd, onError, resolve);
+          });
+        }
       });
     } else {
       // 3. Fallback to Web Speech API
@@ -376,10 +509,20 @@ export function speakTransactionDetails(tx, categoryName = '', options = {}) {
  */
 export function stopSpeech() {
   if (activeAudio) {
-    activeAudio.pause();
+    try {
+      activeAudio.pause();
+      activeAudio.onended = null;
+      activeAudio.onerror = null;
+    } catch {
+      // ignore pause errors
+    }
     activeAudio = null;
   }
-  if ('speechSynthesis' in window) {
+  if (activeAudioUrl) {
+    URL.revokeObjectURL(activeAudioUrl);
+    activeAudioUrl = null;
+  }
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     window.speechSynthesis.cancel();
   }
 }

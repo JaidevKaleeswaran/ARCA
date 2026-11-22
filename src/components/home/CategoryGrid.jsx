@@ -167,7 +167,7 @@ export default function CategoryGrid() {
             </button>
             
             {isQuickFillOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-[#18181b] border border-zinc-800 rounded-xl shadow-xl z-20 py-1 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-2rem)] bg-[#18181b] border border-zinc-800 rounded-xl shadow-xl z-20 py-1 overflow-hidden">
                 {Object.entries(QUICK_FILL_TEMPLATES).map(([key, tpl]) => (
                   <button
                     key={key}
@@ -201,8 +201,9 @@ export default function CategoryGrid() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {categories.map((category) => {
           const spent = categorySpending[category.id] || 0;
-          const remaining = category.limit - spent;
-          const percentUsed = Math.min(100, Math.round((spent / category.limit) * 100)) || 0;
+          const limit = Number(category.limit) || 0;
+          const remaining = limit - spent;
+          const percentUsed = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : (spent > 0 ? 100 : 0);
 
           return (
             <SpotlightCard key={category.id} className="p-4 sm:p-6 shadow-sm group relative overflow-hidden flex flex-col">

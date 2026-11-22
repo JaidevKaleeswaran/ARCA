@@ -45,6 +45,16 @@
     background-color: #141412;
     color: var(--color-text);
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* Hide scrollbar for horizontal scroll containers on mobile & desktop */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
   
   /* Scrollbar styles for a sleek look */

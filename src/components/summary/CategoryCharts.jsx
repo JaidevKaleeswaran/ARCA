@@ -35,8 +35,9 @@ export default function CategoryCharts() {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
         {categories.map(category => {
           const spent = categorySpending[category.id] || 0;
-          const remaining = Math.max(0, category.limit - spent);
-          const percentUsed = (spent / category.limit) * 100;
+          const limit = Number(category.limit) || 0;
+          const remaining = Math.max(0, limit - spent);
+          const percentUsed = limit > 0 ? (spent / limit) * 100 : (spent > 0 ? 100 : 0);
           
           let spentColor = category.color; // Normal
           if (percentUsed >= 100) spentColor = '#ef4444'; // Red if exceeded

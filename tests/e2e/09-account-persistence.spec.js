@@ -13,26 +13,34 @@ test.describe('Account Data Saving — Leave & Rejoin Persistence', () => {
     await authPage.loginAsGuest();
   });
 
-  test('Preserves added salary, categories, transactions, and category deletions across page reload and logout/rejoin', async ({ page }) => {
+  test('Preserves added salary, categories, transactions, and category deletions across page reload and logout/rejoin without adding default categories', async ({ page }) => {
     const authPage = new AuthPage(page);
     const basePage = new BasePage(page);
     const homePage = new HomeTabPage(page);
     const txPage = new TransactionsTabPage(page);
 
-    // 1. Add salary, a custom category, and delete a default category on Home tab
+    // 0. Verify no initial default categories (Bills, Groceries, Entertainment) exist on fresh start
+    await expect(page.locator('h3:has-text("Bills")')).toHaveCount(0);
+    await expect(page.locator('h3:has-text("Groceries")')).toHaveCount(0);
+    await expect(page.locator('h3:has-text("Entertainment")')).toHaveCount(0);
+
+    // 1. Add salary, two custom categories, and delete one category on Home tab
     await homePage.setSalary(8250, 'monthly');
     await expect(homePage.salaryModal).not.toBeVisible();
 
     await homePage.createCategory('Travel Fund', 650);
     await expect(page.locator('h3:has-text("Travel Fund")')).toBeVisible();
 
-    // Delete default 'Entertainment' category via its card delete button
-    const entertainmentHeading = page.locator('h3:has-text("Entertainment")').first();
-    await expect(entertainmentHeading).toBeVisible();
-    const entertainmentCard = entertainmentHeading.locator('xpath=ancestor::div[contains(@class, "group")][1]');
+    await homePage.createCategory('Temporary Category', 200);
+    await expect(page.locator('h3:has-text("Temporary Category")')).toBeVisible();
+
+    // Delete 'Temporary Category' via its card delete button
+    const tempHeading = page.locator('h3:has-text("Temporary Category")').first();
+    await expect(tempHeading).toBeVisible();
+    const tempCard = tempHeading.locator('xpath=ancestor::div[contains(@class, "group")][1]');
     page.once('dialog', (dialog) => dialog.accept());
-    await entertainmentCard.locator('button[title="Delete Category"]').click();
-    await expect(page.locator('h3:has-text("Entertainment")')).toHaveCount(0);
+    await tempCard.locator('button[title="Delete Category"]').click();
+    await expect(page.locator('h3:has-text("Temporary Category")')).toHaveCount(0);
 
     // 2. Add a transaction on Transactions tab
     await basePage.selectTab('transactions');
@@ -42,12 +50,15 @@ test.describe('Account Data Saving — Leave & Rejoin Persistence', () => {
     // 3. Simulate leaving and reopening the app (page reload without logout)
     await page.reload();
 
-    // User stays authenticated in their session and retains all added/deleted state
+    // User stays authenticated in their session and retains all added/deleted state with no phantom categories
     await expect(basePage.userBadge).toBeVisible();
     await expect(page.locator('h3:has-text("Travel Fund")')).toBeVisible();
+    await expect(page.locator('h3:has-text("Temporary Category")')).toHaveCount(0);
+    await expect(page.locator('h3:has-text("Bills")')).toHaveCount(0);
+    await expect(page.locator('h3:has-text("Groceries")')).toHaveCount(0);
     await expect(page.locator('h3:has-text("Entertainment")')).toHaveCount(0);
-    // $8,250 salary - ($1,000 Bills + $400 Groceries + $650 Travel Fund) = $6,200.00 Left to Budget
-    await expect(homePage.leftToBudgetBanner).toContainText('$6,200.00');
+    // $8,250 salary - $650 Travel Fund = $7,600.00 Left to Budget
+    await expect(homePage.leftToBudgetBanner).toContainText('$7,600.00');
     await expect(page.locator('text=$8,250.00').first()).toBeVisible();
 
     await basePage.selectTab('transactions');
@@ -58,10 +69,13 @@ test.describe('Account Data Saving — Leave & Rejoin Persistence', () => {
     await expect(authPage.guestButton).toBeVisible();
     await authPage.loginAsGuest();
 
-    // Verify all data added in the previous session is still intact
+    // Verify all data added in the previous session is still intact and no default categories reappeared
     await expect(page.locator('h3:has-text("Travel Fund")')).toBeVisible();
+    await expect(page.locator('h3:has-text("Temporary Category")')).toHaveCount(0);
+    await expect(page.locator('h3:has-text("Bills")')).toHaveCount(0);
+    await expect(page.locator('h3:has-text("Groceries")')).toHaveCount(0);
     await expect(page.locator('h3:has-text("Entertainment")')).toHaveCount(0);
-    await expect(homePage.leftToBudgetBanner).toContainText('$6,200.00');
+    await expect(homePage.leftToBudgetBanner).toContainText('$7,600.00');
     await expect(page.locator('text=$8,250.00').first()).toBeVisible();
 
     await basePage.selectTab('transactions');

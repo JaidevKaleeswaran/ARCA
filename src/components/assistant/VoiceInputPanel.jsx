@@ -1,6 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, MicOff, Loader2, CheckCircle2, X, Volume2, Send, AlertCircle } from 'lucide-react';
-import { parseSpokenReceipt, createWebSpeechRecognition, speakTransactionDetails } from '../../services/agents/voiceAgent';
+import {
+  parseSpokenReceipt,
+  createWebSpeechRecognition,
+  speakTransactionDetails,
+  isMobileDevice,
+  getPreferredRecordingFormat,
+  getHighQualityAudioConstraints,
+} from '../../services/agents/voiceAgent';
 import { env } from '../../config/env';
 import { useBudget } from '../../contexts/BudgetContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -27,10 +34,28 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
   const [pulsePhase, setPulsePhase] = useState(0);
 
   const mediaRecorderRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+  const recordingFormatRef = useRef({ mimeType: 'audio/webm', cleanMimeType: 'audio/webm', extension: 'webm' });
   const audioChunksRef = useRef([]);
   const recognitionRef = useRef(null);
   const animFrameRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Release microphone tracks if panel unmounts while recording
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (_) {}
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.stop(); } catch (_) {}
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+    };
+  }, []);
 
   // Auto-focus text input
   useEffect(() => {
@@ -102,8 +127,9 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
     }
 
     try {
+      const ext = recordingFormatRef.current?.extension || (audioBlob.type.includes('mp4') ? 'm4a' : 'webm');
       const formData = new FormData();
-      formData.append('audio', audioBlob, 'receipt-recording.webm');
+      formData.append('audio', audioBlob, `receipt-recording.${ext}`);
       formData.append('mode', 'receipt');
 
       const apiBase = env.apiBaseUrl || '';
@@ -171,7 +197,7 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
     }
   };
 
-  // Start voice recording (MediaRecorder + WebSpeech fallback)
+  // Start voice recording (single-owner mic on mobile to prevent hardware contention)
   const startListening = useCallback(async () => {
     // Pre-validate quota for non-subscribed users before opening mic
     if (!isSubscribed) {
@@ -196,57 +222,108 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
     setParsedData(null);
     audioChunksRef.current = [];
 
-    // 1. Start MediaRecorder (native audio stream recording)
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
+    const onMobile = isMobileDevice();
+    const preferredFormat = getPreferredRecordingFormat();
+    recordingFormatRef.current = preferredFormat;
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
+    // 1. Start MediaRecorder (native audio stream recording with mobile-safe format)
+    let recorderStarted = false;
+    if (navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined') {
+      try {
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(getHighQualityAudioConstraints());
+        } catch {
+          // Fall back to default audio constraints if browser rejects sampleRate/channelCount
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
-      };
+        mediaStreamRef.current = stream;
 
-      mediaRecorder.onstop = () => {
-        // Stop all tracks
-        stream.getTracks().forEach((track) => track.stop());
-        const mimeType = mediaRecorder.mimeType || 'audio/webm';
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        sendAudioToBackend(audioBlob);
-      };
+        let mediaRecorder;
+        try {
+          mediaRecorder = new MediaRecorder(stream, {
+            mimeType: preferredFormat.mimeType,
+            audioBitsPerSecond: 128000,
+          });
+        } catch {
+          mediaRecorder = new MediaRecorder(stream);
+        }
+        mediaRecorderRef.current = mediaRecorder;
 
-      // Start recording with 100ms timeslice to gather chunks continuously
-      mediaRecorder.start(100);
-      setIsListening(true);
-    } catch (micErr) {
-      console.warn('MediaRecorder mic access error:', micErr);
-      setError('Microphone permission denied or not available. Please allow mic access or type below.');
-      return;
-    }
-
-    // 2. Also start WebSpeech if available for live typing feedback
-    try {
-      const recognition = createWebSpeechRecognition(
-        (text, isFinal) => {
-          if (text) {
-            setInputText(text);
-            if (!isFinal) setInterimTranscript(text);
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
           }
-        },
-        () => {
-          // Ignore WebSpeech errors since MediaRecorder is recording primary audio!
-        },
-        () => {}
-      );
-      if (recognition) {
-        recognitionRef.current = recognition;
-        recognition.start();
+        };
+
+        mediaRecorder.onstop = () => {
+          stream.getTracks().forEach((track) => track.stop());
+          if (mediaStreamRef.current === stream) {
+            mediaStreamRef.current = null;
+          }
+          const rawMime = mediaRecorder.mimeType || preferredFormat.cleanMimeType || 'audio/webm';
+          const cleanMime = rawMime.split(';')[0].trim();
+          const audioBlob = new Blob(audioChunksRef.current, { type: cleanMime });
+          sendAudioToBackend(audioBlob);
+        };
+
+        // On iOS Safari, calling start() without a short timeslice or with 250ms avoids chunk corruption
+        mediaRecorder.start(onMobile ? 250 : 100);
+        setIsListening(true);
+        recorderStarted = true;
+      } catch (micErr) {
+        console.warn('MediaRecorder mic access error:', micErr);
       }
-    } catch (_) {
-      // Ignore WebSpeech start failures
     }
-  }, [processText]);
+
+    // 2. Only run WebSpeech simultaneously on desktop; on mobile only use it as a fallback
+    //    if MediaRecorder failed (e.g. OS screen recorder holding exclusive audio session)
+    if (!onMobile || !recorderStarted) {
+      try {
+        const recognition = createWebSpeechRecognition(
+          (text, isFinal) => {
+            if (text) {
+              setInputText(text);
+              if (!isFinal) {
+                setInterimTranscript(text);
+              } else if (!recorderStarted) {
+                setIsListening(false);
+                processText(text);
+              }
+            }
+          },
+          (err) => {
+            if (!recorderStarted) {
+              setIsListening(false);
+              setError(
+                err?.message === 'not-allowed'
+                  ? 'Microphone permission denied. Please allow mic access or type below.'
+                  : 'Microphone busy (e.g. screen recording mic active). Tap to retry or type your purchase below.'
+              );
+            }
+          },
+          () => {
+            if (!recorderStarted) {
+              setIsListening(false);
+            }
+          }
+        );
+        if (recognition) {
+          recognitionRef.current = recognition;
+          recognition.start();
+          if (!recorderStarted) {
+            setIsListening(true);
+          }
+        } else if (!recorderStarted) {
+          setError('Microphone permission denied or busy. Please allow mic access or type below.');
+        }
+      } catch (_) {
+        if (!recorderStarted) {
+          setError('Microphone unavailable. If screen recording on mobile, turn off the screen recorder mic or type below.');
+        }
+      }
+    }
+  }, [isSubscribed, user?.uid, quotaUsage, openProModal, processText]);
 
   // Stop voice recording
   const stopListening = useCallback(() => {
@@ -255,7 +332,12 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
       try { recognitionRef.current.stop(); } catch (_) {}
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try { mediaRecorderRef.current.stop(); } catch (_) {}
+      try {
+        if (typeof mediaRecorderRef.current.requestData === 'function') {
+          mediaRecorderRef.current.requestData();
+        }
+        mediaRecorderRef.current.stop();
+      } catch (_) {}
     }
   }, []);
 
@@ -433,10 +515,10 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 text-center">
             <div className={`rounded-lg p-2.5 ${parsedData._confidenceIssues?.includes('merchant') ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-primary border border-border'}`}>
               <p className="text-[10px] text-text-muted uppercase">Item</p>
-              <p className={`text-sm font-semibold mt-0.5 ${parsedData._confidenceIssues?.includes('merchant') ? 'text-amber-400' : 'text-text'}`}>{parsedData.description}</p>
+              <p className={`text-sm font-semibold mt-0.5 truncate ${parsedData._confidenceIssues?.includes('merchant') ? 'text-amber-400' : 'text-text'}`}>{parsedData.description}</p>
               {parsedData._confidenceIssues?.includes('merchant') && <p className="text-[9px] text-amber-500 mt-0.5">Needs Review</p>}
             </div>
             <div className={`rounded-lg p-2.5 ${parsedData._confidenceIssues?.includes('amount') ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-primary border border-border'}`}>

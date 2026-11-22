@@ -604,7 +604,7 @@ export default function MarketTrackerTab() {
         </div>
 
         {/* Live Search Box */}
-        <div className="relative min-w-[280px]">
+        <div className="relative w-full sm:w-auto sm:min-w-[280px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
           <input
             type="text"
@@ -801,9 +801,9 @@ export default function MarketTrackerTab() {
 
                 {/* Articles Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {articles.map((art) => (
+                  {articles.map((art, artIdx) => (
                     <div
-                      key={art.id}
+                      key={`${art.id || art.link || 'news'}_${artIdx}`}
                       className="bg-card border border-border hover:border-accent/40 rounded-xl p-4 flex flex-col justify-between space-y-3 transition-colors group"
                     >
                       <div className="space-y-2">

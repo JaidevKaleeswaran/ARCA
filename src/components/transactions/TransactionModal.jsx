@@ -45,14 +45,30 @@ export default function TransactionModal({ isOpen, onClose, transaction = null }
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.categoryId) {
+
+    let targetCategoryId = formData.categoryId;
+
+    // Auto-create a General category if user logs an expense before creating categories
+    if (!targetCategoryId && categories.length === 0) {
+      targetCategoryId = `cat_general_${Date.now()}`;
+      dispatch({
+        type: 'ADD_CATEGORY',
+        payload: {
+          id: targetCategoryId,
+          name: 'General',
+          limit: Math.max(200, Math.round(Number(formData.amount) || 100)),
+          color: '#e7b956',
+          endOfCycleAction: 'none',
+        },
+      });
+    } else if (!targetCategoryId) {
       toast.error('Please select a category');
       return;
     }
 
     const payload = {
       amount: Number(formData.amount),
-      categoryId: formData.categoryId,
+      categoryId: targetCategoryId,
       description: formData.description,
       date: formData.date,
       isSubscription: formData.isSubscription,
@@ -107,9 +123,9 @@ export default function TransactionModal({ isOpen, onClose, transaction = null }
             value={formData.categoryId}
             onChange={handleChange}
             className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
-            required
+            required={categories.length > 0}
           >
-            {categories.length === 0 && <option value="">No categories available</option>}
+            {categories.length === 0 && <option value="">General (Auto-created)</option>}
             {categories.map(cat => (
               <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}

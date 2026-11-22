@@ -6,7 +6,12 @@ import {
 import { env } from '../../config/env';
 import { answerQuery } from '../../services/agents/assistantAgent';
 import { buildFinancialSnapshot } from '../../services/agents/managerAgent';
-import { createWebSpeechRecognition } from '../../services/agents/voiceAgent';
+import {
+  createWebSpeechRecognition,
+  isMobileDevice,
+  getPreferredRecordingFormat,
+  getHighQualityAudioConstraints,
+} from '../../services/agents/voiceAgent';
 import { useBudget } from '../../contexts/BudgetContext';
 import { useAuth } from '../../contexts/AuthContext';
 import VoiceAuditLogModal from './VoiceAuditLogModal';
@@ -121,10 +126,28 @@ export default function AIAssistantTab() {
 
   const chatEndRef = useRef(null);
   const promptMediaRecorderRef = useRef(null);
+  const promptMediaStreamRef = useRef(null);
+  const promptRecordingFormatRef = useRef({ mimeType: 'audio/webm', cleanMimeType: 'audio/webm', extension: 'webm' });
   const promptAudioChunksRef = useRef([]);
   const promptRecognitionRef = useRef(null);
   const welcomeDispatchedRef = useRef(false);
   const hasUserSubmittedRef = useRef(false);
+
+  // Release microphone tracks if tab unmounts while recording
+  useEffect(() => {
+    return () => {
+      if (promptRecognitionRef.current) {
+        try { promptRecognitionRef.current.stop(); } catch (_) {}
+      }
+      if (promptMediaRecorderRef.current && promptMediaRecorderRef.current.state !== 'inactive') {
+        try { promptMediaRecorderRef.current.stop(); } catch (_) {}
+      }
+      if (promptMediaStreamRef.current) {
+        promptMediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        promptMediaStreamRef.current = null;
+      }
+    };
+  }, []);
 
   const handleStartPromptVoice = async () => {
     // Pre-validate voice quota for non-subscribed users before starting recording
@@ -145,52 +168,102 @@ export default function AIAssistantTab() {
       }
     }
 
-    setIsVoicePrompting(true);
     promptAudioChunksRef.current = [];
+    const onMobile = isMobileDevice();
+    const preferredFormat = getPreferredRecordingFormat();
+    promptRecordingFormatRef.current = preferredFormat;
 
-    // 1. Web Speech API for real-time live typing feedback
-    try {
-      const recognition = createWebSpeechRecognition(
-        (text) => {
-          if (text) {
-            setInputQuery(text);
-          }
-        },
-        (err) => {
-          console.warn('[AI Prompt Voice] WebSpeech event warning:', err);
-        },
-        () => {}
-      );
-      if (recognition) {
-        promptRecognitionRef.current = recognition;
-        recognition.start();
-      }
-    } catch (_) {}
-
-    // 2. Native MediaRecorder for full audio recording + transcription
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      promptMediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          promptAudioChunksRef.current.push(e.data);
+    // 1. Native MediaRecorder for full audio recording + transcription (mobile-safe MIME format)
+    let recorderStarted = false;
+    if (navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined') {
+      try {
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(getHighQualityAudioConstraints());
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
-      };
+        promptMediaStreamRef.current = stream;
 
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop());
-        const mimeType = mediaRecorder.mimeType || 'audio/webm';
-        const audioBlob = new Blob(promptAudioChunksRef.current, { type: mimeType });
-        await handleTranscribeAndPromptAI(audioBlob);
-      };
+        let mediaRecorder;
+        try {
+          mediaRecorder = new MediaRecorder(stream, {
+            mimeType: preferredFormat.mimeType,
+            audioBitsPerSecond: 128000,
+          });
+        } catch {
+          mediaRecorder = new MediaRecorder(stream);
+        }
+        promptMediaRecorderRef.current = mediaRecorder;
 
-      mediaRecorder.start(100);
-    } catch (err) {
-      console.warn('[AI Prompt Voice] Mic access error:', err);
-      setIsVoicePrompting(false);
-      toast.error('Microphone permission denied or not available. Please allow mic access or type below.');
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            promptAudioChunksRef.current.push(e.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          stream.getTracks().forEach((track) => track.stop());
+          if (promptMediaStreamRef.current === stream) {
+            promptMediaStreamRef.current = null;
+          }
+          const rawMime = mediaRecorder.mimeType || preferredFormat.cleanMimeType || 'audio/webm';
+          const cleanMime = rawMime.split(';')[0].trim();
+          const audioBlob = new Blob(promptAudioChunksRef.current, { type: cleanMime });
+          await handleTranscribeAndPromptAI(audioBlob);
+        };
+
+        mediaRecorder.start(onMobile ? 250 : 100);
+        setIsVoicePrompting(true);
+        recorderStarted = true;
+      } catch (err) {
+        console.warn('[AI Prompt Voice] Mic access error:', err);
+      }
+    }
+
+    // 2. Only run Web Speech simultaneously on desktop; on mobile use it only as fallback
+    //    so iOS/Android never have two APIs fighting over the hardware microphone
+    if (!onMobile || !recorderStarted) {
+      try {
+        const recognition = createWebSpeechRecognition(
+          (text, isFinal) => {
+            if (text) {
+              setInputQuery(text);
+              if (isFinal && !recorderStarted) {
+                setIsVoicePrompting(false);
+                handleSendQuery(text);
+              }
+            }
+          },
+          (err) => {
+            console.warn('[AI Prompt Voice] WebSpeech event warning:', err);
+            if (!recorderStarted) {
+              setIsVoicePrompting(false);
+              toast.error('Microphone busy or unavailable. Try again or type your question.');
+            }
+          },
+          () => {
+            if (!recorderStarted) {
+              setIsVoicePrompting(false);
+            }
+          }
+        );
+        if (recognition) {
+          promptRecognitionRef.current = recognition;
+          recognition.start();
+          if (!recorderStarted) {
+            setIsVoicePrompting(true);
+          }
+        } else if (!recorderStarted) {
+          setIsVoicePrompting(false);
+          toast.error('Microphone permission denied or busy. Please allow mic access or type below.');
+        }
+      } catch (_) {
+        if (!recorderStarted) {
+          setIsVoicePrompting(false);
+          toast.error('Microphone permission denied or busy. Please allow mic access or type below.');
+        }
+      }
     }
   };
 
@@ -203,7 +276,9 @@ export default function AIAssistantTab() {
 
     if (promptMediaRecorderRef.current && promptMediaRecorderRef.current.state !== 'inactive') {
       try {
-        promptMediaRecorderRef.current.requestData();
+        if (typeof promptMediaRecorderRef.current.requestData === 'function') {
+          promptMediaRecorderRef.current.requestData();
+        }
         promptMediaRecorderRef.current.stop();
       } catch (_) {}
     }
@@ -215,8 +290,9 @@ export default function AIAssistantTab() {
     if (audioBlob && audioBlob.size > 100) {
       setIsTranscribingPrompt(true);
       try {
+        const ext = promptRecordingFormatRef.current?.extension || (audioBlob.type.includes('mp4') ? 'm4a' : 'webm');
         const formData = new FormData();
-        formData.append('audio', audioBlob, 'prompt-recording.webm');
+        formData.append('audio', audioBlob, `prompt-recording.${ext}`);
         formData.append('mode', 'prompt');
 
         const apiBase = env.apiBaseUrl || '';
@@ -413,7 +489,7 @@ export default function AIAssistantTab() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {budgetState.isSubscribed ? (
               <span className="text-[11px] bg-accent/20 text-accent font-semibold px-3 py-1 rounded-full border border-accent/40 flex items-center gap-1.5 shadow-sm">
                 ARCA Pro • Unlimited
@@ -441,7 +517,7 @@ export default function AIAssistantTab() {
               className="text-xs bg-card-hover hover:bg-card text-zinc-300 border border-border px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
               title="Inspect voice transcripts & logs"
             >
-              <ShieldCheck size={13} className="text-accent" />
+              <ShieldCheck size={13} className="text-accent shrink-0" />
               <span>Voice Logs</span>
             </button>
 

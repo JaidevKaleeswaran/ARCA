@@ -25,16 +25,12 @@ import StackedProModal from '../components/ui/StackedProModal';
 
 export { getStorageKey };
 
-// Default fallback state
+// Default fallback state — no hardcoded initial categories so users start with a clean zero-based slate
 const defaultState = {
   incomeSources: [],
   cycleStartDate: null, // ISO date string — anchor for pay-cycle window
   cycleFrequency: 'monthly', // The master cycle the budget operates on
-  categories: [
-    { id: '1', name: 'Bills', limit: 1000, color: '#e7b956', endOfCycleAction: 'none' },
-    { id: '2', name: 'Groceries', limit: 400, color: '#2e5b45', endOfCycleAction: 'none' },
-    { id: '3', name: 'Entertainment', limit: 200, color: '#8c6d37', endOfCycleAction: 'none' },
-  ],
+  categories: [],
   transactions: [],
   investments: [], // User stock portfolio holdings
   voiceLogs: [],
@@ -433,11 +429,8 @@ function internalBudgetReducer(state, action) {
         if (tx?.id) txMap.set(tx.id, tx);
       });
 
-      // Merge categories by normalized name
+      // Merge categories by normalized name (never re-inject deleted or default categories)
       const catMap = new Map();
-      (defaultState.categories || []).forEach((cat) => {
-        if (cat?.name) catMap.set(cat.name.trim().toLowerCase(), cat);
-      });
       (state?.categories || []).forEach((cat) => {
         if (cat?.name) catMap.set(cat.name.trim().toLowerCase(), cat);
       });

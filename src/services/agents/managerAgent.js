@@ -170,8 +170,25 @@ export async function processTransaction({ description, amount, date, merchant, 
     suggestedCategory = await aiCategorize(merchantOrDesc, txAmount, categoryNames);
   }
 
-  // Step 3: Match to user's actual category IDs
-  const categoryId = matchToUserCategory(suggestedCategory || 'General', categories);
+  // Step 3: Match to user's actual category IDs (auto-create category if none exist yet)
+  let categoryId = matchToUserCategory(suggestedCategory || 'General', categories);
+  let matchedCategoryName = categories.find(c => c.id === categoryId)?.name;
+
+  if (!categoryId) {
+    const newCatName = suggestedCategory || 'General';
+    categoryId = `cat_${newCatName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`;
+    matchedCategoryName = newCatName;
+    dispatch({
+      type: 'ADD_CATEGORY',
+      payload: {
+        id: categoryId,
+        name: newCatName,
+        limit: Math.max(200, Math.round(txAmount || 100)),
+        color: '#e7b956',
+        endOfCycleAction: 'none',
+      },
+    });
+  }
 
   // Step 4: Build and dispatch the transaction
   const txId = `tx_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
@@ -199,7 +216,7 @@ export async function processTransaction({ description, amount, date, merchant, 
         merchant: merchantOrDesc,
         amount: txAmount,
         date: txDate,
-        category: categories.find(c => c.id === categoryId)?.name || 'General',
+        category: matchedCategoryName || 'General',
       },
       transactionId: txId,
       source: 'elevenlabs_conversational_voice',
@@ -209,12 +226,11 @@ export async function processTransaction({ description, amount, date, merchant, 
   }
 
   // Return the processed transaction info
-  const matchedCategory = categories.find(c => c.id === categoryId);
   return {
     success: true,
     transaction,
-    category: matchedCategory?.name || 'Unknown',
-    message: `Added $${txAmount.toFixed(2)} for "${merchantOrDesc}" under ${matchedCategory?.name || 'General'}`,
+    category: matchedCategoryName || 'General',
+    message: `Added $${txAmount.toFixed(2)} for "${merchantOrDesc}" under ${matchedCategoryName || 'General'}`,
   };
 }
 

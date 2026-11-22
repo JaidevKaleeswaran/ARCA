@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { parseSpokenReceipt, createVoiceLogEntry } from '../../src/services/agents/voiceAgent.js';
+import {
+  parseSpokenReceipt,
+  createVoiceLogEntry,
+  getPreferredRecordingFormat,
+  getHighQualityAudioConstraints,
+} from '../../src/services/agents/voiceAgent.js';
 
 describe('Voice Agent — Speech Parsing & Transaction Extraction', () => {
   it('parses spoken dollar amounts with currency symbols ("$15 at Starbucks")', () => {
@@ -46,5 +51,20 @@ describe('Voice Agent — Speech Parsing & Transaction Extraction', () => {
     expect(log).toHaveProperty('rawTranscript', 'Spent $30 on gas');
     expect(log.extracted.amount).toBe(30);
     expect(log.transactionId).toBe('tx-123');
+  });
+
+  it('returns valid mobile-safe recording format and high-quality audio constraints', () => {
+    const format = getPreferredRecordingFormat();
+    expect(format).toHaveProperty('mimeType');
+    expect(format).toHaveProperty('cleanMimeType');
+    expect(format).toHaveProperty('extension');
+    expect(format.cleanMimeType).not.toContain(';');
+
+    const constraints = getHighQualityAudioConstraints();
+    expect(constraints.audio).toMatchObject({
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    });
   });
 });
