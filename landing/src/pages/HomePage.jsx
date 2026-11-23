@@ -6,6 +6,7 @@ import {
   Brain,
   ArrowRight
 } from 'lucide-react';
+import SpotlightCard from '../components/SpotlightCard';
 
 export default function HomePage({ navigate, appUrl }) {
   // Mini interactive demo state for the zero-based visualizer
@@ -74,7 +75,7 @@ export default function HomePage({ navigate, appUrl }) {
 
       {/* ── 2. Interactive Zero-Based Allocator (Yellow & Black Theme) ── */}
       <section className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
-        <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl">
+        <SpotlightCard className="p-6 sm:p-8 space-y-6 shadow-xl">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-5">
             <div>
@@ -215,7 +216,7 @@ export default function HomePage({ navigate, appUrl }) {
               />
             </div>
           </div>
-        </div>
+        </SpotlightCard>
       </section>
 
       {/* ── 3. Core Architecture ── */}
@@ -228,7 +229,7 @@ export default function HomePage({ navigate, appUrl }) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-card border border-border hover:border-accent/60 rounded-xl p-6 space-y-3 transition-colors">
+          <SpotlightCard className="hover:border-accent/60 rounded-xl p-6 space-y-3 transition-colors">
             <span className="text-xs font-mono text-accent">01 / METHOD</span>
             <div className="flex items-center space-x-2">
               <Layers size={18} className="text-accent" />
@@ -237,9 +238,9 @@ export default function HomePage({ navigate, appUrl }) {
             <p className="text-xs text-text-muted leading-relaxed">
               Every dollar is assigned to an envelope upon paycheck receipt. Spending occurs from allocated buckets, not ambiguous checking account totals.
             </p>
-          </div>
+          </SpotlightCard>
 
-          <div className="bg-card border border-border hover:border-accent/60 rounded-xl p-6 space-y-3 transition-colors">
+          <SpotlightCard className="hover:border-accent/60 rounded-xl p-6 space-y-3 transition-colors">
             <span className="text-xs font-mono text-accent">02 / SPEED</span>
             <div className="flex items-center space-x-2">
               <Brain size={18} className="text-accent" />
@@ -248,9 +249,9 @@ export default function HomePage({ navigate, appUrl }) {
             <p className="text-xs text-text-muted leading-relaxed">
               Log expenditures instantly through voice dictation, camera receipt capture, or manual input with intelligent category matching.
             </p>
-          </div>
+          </SpotlightCard>
 
-          <div className="bg-card border border-border hover:border-accent/60 rounded-xl p-6 space-y-3 transition-colors">
+          <SpotlightCard className="hover:border-accent/60 rounded-xl p-6 space-y-3 transition-colors">
             <span className="text-xs font-mono text-accent">03 / FLOW</span>
             <div className="flex items-center space-x-2">
               <Repeat size={18} className="text-accent" />
@@ -259,13 +260,13 @@ export default function HomePage({ navigate, appUrl }) {
             <p className="text-xs text-text-muted leading-relaxed">
               Cycles archive automatically on pay schedules. Unspent funds roll over to designated targets or reset for clean new periods.
             </p>
-          </div>
+          </SpotlightCard>
         </div>
       </section>
 
       {/* ── 4. Narrative Teasers ── */}
       <section className="px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-card border border-border hover:border-accent/60 rounded-xl p-6 sm:p-8 flex flex-col justify-between space-y-6 transition-colors">
+        <SpotlightCard className="hover:border-accent/60 rounded-xl p-6 sm:p-8 flex flex-col justify-between space-y-6 transition-colors">
           <div className="space-y-3">
             <span className="text-xs font-mono uppercase tracking-wider text-accent">Origin</span>
             <h3 className="text-lg font-semibold text-white">Why We Made ARCA</h3>
@@ -282,9 +283,9 @@ export default function HomePage({ navigate, appUrl }) {
               <ArrowRight size={14} />
             </button>
           </div>
-        </div>
+        </SpotlightCard>
 
-        <div className="bg-card border border-border hover:border-accent/60 rounded-xl p-6 sm:p-8 flex flex-col justify-between space-y-6 transition-colors">
+        <SpotlightCard className="hover:border-accent/60 rounded-xl p-6 sm:p-8 flex flex-col justify-between space-y-6 transition-colors">
           <div className="space-y-3">
             <span className="text-xs font-mono uppercase tracking-wider text-accent">Principles</span>
             <h3 className="text-lg font-semibold text-white">About the Team</h3>
@@ -301,12 +302,12 @@ export default function HomePage({ navigate, appUrl }) {
               <ArrowRight size={14} />
             </button>
           </div>
-        </div>
+        </SpotlightCard>
       </section>
 
       {/* ── 5. Bottom Call-to-Action ── */}
       <section className="px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto text-center">
-        <div className="border border-accent/40 rounded-2xl p-8 sm:p-12 space-y-5 bg-card">
+        <SpotlightCard className="border-accent/40 p-8 sm:p-12 space-y-5">
           <h2 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
             Ready to balance your first cycle?
           </h2>
@@ -324,7 +325,7 @@ export default function HomePage({ navigate, appUrl }) {
               <ArrowUpRight size={15} />
             </a>
           </div>
-        </div>
+        </SpotlightCard>
       </section>
     </div>
   );
