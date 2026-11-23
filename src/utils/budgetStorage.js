@@ -51,7 +51,6 @@ export function getTimestampMs(value) {
  */
 export function buildFirestoreBudgetPayload(state, uid, { includeCreatedAt = false } = {}) {
   const safeState = state || {};
-  const isSubscribed = Boolean(safeState.isSubscribed);
 
   const payload = {
     transactions: Array.isArray(safeState.transactions) ? safeState.transactions : [],
@@ -63,8 +62,8 @@ export function buildFirestoreBudgetPayload(state, uid, { includeCreatedAt = fal
     voiceLogs: Array.isArray(safeState.voiceLogs) ? safeState.voiceLogs : [],
     chatMessages: Array.isArray(safeState.chatMessages) ? safeState.chatMessages : [],
     quotaUsage: normalizeQuotaState(safeState.quotaUsage),
-    isSubscribed,
-    subscriptionPlan: safeState.subscriptionPlan || (isSubscribed ? 'pro' : 'free'),
+    isSubscribed: false,
+    subscriptionPlan: 'free',
     uid,
     userId: uid,
     updatedAt: safeState.updatedAt || new Date().toISOString(),

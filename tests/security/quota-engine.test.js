@@ -80,36 +80,36 @@ describe('Quota Engine & Deterministic Reset', () => {
     expect(res.used).toBe(4);
   });
 
-  it('checkAndIncrementQuota grants unlimited access when isSubscribed is true across all features', async () => {
+  it('checkAndIncrementQuota permanently enforces weekly caps even if isSubscribed is passed as true', async () => {
     const maxedState = {
       weekStartDate: getMondayOfCurrentWeekISO(),
-      receiptsUsed: 50,
-      voiceUsed: 50,
-      assistantUsed: 50,
+      receiptsUsed: QUOTA_LIMITS.receipts,
+      voiceUsed: QUOTA_LIMITS.voice,
+      assistantUsed: QUOTA_LIMITS.assistant,
     };
 
     const resAssistant = await checkAndIncrementQuota('sub_user', 'assistant', maxedState, {
       skipIncrement: true,
       isSubscribed: true,
     });
-    expect(resAssistant.allowed).toBe(true);
-    expect(resAssistant.isSubscribed).toBe(true);
-    expect(resAssistant.limit).toBe(Infinity);
+    expect(resAssistant.allowed).toBe(false);
+    expect(resAssistant.reason).toBe('QUOTA_EXHAUSTED');
+    expect(resAssistant.limit).toBe(QUOTA_LIMITS.assistant);
 
     const resVoice = await checkAndIncrementQuota('sub_user', 'voice', maxedState, {
       skipIncrement: true,
       isSubscribed: true,
     });
-    expect(resVoice.allowed).toBe(true);
-    expect(resVoice.isSubscribed).toBe(true);
-    expect(resVoice.limit).toBe(Infinity);
+    expect(resVoice.allowed).toBe(false);
+    expect(resVoice.reason).toBe('QUOTA_EXHAUSTED');
+    expect(resVoice.limit).toBe(QUOTA_LIMITS.voice);
 
     const resReceipts = await checkAndIncrementQuota('sub_user', 'receipts', maxedState, {
       skipIncrement: true,
       isSubscribed: true,
     });
-    expect(resReceipts.allowed).toBe(true);
-    expect(resReceipts.isSubscribed).toBe(true);
-    expect(resReceipts.limit).toBe(Infinity);
+    expect(resReceipts.allowed).toBe(false);
+    expect(resReceipts.reason).toBe('QUOTA_EXHAUSTED');
+    expect(resReceipts.limit).toBe(QUOTA_LIMITS.receipts);
   });
 });

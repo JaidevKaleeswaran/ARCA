@@ -82,26 +82,15 @@ export function normalizeQuotaState(quotaState = {}) {
 
 /**
  * Checks feature quota availability and optionally executes an atomic dot-notation Firestore increment.
+ * Subscriptions are disabled — all users are permanently capped at QUOTA_LIMITS per week.
  *
  * @param {string} uid - User ID
  * @param {'receipts' | 'voice' | 'assistant'} feature - Feature being used
  * @param {Object} currentQuotaState - State from BudgetContext
- * @param {Object} options - Options ({ skipIncrement: boolean, isSubscribed: boolean })
- * @returns {Promise<{ allowed: boolean, isSubscribed?: boolean, reason?: string, limit: number, used: number, resetCountdown: string }>}
+ * @param {Object} options - Options ({ skipIncrement: boolean })
+ * @returns {Promise<{ allowed: boolean, reason?: string, limit: number, used: number, resetCountdown: string }>}
  */
-export async function checkAndIncrementQuota(uid, feature, currentQuotaState = {}, { skipIncrement = false, isSubscribed = false } = {}) {
-  const hasSubscription = isSubscribed === true || currentQuotaState?.isSubscribed === true;
-  if (hasSubscription) {
-    return {
-      allowed: true,
-      isSubscribed: true,
-      feature,
-      limit: Infinity,
-      used: currentQuotaState?.[`${feature}Used`] || 0,
-      resetCountdown: '',
-    };
-  }
-
+export async function checkAndIncrementQuota(uid, feature, currentQuotaState = {}, { skipIncrement = false } = {}) {
   const normalized = normalizeQuotaState(currentQuotaState);
   const currentMondayISO = normalized.weekStartDate;
   const isStale = !currentQuotaState || currentQuotaState.weekStartDate !== currentMondayISO;

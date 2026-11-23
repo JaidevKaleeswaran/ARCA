@@ -11,7 +11,7 @@ import { Upload, Loader2, CheckCircle2, FileText, AlertCircle, Volume2 } from 'l
 
 export default function ReceiptScannerModal({ isOpen, onClose }) {
   const budgetState = useBudget();
-  const { categories, dispatch, quotaUsage, openProModal, updateQuota, isSubscribed } = budgetState;
+  const { categories, dispatch, quotaUsage, openProModal, updateQuota } = budgetState;
   const { user } = useAuth();
   
   const fileInputRef = useRef(null);
@@ -76,22 +76,19 @@ export default function ReceiptScannerModal({ isOpen, onClose }) {
       return;
     }
 
-    // Pre-validate quota for non-subscribed users before dispatching API request
-    if (!isSubscribed) {
-      const quotaCheck = await checkAndIncrementQuota(user?.uid, 'receipts', quotaUsage, {
-        skipIncrement: true,
-        isSubscribed: Boolean(isSubscribed),
+    // Pre-validate receipt quota before dispatching API request
+    const quotaCheck = await checkAndIncrementQuota(user?.uid, 'receipts', quotaUsage, {
+      skipIncrement: true,
+    });
+    if (!quotaCheck.allowed) {
+      openProModal({
+        reason: 'QUOTA_EXHAUSTED',
+        feature: 'receipts',
+        used: quotaCheck.used,
+        limit: quotaCheck.limit,
+        resetCountdown: quotaCheck.resetCountdown,
       });
-      if (!quotaCheck.allowed) {
-        openProModal({
-          reason: 'QUOTA_EXHAUSTED',
-          feature: 'receipts',
-          used: quotaCheck.used,
-          limit: quotaCheck.limit,
-          resetCountdown: quotaCheck.resetCountdown,
-        });
-        return;
-      }
+      return;
     }
 
     setIsScanning(true);

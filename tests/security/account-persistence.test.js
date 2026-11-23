@@ -76,8 +76,8 @@ describe('Account Data Persistence & Firestore Rules Schema Parity', () => {
     expect(updatePayload.createdAt).toBeUndefined();
     expect(updatePayload.uid).toBe('usr_abc');
     expect(updatePayload.userId).toBe('usr_abc');
-    expect(updatePayload.isSubscribed).toBe(true);
-    expect(updatePayload.subscriptionPlan).toBe('pro');
+    expect(updatePayload.isSubscribed).toBe(false);
+    expect(updatePayload.subscriptionPlan).toBe('free');
 
     const createPayload = buildFirestoreBudgetPayload(dirtyState, 'usr_abc', { includeCreatedAt: true });
     expect(typeof createPayload.createdAt).toBe('string');

@@ -150,22 +150,19 @@ export default function AIAssistantTab() {
   }, []);
 
   const handleStartPromptVoice = async () => {
-    // Pre-validate voice quota for non-subscribed users before starting recording
-    if (!budgetState.isSubscribed) {
-      const quotaCheck = await checkAndIncrementQuota(user?.uid, 'voice', budgetState.quotaUsage, {
-        skipIncrement: true,
-        isSubscribed: Boolean(budgetState.isSubscribed),
+    // Pre-validate voice quota before starting recording
+    const quotaCheck = await checkAndIncrementQuota(user?.uid, 'voice', budgetState.quotaUsage, {
+      skipIncrement: true,
+    });
+    if (!quotaCheck.allowed) {
+      budgetState.openProModal({
+        reason: 'QUOTA_EXHAUSTED',
+        feature: 'voice',
+        used: quotaCheck.used,
+        limit: quotaCheck.limit,
+        resetCountdown: quotaCheck.resetCountdown,
       });
-      if (!quotaCheck.allowed) {
-        budgetState.openProModal({
-          reason: 'QUOTA_EXHAUSTED',
-          feature: 'voice',
-          used: quotaCheck.used,
-          limit: quotaCheck.limit,
-          resetCountdown: quotaCheck.resetCountdown,
-        });
-        return;
-      }
+      return;
     }
 
     promptAudioChunksRef.current = [];
@@ -377,22 +374,19 @@ export default function AIAssistantTab() {
     const query = (queryToRun || inputQuery).trim();
     if (!query || isProcessing) return;
 
-    // Pre-validate quota for non-subscribed users
-    if (!budgetState.isSubscribed) {
-      const quotaCheck = await checkAndIncrementQuota(user?.uid, 'assistant', budgetState.quotaUsage, {
-        skipIncrement: true,
-        isSubscribed: Boolean(budgetState.isSubscribed),
+    // Pre-validate assistant quota
+    const quotaCheck = await checkAndIncrementQuota(user?.uid, 'assistant', budgetState.quotaUsage, {
+      skipIncrement: true,
+    });
+    if (!quotaCheck.allowed) {
+      budgetState.openProModal({
+        reason: 'QUOTA_EXHAUSTED',
+        feature: 'assistant',
+        used: quotaCheck.used,
+        limit: quotaCheck.limit,
+        resetCountdown: quotaCheck.resetCountdown,
       });
-      if (!quotaCheck.allowed) {
-        budgetState.openProModal({
-          reason: 'QUOTA_EXHAUSTED',
-          feature: 'assistant',
-          used: quotaCheck.used,
-          limit: quotaCheck.limit,
-          resetCountdown: quotaCheck.resetCountdown,
-        });
-        return;
-      }
+      return;
     }
 
     hasUserSubmittedRef.current = true;
@@ -425,9 +419,7 @@ export default function AIAssistantTab() {
         return;
       }
 
-      if (!budgetState.isSubscribed) {
-        await budgetState.updateQuota('assistant');
-      }
+      await budgetState.updateQuota('assistant');
 
       const aiMsg = {
         id: `ai_${Date.now()}`,
@@ -490,26 +482,20 @@ export default function AIAssistantTab() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {budgetState.isSubscribed ? (
-              <span className="text-[11px] bg-accent/20 text-accent font-semibold px-3 py-1 rounded-full border border-accent/40 flex items-center gap-1.5 shadow-sm">
-                ARCA Pro • Unlimited
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => budgetState.openProModal({
-                  reason: 'QUOTA_EXHAUSTED',
-                  feature: 'assistant',
-                  used: assistantUsed,
-                  limit: QUOTA_LIMITS.assistant,
-                  resetCountdown: getNextMondayCountdown(),
-                })}
-                className="text-[11px] bg-accent/15 hover:bg-accent/25 text-accent font-semibold px-3 py-1 rounded-full border border-accent/30 flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-                title="Weekly AI Assistant Quota"
-              >
-                {remainingQueries}/{QUOTA_LIMITS.assistant} queries left • Resets Mon
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => budgetState.openProModal({
+                reason: 'QUOTA_EXHAUSTED',
+                feature: 'assistant',
+                used: assistantUsed,
+                limit: QUOTA_LIMITS.assistant,
+                resetCountdown: getNextMondayCountdown(),
+              })}
+              className="text-[11px] bg-accent/15 hover:bg-accent/25 text-accent font-semibold px-3 py-1 rounded-full border border-accent/30 flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              title="Weekly AI Assistant Quota"
+            >
+              {remainingQueries}/{QUOTA_LIMITS.assistant} queries left • Resets Mon
+            </button>
 
             <button
               type="button"

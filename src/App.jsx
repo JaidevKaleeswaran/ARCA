@@ -11,7 +11,6 @@ import VerifyEmailPage from './components/auth/VerifyEmailPage';
 import { useCycleCheck } from './hooks/useCycleCheck';
 import { useFirebaseSync } from './hooks/useFirebaseSync';
 import { useAuth } from './contexts/AuthContext';
-import { useBudget } from './contexts/BudgetContext';
 import { LogOut, HelpCircle, ExternalLink } from 'lucide-react';
 import Logo from './components/ui/Logo';
 import { env } from './config/env';
@@ -22,7 +21,6 @@ function MainApp() {
   useCycleCheck();
   useFirebaseSync();
   const { user, logout } = useAuth();
-  const { isSubscribed, openProModal } = useBudget();
   const { startTutorial } = useTutorial();
   const [activeTab, setActiveTab] = useState('home');
 
@@ -77,21 +75,6 @@ function MainApp() {
                     <span className="text-[9px] sm:text-[10px] bg-card-hover text-zinc-400 px-1.5 py-0.2 rounded shrink-0">Guest</span>
                   )}
                 </div>
-
-                {isSubscribed ? (
-                  <span className="text-[10px] font-bold uppercase tracking-wider bg-accent/20 text-accent border border-accent/40 px-2.5 py-1 rounded-full flex items-center shadow-sm shrink-0">
-                    PRO
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => openProModal({ reason: 'UPGRADE' })}
-                    className="text-[10px] font-bold uppercase tracking-wider bg-accent/15 hover:bg-accent/25 text-accent border border-accent/30 px-2.5 py-1 rounded-full transition-colors flex items-center shrink-0 cursor-pointer"
-                    title="Upgrade to ARCA Pro"
-                  >
-                    Upgrade
-                  </button>
-                )}
 
                 <button
                   type="button"

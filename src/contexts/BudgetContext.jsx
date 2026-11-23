@@ -106,8 +106,8 @@ function sanitizeState(state) {
     investments: Array.isArray(state.investments) ? state.investments : [],
     chatMessages: cleanedMessages,
     quotaUsage: normalizeQuotaState(state?.quotaUsage),
-    isSubscribed: Boolean(state?.isSubscribed),
-    subscriptionPlan: state?.subscriptionPlan || 'free',
+    isSubscribed: false,
+    subscriptionPlan: 'free',
     updatedAt: state?.updatedAt || null,
   };
 }
@@ -504,8 +504,8 @@ function internalBudgetReducer(state, action) {
         voiceLogs: Array.isArray(incoming.voiceLogs) ? incoming.voiceLogs : [],
         chatMessages: Array.isArray(incoming.chatMessages) ? incoming.chatMessages : [],
         quotaUsage: normalizeQuotaState(incoming.quotaUsage),
-        isSubscribed: Boolean(incoming.isSubscribed),
-        subscriptionPlan: incoming.subscriptionPlan || (incoming.isSubscribed ? 'pro' : 'free'),
+        isSubscribed: false,
+        subscriptionPlan: 'free',
         updatedAt: incoming.updatedAt || null,
         _sessionKey: sessionKey,
       });
@@ -521,10 +521,11 @@ function internalBudgetReducer(state, action) {
       };
     }
     case 'UPDATE_SUBSCRIPTION': {
+      // Subscriptions are disabled; all accounts remain permanently on the capped tier.
       return {
         ...state,
-        isSubscribed: Boolean(action.payload.isSubscribed),
-        subscriptionPlan: action.payload.plan || (action.payload.isSubscribed ? 'pro' : 'free'),
+        isSubscribed: false,
+        subscriptionPlan: 'free',
       };
     }
     case 'RESET_STATE':
@@ -588,20 +589,9 @@ export function BudgetProvider({ children }) {
     setProModalConfig(prev => ({ ...prev, isOpen: false }));
   };
 
-  const subscribeToPro = async (plan = 'pro') => {
-    dispatch({
-      type: 'UPDATE_SUBSCRIPTION',
-      payload: { isSubscribed: true, plan },
-    });
-    if (db && user && user.uid && !user.isGuest) {
-      try {
-        const docRef = doc(db, 'users', user.uid, 'budgetData', 'main');
-        await setDoc(docRef, { isSubscribed: true, subscriptionPlan: plan, updatedAt: new Date().toISOString() }, { merge: true });
-      } catch (err) {
-        console.warn('[BudgetContext] Firestore subscribe update failed:', err);
-      }
-    }
-    return { success: true };
+  const subscribeToPro = async () => {
+    // Subscriptions are disabled — users remain permanently capped at QUOTA_LIMITS.
+    return { success: false, blocked: true, message: 'Subscriptions are unavailable.' };
   };
 
   const cancelProSubscription = async () => {
@@ -623,9 +613,8 @@ export function BudgetProvider({ children }) {
   const updateQuota = async (feature, skipIncrement = false) => {
     const result = await checkAndIncrementQuota(user?.uid, feature, state.quotaUsage, {
       skipIncrement,
-      isSubscribed: state.isSubscribed,
     });
-    if (!skipIncrement && result.allowed && !state.isSubscribed) {
+    if (!skipIncrement && result.allowed) {
       dispatch({
         type: 'UPDATE_QUOTA_USAGE',
         payload: {

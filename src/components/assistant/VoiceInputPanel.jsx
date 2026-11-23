@@ -22,7 +22,7 @@ import { checkAndIncrementQuota, QUOTA_LIMITS, getNextMondayCountdown } from '..
  * 3. Direct natural language text entry
  */
 export default function VoiceInputPanel({ onTransactionReady, onClose }) {
-  const { quotaUsage, openProModal, updateQuota, isSubscribed } = useBudget();
+  const { quotaUsage, openProModal, updateQuota } = useBudget();
   const { user } = useAuth();
 
   const [inputText, setInputText] = useState('');
@@ -199,22 +199,19 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
 
   // Start voice recording (single-owner mic on mobile to prevent hardware contention)
   const startListening = useCallback(async () => {
-    // Pre-validate quota for non-subscribed users before opening mic
-    if (!isSubscribed) {
-      const quotaCheck = await checkAndIncrementQuota(user?.uid, 'voice', quotaUsage, {
-        skipIncrement: true,
-        isSubscribed: Boolean(isSubscribed),
+    // Pre-validate voice quota before opening mic
+    const quotaCheck = await checkAndIncrementQuota(user?.uid, 'voice', quotaUsage, {
+      skipIncrement: true,
+    });
+    if (!quotaCheck.allowed) {
+      openProModal({
+        reason: 'QUOTA_EXHAUSTED',
+        feature: 'voice',
+        used: quotaCheck.used,
+        limit: quotaCheck.limit,
+        resetCountdown: quotaCheck.resetCountdown,
       });
-      if (!quotaCheck.allowed) {
-        openProModal({
-          reason: 'QUOTA_EXHAUSTED',
-          feature: 'voice',
-          used: quotaCheck.used,
-          limit: quotaCheck.limit,
-          resetCountdown: quotaCheck.resetCountdown,
-        });
-        return;
-      }
+      return;
     }
 
     setError(null);
@@ -323,7 +320,7 @@ export default function VoiceInputPanel({ onTransactionReady, onClose }) {
         }
       }
     }
-  }, [isSubscribed, user?.uid, quotaUsage, openProModal, processText]);
+  }, [user?.uid, quotaUsage, openProModal, processText]);
 
   // Stop voice recording
   const stopListening = useCallback(() => {
