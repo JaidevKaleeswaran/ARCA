@@ -17,7 +17,6 @@ import Logo from './components/ui/Logo';
 import { env } from './config/env';
 import { TutorialProvider, useTutorial } from './components/tutorial/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
-import CursorGleam from './components/ui/CursorGleam';
 
 function MainApp() {
   useCycleCheck();
@@ -157,7 +156,6 @@ export default function App() {
           },
         }}
       />
-      <CursorGleam />
       <MainApp />
     </TutorialProvider>
   );
