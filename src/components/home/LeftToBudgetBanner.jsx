@@ -54,7 +54,7 @@ export default function LeftToBudgetBanner({ onAddExpense }) {
               : formatCurrency(remainingToSpend)}
           </span>
           <span className="text-2xl font-bold tracking-tight text-zinc-400">
-            // {formatCurrency(effectiveBudget)}
+            / {formatCurrency(effectiveBudget)}
           </span>
         </div>
 

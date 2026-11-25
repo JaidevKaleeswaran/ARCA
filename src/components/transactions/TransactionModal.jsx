@@ -3,13 +3,21 @@ import { Modal } from '../ui/Modal';
 import { useBudget } from '../../contexts/BudgetContext';
 import toast from 'react-hot-toast';
 
+function getLocalTodayISO() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export default function TransactionModal({ isOpen, onClose, transaction = null }) {
   const { categories, dispatch } = useBudget();
   const [formData, setFormData] = useState({
     amount: '',
     categoryId: '',
     description: '',
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalTodayISO(),
     isSubscription: false,
   });
 
@@ -30,7 +38,7 @@ export default function TransactionModal({ isOpen, onClose, transaction = null }
           amount: '',
           categoryId: categories.length > 0 ? categories[0].id : '',
           description: '',
-          date: new Date().toISOString().split('T')[0],
+          date: getLocalTodayISO(),
           isSubscription: false,
         });
       }

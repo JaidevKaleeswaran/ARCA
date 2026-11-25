@@ -194,7 +194,7 @@ function MobileCategoryWidget({
         </div>
 
         <div className="mt-1.5 text-xs font-semibold text-zinc-400 tabular-nums">
-          {formatCurrency(spent)} // {formatCurrency(limit)}
+          {formatCurrency(spent)} / {formatCurrency(limit)}
         </div>
       </button>
 

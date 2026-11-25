@@ -1,5 +1,5 @@
 import React, { createContext, useReducer, useContext, useEffect, useState } from 'react';
-import { normalizeToMasterCycle, getCycleWindow, isWithinCycle } from '../utils/cycleUtils';
+import { normalizeToMasterCycle, getCycleWindow } from '../utils/cycleUtils';
 import { useAuth } from './AuthContext';
 import { env } from '../config/env';
 import { db } from '../config/firebase';
@@ -829,19 +829,16 @@ export function BudgetProvider({ children }) {
   // Determine current cycle window
   const cycleWindow = getCycleWindow(state.cycleStartDate, state.cycleFrequency);
 
-  // Filter transactions to the current cycle
-  const currentCycleTransactions = state.transactions.filter(tx => isWithinCycle(tx.date, cycleWindow));
-
-  // Calculate totals for the current cycle
-  const totalSpent = currentCycleTransactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
-  const totalAllocated = state.categories.reduce((sum, cat) => sum + Number(cat.limit), 0);
+  // Calculate totals consistently across all recorded transactions (matches categorySpending & Ledger)
+  const totalSpent = state.transactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+  const totalAllocated = state.categories.reduce((sum, cat) => sum + (Number(cat.limit) || 0), 0);
   const leftToBudget = totalIncome - totalAllocated;
 
   // Calculate spent per category (summing all transactions assigned to that category)
   const categorySpending = state.categories.reduce((acc, cat) => {
     acc[cat.id] = state.transactions
       .filter((tx) => tx.categoryId === cat.id)
-      .reduce((sum, tx) => sum + Number(tx.amount), 0);
+      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     return acc;
   }, {});
 
