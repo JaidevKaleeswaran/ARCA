@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useBudget } from '../contexts/BudgetContext';
@@ -16,6 +16,7 @@ export function useFirebaseSync() {
     categories,
     incomeSources,
     investments,
+    watchlist,
     cycleStartDate,
     cycleFrequency,
     voiceLogs,
@@ -43,6 +44,7 @@ export function useFirebaseSync() {
     categories,
     incomeSources,
     investments: investments || [],
+    watchlist: watchlist || [],
     cycleStartDate,
     cycleFrequency,
     voiceLogs: voiceLogs || [],
@@ -68,6 +70,27 @@ export function useFirebaseSync() {
         getTimestampMs(payload.updatedAt)
       );
       await setDoc(docRef, payload, { merge: true });
+
+      // Sync favorited watchlist stocks under /users/{uid}.preferences.watchlist (compliant with firestore.rules)
+      const watchPayload = (stateRef.current?.watchlist || []).slice(0, 100).map((w) => ({
+        symbol: String(w.symbol || '').toUpperCase(),
+        name: String(w.name || w.symbol || '').slice(0, 80),
+        sector: String(w.sector || 'Equities').slice(0, 40),
+        price: Number(w.price) || 0,
+        change: Number(w.change) || 0,
+        changePercent: Number(w.changePercent) || 0,
+        marketCap: String(w.marketCap || 'N/A').slice(0, 20),
+        addedAt: w.addedAt || new Date().toISOString(),
+      }));
+      await setDoc(
+        doc(db, 'users', targetUid),
+        {
+          uid: targetUid,
+          preferences: { watchlist: watchPayload },
+          updatedAt: payload.updatedAt,
+        },
+        { merge: true }
+      ).catch(() => {});
     } catch (error) {
       console.warn('[Firestore] Error syncing budget data:', error);
     }
@@ -83,6 +106,20 @@ export function useFirebaseSync() {
 
     let isMounted = true;
     const docRef = doc(db, 'users', activeUid, 'budgetData', 'main');
+
+    // Hydrate favorited watchlist from /users/{uid}.preferences.watchlist
+    getDoc(doc(db, 'users', activeUid))
+      .then((userSnap) => {
+        if (!isMounted || !userSnap.exists()) return;
+        const prefs = userSnap.data()?.preferences;
+        if (prefs && Array.isArray(prefs.watchlist) && prefs.watchlist.length > 0) {
+          const localWatch = stateRef.current?.watchlist || [];
+          if (localWatch.length === 0) {
+            dispatch({ type: 'SET_WATCHLIST', payload: prefs.watchlist });
+          }
+        }
+      })
+      .catch(() => {});
 
     const unsubscribe = onSnapshot(
       docRef,
@@ -205,6 +242,7 @@ export function useFirebaseSync() {
     categories,
     incomeSources,
     investments,
+    watchlist,
     cycleStartDate,
     cycleFrequency,
     voiceLogs,

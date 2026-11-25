@@ -72,8 +72,8 @@ export const TUTORIAL_STEPS = {
     {
       id: 'market-header-status',
       targetSelector: '[data-tutorial="market-header-status"]',
-      title: 'Market Status & Overview',
-      description: 'Check whether regular trading sessions are active, view timestamped updates, and refresh rates with a single click.',
+      title: 'Market Overview & Refresh',
+      description: 'Refresh live equity prices, indices, and market data with a single click.',
     },
     {
       id: 'market-indices-grid',
@@ -98,6 +98,27 @@ export const TUTORIAL_STEPS = {
       targetSelector: '[data-tutorial="market-budget-impact"]',
       title: 'Actionable Budget Playbook',
       description: 'Direct zero-based recommendations on how current market conditions should adjust your debt repayment and cash buffers.',
+    },
+  ],
+
+  financial: [
+    {
+      id: 'financial-header-status',
+      targetSelector: '[data-tutorial="market-header-status"]',
+      title: 'Financial Overview',
+      description: 'Track macroeconomic indicators, official Federal Reserve rates, Treasury yields, and primary financial news in one dedicated mobile view.',
+    },
+    {
+      id: 'financial-rates-panel',
+      targetSelector: '[data-tutorial="market-rates-panel"]',
+      title: 'Macroeconomic Indicators & Rates',
+      description: 'Monitor CPI inflation, unemployment, Federal Reserve benchmark rates, mortgage yields, and high-yield savings APYs.',
+    },
+    {
+      id: 'financial-ai-digest',
+      targetSelector: '[data-tutorial="market-ai-digest"]',
+      title: 'Macroeconomic Outlook',
+      description: 'Concise personal-finance takeaways showing how macro conditions affect your budget and savings.',
     },
   ],
 

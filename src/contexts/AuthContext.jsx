@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db } from '../config/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import {
   USER_SESSION_KEY,
   LEGACY_USER_SESSION_KEY,
@@ -15,6 +15,11 @@ import {
   signInWithRedirect,
   getRedirectResult,
   GoogleAuthProvider,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
+  linkWithCredential,
+  updatePassword as firebaseUpdatePassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   sendEmailVerification,
@@ -36,6 +41,43 @@ function getActivationPendingKey(uid) {
   return `arca_activation_pending_${uid}`;
 }
 
+function getProfileMetaKey(uid) {
+  return `arca_profile_meta_${uid}`;
+}
+
+function readLocalProfileMeta(uid) {
+  if (!uid) return null;
+  try {
+    const raw = localStorage.getItem(getProfileMetaKey(uid));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalProfileMeta(uid, meta) {
+  if (!uid) return;
+  try {
+    localStorage.setItem(getProfileMetaKey(uid), JSON.stringify(meta));
+  } catch {
+    // ignore storage quota issues
+  }
+}
+
+function applyProfileMeta(baseUser, meta) {
+  if (!meta) return baseUser;
+  const next = { ...baseUser };
+  if (typeof meta.displayName === 'string' && meta.displayName.trim()) {
+    next.displayName = meta.displayName.trim();
+  }
+  if (meta.customAvatarOverride) {
+    next.photoURL = meta.photoURL || null;
+    next.avatarPreset = meta.avatarPreset || null;
+    next.customAvatarOverride = true;
+  }
+  return next;
+}
+
 function buildFirebaseUserData(firebaseUser, fallbackName = null) {
   const pendingKey = getActivationPendingKey(firebaseUser.uid);
   let isDeferred = false;
@@ -49,7 +91,11 @@ function buildFirebaseUserData(firebaseUser, fallbackName = null) {
     // ignore storage access issues
   }
 
-  return {
+  const providerIds = Array.isArray(firebaseUser.providerData)
+    ? firebaseUser.providerData.map((p) => p?.providerId).filter(Boolean)
+    : [];
+
+  const base = {
     uid: firebaseUser.uid,
     email: firebaseUser.email,
     displayName:
@@ -57,10 +103,17 @@ function buildFirebaseUserData(firebaseUser, fallbackName = null) {
       fallbackName ||
       (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'ARCA User'),
     photoURL: firebaseUser.photoURL || null,
+    providerPhotoURL: firebaseUser.photoURL || null,
+    avatarPreset: null,
+    customAvatarOverride: false,
+    providerIds,
     emailVerified: firebaseUser.emailVerified || isDeferred,
     activationPending: !firebaseUser.emailVerified && isDeferred,
     isGuest: false,
   };
+
+  const localMeta = readLocalProfileMeta(firebaseUser.uid);
+  return applyProfileMeta(base, localMeta);
 }
 
 function formatAuthError(error) {
@@ -97,6 +150,11 @@ function formatAuthError(error) {
       return new Error('Network error during authentication. Please check your internet connection.');
     case 'auth/too-many-requests':
       return new Error('Too many failed attempts. Please wait a moment or reset your password.');
+    case 'auth/requires-recent-login':
+      return new Error('For your security, please sign out and sign back in before changing your password.');
+    case 'auth/provider-already-linked':
+    case 'auth/credential-already-in-use':
+      return new Error('A password is already linked to this account. Use Change Password instead.');
     case 'auth/invalid-api-key':
     case 'auth/api-key-not-valid-please-pass-a-valid-api-key':
       return new Error('Invalid Firebase API Key. Please check your environment configuration.');
@@ -164,6 +222,50 @@ export function AuthProvider({ children }) {
           try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
           } catch (e) { }
+
+          // Hydrate custom ARCA avatar / displayName from Firestore /users/{uid} across devices
+          if (db) {
+            getDoc(doc(db, 'users', firebaseUser.uid))
+              .then((snap) => {
+                if (!snap.exists()) return;
+                const data = snap.data() || {};
+                const prefs = data.preferences && typeof data.preferences === 'object' ? data.preferences : {};
+                const hasOverride = Boolean(prefs.customAvatarOverride);
+                const resolvedPhoto = hasOverride
+                  ? (prefs.customAvatarDataUrl || data.photoURL || null)
+                  : (data.photoURL || firebaseUser.photoURL || null);
+                const resolvedPreset = hasOverride ? (prefs.avatarPreset || null) : null;
+                const resolvedName = (typeof data.displayName === 'string' && data.displayName.trim())
+                  ? data.displayName.trim()
+                  : userData.displayName;
+
+                const syncedMeta = {
+                  displayName: resolvedName,
+                  photoURL: resolvedPhoto,
+                  avatarPreset: resolvedPreset,
+                  customAvatarOverride: hasOverride,
+                };
+                writeLocalProfileMeta(firebaseUser.uid, syncedMeta);
+
+                setUser((prev) => {
+                  if (!prev || prev.uid !== firebaseUser.uid) return prev;
+                  const merged = {
+                    ...prev,
+                    displayName: resolvedName,
+                    photoURL: resolvedPhoto,
+                    avatarPreset: resolvedPreset,
+                    customAvatarOverride: hasOverride,
+                  };
+                  try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+                  } catch { }
+                  return merged;
+                });
+              })
+              .catch((err) => {
+                console.warn('[AuthContext] Could not hydrate profile preferences:', err?.message || err);
+              });
+          }
         } else {
           // Preserve active Guest sessions across page reloads until explicit logout
           let activeGuestSession = null;
@@ -339,17 +441,236 @@ export function AuthProvider({ children }) {
   };
 
   const loginAsGuest = () => {
-    const guestUser = {
+    const baseGuest = {
       uid: 'usr_arca_guest',
       email: 'guest@arca.app',
       displayName: 'Guest User',
       photoURL: null,
+      providerPhotoURL: null,
+      avatarPreset: null,
+      customAvatarOverride: false,
+      providerIds: [],
       emailVerified: true,
       isGuest: true,
     };
+    const guestUser = applyProfileMeta(baseGuest, readLocalProfileMeta(baseGuest.uid));
     setUser(guestUser);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(guestUser));
     return guestUser;
+  };
+
+  /**
+   * Update user's ARCA profile picture (uploaded image, preset, external URL, or reset) & display name.
+   * Keeps ARCA PFP independent of external Google profile while syncing across reloads & devices.
+   */
+  const updateAccountProfile = async ({
+    displayName,
+    photoURL,
+    avatarPreset,
+    resetToProviderPhoto = false,
+  } = {}) => {
+    if (!user) throw new Error('You must be signed in to update your profile.');
+
+    const cleanName =
+      typeof displayName === 'string'
+        ? displayName.trim().slice(0, 100)
+        : (user.displayName || 'ARCA User');
+
+    if (!cleanName) {
+      throw new Error('Display name cannot be empty.');
+    }
+
+    let nextPhotoURL = user.photoURL || null;
+    let nextAvatarPreset = user.avatarPreset || null;
+    let nextOverride = Boolean(user.customAvatarOverride);
+
+    if (resetToProviderPhoto) {
+      nextPhotoURL = auth?.currentUser?.photoURL || user.providerPhotoURL || null;
+      nextAvatarPreset = null;
+      nextOverride = false;
+    } else if (avatarPreset !== undefined || photoURL !== undefined) {
+      if (avatarPreset) {
+        nextAvatarPreset = String(avatarPreset);
+        nextPhotoURL = null;
+        nextOverride = true;
+      } else if (photoURL === null || photoURL === '') {
+        nextPhotoURL = null;
+        nextAvatarPreset = null;
+        nextOverride = true;
+      } else if (typeof photoURL === 'string') {
+        const trimmedUrl = photoURL.trim();
+        if (trimmedUrl.startsWith('data:image/')) {
+          if (trimmedUrl.length > 250000) {
+            throw new Error('Image is too large after compression. Please pick a smaller image.');
+          }
+          nextPhotoURL = trimmedUrl;
+          nextAvatarPreset = null;
+          nextOverride = true;
+        } else if (/^https?:\/\/.+/i.test(trimmedUrl)) {
+          if (trimmedUrl.length > 500) {
+            throw new Error('Image URL must be 500 characters or fewer.');
+          }
+          nextPhotoURL = trimmedUrl;
+          nextAvatarPreset = null;
+          nextOverride = true;
+        } else {
+          throw new Error('Please enter a valid http(s) image URL or upload an image file.');
+        }
+      }
+    }
+
+    const isDataUrl = typeof nextPhotoURL === 'string' && nextPhotoURL.startsWith('data:image/');
+
+    // Sync to Firebase Auth + Firestore for non-guest authenticated accounts
+    if (!user.isGuest && auth?.currentUser) {
+      const fbPatch = {};
+      if (cleanName !== auth.currentUser.displayName) {
+        fbPatch.displayName = cleanName;
+      }
+      if (!isDataUrl && !nextAvatarPreset && nextPhotoURL && nextPhotoURL.length <= 500) {
+        fbPatch.photoURL = nextPhotoURL;
+      } else if (resetToProviderPhoto && nextPhotoURL && nextPhotoURL.length <= 500) {
+        fbPatch.photoURL = nextPhotoURL;
+      }
+
+      if (Object.keys(fbPatch).length > 0) {
+        try {
+          await updateProfile(auth.currentUser, fbPatch);
+        } catch (err) {
+          console.warn('[AuthContext] Firebase updateProfile warning:', err?.message || err);
+        }
+      }
+
+      if (db) {
+        try {
+          const userDocRef = doc(db, 'users', auth.currentUser.uid);
+          const safeTopPhotoUrl = !isDataUrl && typeof nextPhotoURL === 'string' && nextPhotoURL.length <= 500
+            ? nextPhotoURL
+            : null;
+
+          await setDoc(
+            userDocRef,
+            {
+              uid: auth.currentUser.uid,
+              email: auth.currentUser.email || user.email || null,
+              displayName: cleanName,
+              photoURL: safeTopPhotoUrl,
+              preferences: {
+                customAvatarOverride: nextOverride,
+                customAvatarDataUrl: isDataUrl ? nextPhotoURL : null,
+                avatarPreset: nextAvatarPreset,
+              },
+              updatedAt: new Date().toISOString(),
+            },
+            { merge: true }
+          );
+        } catch (err) {
+          console.warn('[AuthContext] Firestore profile save warning:', err?.message || err);
+        }
+      }
+    }
+
+    const updatedUser = {
+      ...user,
+      displayName: cleanName,
+      photoURL: nextPhotoURL,
+      avatarPreset: nextAvatarPreset,
+      customAvatarOverride: nextOverride,
+    };
+
+    writeLocalProfileMeta(updatedUser.uid, {
+      displayName: cleanName,
+      photoURL: nextPhotoURL,
+      avatarPreset: nextAvatarPreset,
+      customAvatarOverride: nextOverride,
+    });
+
+    setUser(updatedUser);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
+    } catch { }
+
+    return updatedUser;
+  };
+
+  /**
+   * Change password for an email/password account (reauthenticates first per Firebase Auth security requirements).
+   */
+  const changePassword = async (currentPassword, newPassword) => {
+    if (!user || user.isGuest) {
+      throw new Error('Guest sessions do not have a password. Create an account to set one.');
+    }
+    if (!currentPassword) {
+      throw new Error('Please enter your current password.');
+    }
+    if (!newPassword || newPassword.length < 6) {
+      throw new Error('New password must be at least 6 characters long.');
+    }
+    if (currentPassword === newPassword) {
+      throw new Error('New password must be different from your current password.');
+    }
+
+    if (auth && auth.currentUser) {
+      const email = auth.currentUser.email || user.email;
+      if (!email) {
+        throw new Error('No email address is associated with this account.');
+      }
+
+      try {
+        const credential = EmailAuthProvider.credential(email, currentPassword);
+        await reauthenticateWithCredential(auth.currentUser, credential);
+      } catch (err) {
+        if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+          throw new Error('Your current password is incorrect.', { cause: err });
+        }
+        throw formatAuthError(err);
+      }
+
+      try {
+        await firebaseUpdatePassword(auth.currentUser, newPassword);
+        return { success: true };
+      } catch (err) {
+        throw formatAuthError(err);
+      }
+    }
+
+    // Offline/local fallback mode
+    return { success: true, simulated: true };
+  };
+
+  /**
+   * Link an email/password credential to an OAuth (Google) user so they can also sign in with a password.
+   */
+  const setPasswordForOAuthUser = async (newPassword) => {
+    if (!user || user.isGuest) {
+      throw new Error('Guest sessions do not have a password.');
+    }
+    if (!newPassword || newPassword.length < 6) {
+      throw new Error('Password must be at least 6 characters long.');
+    }
+    if (!auth || !auth.currentUser) {
+      return { success: true, simulated: true };
+    }
+    const email = auth.currentUser.email || user.email;
+    if (!email) {
+      throw new Error('No email address is associated with this account.');
+    }
+
+    try {
+      const provider = new GoogleAuthProvider();
+      await reauthenticateWithPopup(auth.currentUser, provider);
+      const emailCred = EmailAuthProvider.credential(email, newPassword);
+      await linkWithCredential(auth.currentUser, emailCred);
+      await auth.currentUser.reload();
+      const refreshed = buildFirebaseUserData(auth.currentUser);
+      setUser(refreshed);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(refreshed));
+      } catch { }
+      return { success: true };
+    } catch (err) {
+      throw formatAuthError(err);
+    }
   };
 
   const resendVerificationEmail = async () => {
@@ -429,6 +750,9 @@ export function AuthProvider({ children }) {
         signupWithEmail,
         loginWithGoogle,
         loginAsGuest,
+        updateAccountProfile,
+        changePassword,
+        setPasswordForOAuthUser,
         resetPassword,
         resendVerificationEmail,
         refreshUserStatus,

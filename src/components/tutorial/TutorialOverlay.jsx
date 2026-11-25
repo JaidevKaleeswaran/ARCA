@@ -6,6 +6,7 @@ const TAB_NAMES = {
   home: 'Home Page',
   assistant: 'AI Assistant',
   markets: 'Market Tracker',
+  financial: 'Financial',
   summary: 'Financial Summary',
   transactions: 'Expenses',
 };

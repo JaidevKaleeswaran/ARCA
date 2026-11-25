@@ -467,190 +467,175 @@ export default function AIAssistantTab() {
         onClose={() => setShowVoiceAuditLog(false)}
       />
 
-      {/* ── Sleek, minimal header (No wall-of-text, no promotional badges) ── */}
-      <Reveal delay={0} y={16}>
-        <div data-tutorial="ai-header-tools" className="bg-card border border-border rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 shadow-md">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-card-hover border border-border flex items-center justify-center text-text shrink-0">
-              <Bot size={18} />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white tracking-tight">
-                AI Financial Assistant
-              </h2>
-            </div>
-          </div>
+      {/* ── Minimal Hairline Header ── */}
+      <div
+        data-tutorial="ai-header-tools"
+        className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/[0.08]"
+      >
+        <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-100">Assistant</h1>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => budgetState.openProModal({
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              budgetState.openProModal({
                 reason: 'QUOTA_EXHAUSTED',
                 feature: 'assistant',
                 used: assistantUsed,
                 limit: QUOTA_LIMITS.assistant,
                 resetCountdown: getNextMondayCountdown(),
-              })}
-              className="text-[11px] bg-accent/15 hover:bg-accent/25 text-accent font-semibold px-3 py-1 rounded-full border border-accent/30 flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-              title="Weekly AI Assistant Quota"
-            >
-              {remainingQueries}/{QUOTA_LIMITS.assistant} queries left • Resets Mon
-            </button>
+              })
+            }
+            className="h-8 sm:h-7 rounded-full border border-white/[0.1] bg-[#111110] px-3 text-[11px] font-medium text-[#E7B956] tabular-nums transition-colors hover:border-[#E7B956]/50 cursor-pointer"
+            title="Weekly AI Assistant Quota"
+          >
+            {remainingQueries}/{QUOTA_LIMITS.assistant} left
+          </button>
 
-            <button
-              type="button"
-              onClick={() => setShowVoiceAuditLog(true)}
-              className="text-xs bg-card-hover hover:bg-card text-zinc-300 border border-border px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Inspect voice transcripts & logs"
-            >
-              <ShieldCheck size={13} className="text-accent shrink-0" />
-              <span>Voice Logs</span>
-            </button>
+          <button
+            type="button"
+            onClick={() => setShowVoiceAuditLog(true)}
+            className="inline-flex h-8 sm:h-7 items-center gap-1.5 rounded-full border border-white/[0.1] px-3 text-xs text-zinc-300 transition-colors hover:border-white/[0.2] hover:text-zinc-100 cursor-pointer"
+            title="Inspect voice logs"
+          >
+            <ShieldCheck className="h-3.5 w-3.5 text-zinc-400 shrink-0" strokeWidth={1.5} />
+            <span>Logs</span>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => dispatch({ type: 'CLEAR_CHAT_MESSAGES' })}
-              title="Clear chat messages"
-              className="text-xs text-zinc-400 hover:text-white hover:bg-card-hover px-2.5 py-1 rounded-lg transition-colors border border-border cursor-pointer"
-            >
-              Clear
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => dispatch({ type: 'CLEAR_CHAT_MESSAGES' })}
+            title="Clear chat"
+            className="h-8 sm:h-7 rounded-full border border-white/[0.1] px-3 text-xs text-zinc-400 transition-colors hover:border-white/[0.2] hover:text-zinc-100 cursor-pointer"
+          >
+            Clear
+          </button>
         </div>
-      </Reveal>
+      </div>
 
-      {/* Main Chat Stream Container */}
-      <Reveal delay={0.1} y={20}>
-        <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 min-h-[460px] flex flex-col justify-between shadow-xl">
-          <div className="space-y-6 overflow-y-auto max-h-[580px] pr-2">
-            {messages.map((msg) => (
-              <div key={msg.id} className="space-y-3 transition-all duration-300 ease-out animate-in fade-in slide-in-from-bottom-2">
-                {msg.sender === 'user' ? (
-                  /* User Message Bubble */
-                  <div className="flex justify-end">
-                    <div className="max-w-lg rounded-2xl rounded-tr-xs px-4 py-3 text-sm bg-accent/10 border border-accent/20 text-text shadow-sm">
-                      <p className="font-medium">{msg.text}</p>
-                      <span className="text-[10px] block text-right mt-1 text-accent/60">
-                        {msg.timestamp}
-                      </span>
-                    </div>
+      {/* Open Chat Workspace */}
+      <div className="mt-4 flex min-h-[calc(100vh-16rem)] sm:min-h-[500px] flex-col justify-between">
+        <div className="space-y-5 overflow-y-auto max-h-[580px] pr-1">
+          {messages.map((msg) => (
+            <div key={msg.id} className="animate-step-enter">
+              {msg.sender === 'user' ? (
+                <div className="flex justify-end">
+                  <div className="max-w-lg rounded-lg border border-[#E7B956]/25 bg-[#E7B956]/[0.08] px-3.5 py-2.5 text-sm text-zinc-100">
+                    <p>{msg.text}</p>
+                    <span className="mt-1 block text-right text-[10px] text-zinc-500 tabular-nums">
+                      {msg.timestamp}
+                    </span>
                   </div>
-                ) : (
-                  /* Assistant Response Box */
-                  <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 space-y-3 shadow-md transition-all duration-300 ease-out">
-                    <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center shadow-inner">
-                          <Bot size={13} />
-                        </div>
-                        <span className="text-xs font-semibold text-text">Financial Advisor</span>
-                      </div>
-                      <span className="text-[10px] text-text-muted">{msg.timestamp}</span>
-                    </div>
-
-                    {msg.metrics && (
-                      <AgentPipelineBadge metrics={msg.metrics} />
-                    )}
-
-                    <div className="pt-1">
-                      {renderMarkdownText(msg.text)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {isProcessing && (
-              <div className="flex items-center space-x-2 text-xs text-text-muted bg-card p-4 rounded-xl border border-border animate-pulse transition-all duration-300">
-                <RefreshCw size={14} className="animate-spin text-accent" />
-                <span>Thinking...</span>
-              </div>
-            )}
-
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Voice Prompt Recording Status Banner */}
-          {isVoicePrompting && (
-            <div className="mt-3 px-3.5 py-2.5 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center justify-between animate-pulse">
-              <div className="flex items-center space-x-2 text-xs text-red-400">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                <span className="font-medium">Recording voice prompt... Speak your question into the mic.</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleStopPromptVoice}
-                className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-300 px-3 py-1 rounded-lg transition-colors font-medium cursor-pointer"
-              >
-                Done / Send
-              </button>
-            </div>
-          )}
-
-          {isTranscribingPrompt && (
-            <div className="mt-3 px-3.5 py-2.5 bg-accent/10 border border-accent/30 rounded-xl flex items-center space-x-2 text-xs text-accent">
-              <RefreshCw size={14} className="animate-spin text-accent" />
-              <span className="font-medium">Transcribing voice prompt...</span>
-            </div>
-          )}
-
-          {/* Input Bar */}
-          <div data-tutorial="ai-input-bar" className="mt-4 pt-3 border-t border-border flex items-center space-x-2 transition-all duration-500 ease-out animate-in fade-in">
-            {/* Voice prompt mic button */}
-            <button
-              type="button"
-              data-tutorial="ai-voice-mic"
-              onClick={isVoicePrompting ? handleStopPromptVoice : handleStartPromptVoice}
-              disabled={isProcessing || isTranscribingPrompt}
-              className={`p-3 rounded-xl transition-all border cursor-pointer ${
-                isVoicePrompting
-                  ? 'bg-red-500/20 text-red-400 border-red-500/40 shadow-lg shadow-red-500/20 animate-pulse scale-105'
-                  : isTranscribingPrompt
-                  ? 'bg-accent/20 text-accent border-accent/40 opacity-80'
-                  : 'bg-primary text-text-muted hover:text-accent hover:bg-accent/10 border-border'
-              }`}
-              title={isVoicePrompting ? 'Stop recording & send prompt' : 'Speak prompt to AI Assistant'}
-            >
-              {isTranscribingPrompt ? (
-                <RefreshCw size={18} className="animate-spin text-accent" />
-              ) : isVoicePrompting ? (
-                <MicOff size={18} />
+                </div>
               ) : (
-                <Mic size={18} />
+                <div className="border-l border-white/[0.1] pl-4 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                    <span className="font-medium text-zinc-300">ARCA Assistant</span>
+                    <span className="tabular-nums">{msg.timestamp}</span>
+                  </div>
+
+                  {msg.metrics && <AgentPipelineBadge metrics={msg.metrics} />}
+
+                  <div>{renderMarkdownText(msg.text)}</div>
+                </div>
               )}
-            </button>
+            </div>
+          ))}
 
-            <input
-              type="text"
-              value={inputQuery}
-              onChange={(e) => setInputQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendQuery()}
-              placeholder={
-                isVoicePrompting
-                  ? 'Listening to your question... speak now'
-                  : isTranscribingPrompt
-                  ? 'Transcribing your voice prompt...'
-                  : 'Ask about your spending, budget envelopes, or financial goals...'
-              }
-              disabled={isTranscribingPrompt}
-              className="flex-1 bg-primary border border-border hover:border-border/80 focus:border-accent text-text placeholder-text-muted text-sm rounded-xl px-4 py-3 focus:outline-none transition-colors"
-            />
+          {isProcessing && (
+            <div className="flex items-center gap-2 pl-4 text-xs text-zinc-500">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin text-[#E7B956]" strokeWidth={1.5} />
+              <span>Analyzing your numbers...</span>
+            </div>
+          )}
 
+          <div ref={chatEndRef} />
+        </div>
+
+        {/* Voice Prompt Recording Status Banner */}
+        {isVoicePrompting && (
+          <div className="mt-3 flex items-center justify-between rounded-md border border-rose-500/30 bg-rose-500/10 px-3.5 py-2 text-xs text-rose-300">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+              <span>Recording voice prompt...</span>
+            </div>
             <button
               type="button"
-              onClick={() => {
-                if (isVoicePrompting) handleStopPromptVoice();
-                else handleSendQuery();
-              }}
-              disabled={(!inputQuery.trim() && !isVoicePrompting) || isProcessing || isTranscribingPrompt}
-              className="bg-accent hover:bg-accent-hover text-primary p-3 rounded-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md cursor-pointer"
-              title="Send prompt to AI"
+              onClick={handleStopPromptVoice}
+              className="rounded border border-rose-400/30 px-2.5 py-1 text-xs font-medium text-rose-200 hover:bg-rose-500/20 cursor-pointer"
             >
-              <Send size={18} />
+              Done / Send
             </button>
           </div>
+        )}
+
+        {isTranscribingPrompt && (
+          <div className="mt-3 flex items-center gap-2 rounded-md border border-[#E7B956]/30 bg-[#E7B956]/10 px-3.5 py-2 text-xs text-[#E7B956]">
+            <RefreshCw className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+            <span>Transcribing voice prompt...</span>
+          </div>
+        )}
+
+        {/* Input Bar */}
+        <div
+          data-tutorial="ai-input-bar"
+          className="mt-4 flex items-center gap-2 border-t border-white/[0.08] pt-3.5"
+        >
+          <button
+            type="button"
+            data-tutorial="ai-voice-mic"
+            onClick={isVoicePrompting ? handleStopPromptVoice : handleStartPromptVoice}
+            disabled={isProcessing || isTranscribingPrompt}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors cursor-pointer ${
+              isVoicePrompting
+                ? 'border-rose-500/50 bg-rose-500/15 text-rose-400'
+                : isTranscribingPrompt
+                ? 'border-[#E7B956]/40 bg-[#E7B956]/10 text-[#E7B956]'
+                : 'border-white/[0.1] bg-[#111110] text-zinc-400 hover:border-[#E7B956]/50 hover:text-[#E7B956]'
+            }`}
+            title={isVoicePrompting ? 'Stop recording & send prompt' : 'Speak prompt'}
+          >
+            {isTranscribingPrompt ? (
+              <RefreshCw className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+            ) : isVoicePrompting ? (
+              <MicOff className="h-4 w-4" strokeWidth={1.5} />
+            ) : (
+              <Mic className="h-4 w-4" strokeWidth={1.5} />
+            )}
+          </button>
+
+          <input
+            type="text"
+            value={inputQuery}
+            onChange={(e) => setInputQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSendQuery()}
+            placeholder={
+              isVoicePrompting
+                ? 'Listening...'
+                : isTranscribingPrompt
+                ? 'Transcribing...'
+                : 'Ask about your budget...'
+            }
+            disabled={isTranscribingPrompt}
+            className="h-10 flex-1 rounded-full border border-white/[0.1] bg-[#111110] px-4 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none transition-colors"
+          />
+
+          <button
+            type="button"
+            onClick={() => {
+              if (isVoicePrompting) handleStopPromptVoice();
+              else handleSendQuery();
+            }}
+            disabled={
+              (!inputQuery.trim() && !isVoicePrompting) || isProcessing || isTranscribingPrompt
+            }
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#E7B956] text-[#090908] transition-colors hover:bg-[#d8aa45] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Send message"
+          >
+            <Send className="h-4 w-4" strokeWidth={1.75} />
+          </button>
         </div>
-      </Reveal>
+      </div>
     </div>
   );
 }

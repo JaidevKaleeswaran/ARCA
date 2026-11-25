@@ -11,7 +11,7 @@ import { env } from './env.js';
 
 const firebaseConfig = {
   apiKey: env.firebase.apiKey || '',
-  authDomain: env.firebase.authDomain || 'stacked-budgeting.firebaseapp.com',
+  authDomain: env.firebase.authDomain || 'arca-budgeting.firebaseapp.com',
   projectId: env.firebase.projectId || 'stacked-budgeting',
   storageBucket: env.firebase.storageBucket || 'stacked-budgeting.firebasestorage.app',
   messagingSenderId: env.firebase.messagingSenderId || '127464127687',

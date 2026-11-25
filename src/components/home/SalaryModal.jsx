@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { useBudget } from '../../contexts/BudgetContext';
 import { formatCurrency } from '../../utils/formatCurrency';
-import { DollarSign, Briefcase, Calendar, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function SalaryModal({ isOpen, onClose }) {
@@ -58,13 +57,11 @@ export default function SalaryModal({ isOpen, onClose }) {
     onClose();
   };
 
-  // Estimate per-cycle amount for user preview
   const getCycleEstimate = () => {
     const amt = Number(formData.amount) || 0;
     if (!amt) return 0;
     if (formData.frequency === cycleFrequency) return amt;
 
-    // Quick conversion rules
     let annual = 0;
     if (formData.frequency === 'annual') annual = amt;
     else if (formData.frequency === 'monthly') annual = amt * 12;
@@ -78,40 +75,24 @@ export default function SalaryModal({ isOpen, onClose }) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Set Your Salary">
+    <Modal isOpen={isOpen} onClose={onClose} title="Base Salary">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 text-xs text-accent flex items-start space-x-2.5">
-          <DollarSign size={18} className="shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold">Set your primary earning salary</p>
-            <p className="text-text-muted text-[11px] mt-0.5">
-              This will automatically calculate your cycle budget income and update your financial overview.
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm text-text-muted mb-1 flex items-center gap-1.5">
-            <Briefcase size={14} className="text-text-muted" />
-            Salary Label / Source Name
-          </label>
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-zinc-400">Source name</label>
           <input
             type="text"
             name="name"
             value={formData.name}
             onChange={handleChange}
-            placeholder="e.g. Tech Corp Salary, Primary Job"
-            className="w-full bg-primary border border-border rounded-lg px-3 py-2.5 text-text focus:outline-none focus:border-accent transition-colors text-sm"
+            placeholder="Primary Salary"
+            className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#090908] px-3 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
             required
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-text-muted mb-1 flex items-center gap-1.5 whitespace-nowrap">
-              <DollarSign size={14} className="text-text-muted" />
-              Salary Amount
-            </label>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-zinc-400">Amount</label>
             <input
               type="number"
               name="amount"
@@ -120,21 +101,18 @@ export default function SalaryModal({ isOpen, onClose }) {
               placeholder="0.00"
               min="0.01"
               step="0.01"
-              className="w-full bg-primary border border-border rounded-lg px-3 py-2.5 text-text focus:outline-none focus:border-accent transition-colors text-sm font-semibold"
+              className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#090908] px-3 text-base sm:text-sm font-medium text-zinc-100 tabular-nums placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
               required
             />
           </div>
 
-          <div>
-            <label className="block text-sm text-text-muted mb-1 flex items-center gap-1.5">
-              <Calendar size={14} className="text-text-muted" />
-              Pay Frequency
-            </label>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-zinc-400">Frequency</label>
             <select
               name="frequency"
               value={formData.frequency}
               onChange={handleChange}
-              className="w-full bg-primary border border-border rounded-lg px-3 py-2.5 text-text focus:outline-none focus:border-accent transition-colors text-sm"
+              className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#090908] px-3 text-base sm:text-sm text-zinc-100 focus:border-[#E7B956] focus:outline-none"
             >
               <option value="monthly">Monthly</option>
               <option value="bi-weekly">Bi-weekly</option>
@@ -144,32 +122,28 @@ export default function SalaryModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Live Estimate Card */}
         {Number(formData.amount) > 0 && (
-          <div className="bg-primary border border-border rounded-lg p-3 text-xs flex justify-between items-center flex-wrap gap-2">
-            <span className="text-text-muted">
-              Est. income for your <strong className="text-text capitalize">{cycleFrequency}</strong> cycle:
-            </span>
-            <span className="font-bold text-emerald-400 text-sm">
+          <div className="flex items-center justify-between border-y border-white/[0.08] py-2.5 text-xs">
+            <span className="text-zinc-500 capitalize">Per {cycleFrequency} cycle</span>
+            <span className="font-semibold text-[#E7B956] tabular-nums">
               {formatCurrency(getCycleEstimate())}
             </span>
           </div>
         )}
 
-        <div className="pt-3 flex space-x-3">
+        <div className="pt-2 flex items-center gap-2.5">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 bg-primary text-text-muted hover:text-text font-medium py-2 rounded-lg hover:bg-card-hover border border-border transition-colors text-sm"
+            className="h-10 sm:h-9 rounded-full border border-white/[0.1] px-4 text-xs font-medium text-zinc-400 hover:text-zinc-100 cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="flex-1 bg-accent text-primary font-bold py-2 rounded-lg hover:bg-accent-hover transition-colors text-sm flex items-center justify-center gap-2"
+            className="h-10 sm:h-9 flex-1 rounded-full bg-[#E7B956] text-xs font-semibold text-[#090908] hover:bg-[#d8aa45] cursor-pointer"
           >
-            <CheckCircle2 size={16} />
-            <span>Save Salary</span>
+            Save salary
           </button>
         </div>
       </form>

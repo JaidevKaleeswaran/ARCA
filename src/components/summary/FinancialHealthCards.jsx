@@ -1,16 +1,13 @@
 import React from 'react';
-import { TrendingUp, DollarSign, PieChart, CreditCard, Landmark, LineChart } from 'lucide-react';
 import { useBudget } from '../../contexts/BudgetContext';
 import { formatCurrency } from '../../utils/formatCurrency';
 
-/**
- * Detect recurring subscriptions from transactions (replaces RAG tool)
- */
 function detectSubscriptions(transactions) {
-  const subKeywords = /netflix|spotify|equinox|gym|icloud|apple|hulu|disney|prime|amazon prime|utility|internet|wifi|youtube|hbo|paramount|subscription/i;
+  const subKeywords =
+    /netflix|spotify|equinox|gym|icloud|apple|hulu|disney|prime|amazon prime|utility|internet|wifi|youtube|hbo|paramount|subscription/i;
 
   const subMap = new Map();
-  (transactions || []).forEach(tx => {
+  (transactions || []).forEach((tx) => {
     const desc = tx.description || '';
     if (tx.recurring || subKeywords.test(desc)) {
       if (!subMap.has(desc)) {
@@ -24,15 +21,15 @@ function detectSubscriptions(transactions) {
 
   return {
     count: subs.length,
-    monthlyTotal,
     formattedMonthlyTotal: formatCurrency(monthlyTotal),
-    subscriptions: subs,
   };
 }
 
+/**
+ * Open hairline 5-metric band directly on obsidian canvas (zero box walls or subtext clutter).
+ */
 export default function FinancialHealthCards() {
   const budgetState = useBudget();
-
   const subscriptions = detectSubscriptions(budgetState.transactions);
 
   const totalIncome = budgetState.totalIncome || 0;
@@ -43,83 +40,63 @@ export default function FinancialHealthCards() {
   const portfolioTotalGainPercent = budgetState.portfolioTotalGainPercent || 0;
   const investmentsCount = (budgetState.investments || []).length;
   const netWorth = netCashFlow + portfolioCurrentValue;
-  const savingsRatePct = totalIncome > 0 ? `${((netCashFlow / totalIncome) * 100).toFixed(1)}%` : '0%';
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-      {/* 1. Total Income */}
-      <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
-        <div>
-          <p className="text-xs font-medium text-text-muted">Total Income</p>
-          <p className="text-xl font-bold text-[#3a7056] mt-1 font-mono">
-            {formatCurrency(totalIncome)}
-          </p>
-          <p className="text-[11px] text-zinc-500 mt-0.5">Cycle Inflow</p>
-        </div>
-        <div className="p-3 bg-[#2e5b45]/15 rounded-lg text-[#3a7056]">
-          <TrendingUp size={20} />
-        </div>
+    <section className="grid grid-cols-2 divide-y divide-white/[0.08] border-y border-white/[0.08] sm:grid-cols-5 sm:divide-x sm:divide-y-0">
+      <div className="col-span-2 py-4 sm:col-span-1 sm:pr-5">
+        <p className="text-xs text-zinc-500">Net worth</p>
+        <p
+          className={`mt-1 text-xl font-semibold tracking-tight tabular-nums ${
+            netWorth < 0 ? 'text-rose-400' : 'text-zinc-100'
+          }`}
+        >
+          {formatCurrency(netWorth)}
+        </p>
       </div>
 
-      {/* 2. Net Cash Flow */}
-      <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
-        <div>
-          <p className="text-xs font-medium text-text-muted">Net Cash Flow</p>
-          <p className={`text-xl font-bold mt-1 font-mono ${netCashFlow < 0 ? 'text-red-400' : 'text-accent'}`}>
-            {formatCurrency(netCashFlow)}
-          </p>
-          <p className="text-[11px] text-zinc-500 mt-0.5">Income - Total Spent</p>
-        </div>
-        <div className="p-3 bg-accent/10 rounded-lg text-accent">
-          <DollarSign size={20} />
-        </div>
+      <div className="py-4 pr-4 sm:px-5">
+        <p className="text-xs text-zinc-500">Income</p>
+        <p className="mt-1 text-lg font-semibold tracking-tight text-zinc-100 tabular-nums">
+          {formatCurrency(totalIncome)}
+        </p>
       </div>
 
-      {/* 3. Stock Portfolio Value */}
-      <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
-        <div>
-          <p className="text-xs font-medium text-text-muted">Stock Portfolio</p>
-          <p className="text-xl font-bold text-white mt-1 font-mono">
+      <div className="border-l border-white/[0.08] py-4 pl-4 sm:border-l-0 sm:px-5">
+        <p className="text-xs text-zinc-500">Cash flow</p>
+        <p
+          className={`mt-1 text-lg font-semibold tracking-tight tabular-nums ${
+            netCashFlow < 0 ? 'text-rose-400' : 'text-[#E7B956]'
+          }`}
+        >
+          {formatCurrency(netCashFlow)}
+        </p>
+      </div>
+
+      <div className="py-4 pr-4 sm:px-5">
+        <p className="text-xs text-zinc-500">Portfolio</p>
+        <div className="mt-1 flex items-baseline gap-1.5">
+          <span className="text-lg font-semibold tracking-tight text-zinc-100 tabular-nums">
             {formatCurrency(portfolioCurrentValue)}
-          </p>
-          <p className={`text-[11px] font-mono mt-0.5 ${portfolioTotalGain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {investmentsCount > 0
-              ? `${portfolioTotalGain >= 0 ? '+' : ''}${portfolioTotalGainPercent.toFixed(1)}% (${investmentsCount} stocks)`
-              : '0 Holdings'}
-          </p>
-        </div>
-        <div className="p-3 bg-accent/15 rounded-lg text-accent">
-          <LineChart size={20} />
-        </div>
-      </div>
-
-      {/* 4. Estimated Net Worth */}
-      <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
-        <div>
-          <p className="text-xs font-medium text-text-muted">Total Net Worth</p>
-          <p className={`text-xl font-bold mt-1 font-mono ${netWorth < 0 ? 'text-red-400' : 'text-accent'}`}>
-            {formatCurrency(netWorth)}
-          </p>
-          <p className="text-[11px] text-zinc-500 mt-0.5">Cash + Stock Assets</p>
-        </div>
-        <div className="p-3 bg-accent/10 rounded-lg text-accent">
-          <Landmark size={20} />
+          </span>
+          {investmentsCount > 0 && (
+            <span
+              className={`text-[11px] tabular-nums ${
+                portfolioTotalGain >= 0 ? 'text-emerald-400' : 'text-rose-400'
+              }`}
+            >
+              {portfolioTotalGain >= 0 ? '+' : ''}
+              {portfolioTotalGainPercent.toFixed(1)}%
+            </span>
+          )}
         </div>
       </div>
 
-      {/* 5. Active Subscriptions */}
-      <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
-        <div>
-          <p className="text-xs font-medium text-text-muted">Subscriptions</p>
-          <p className="text-xl font-bold text-accent mt-1 font-mono">
-            {subscriptions.formattedMonthlyTotal}
-          </p>
-          <p className="text-[11px] text-zinc-500 mt-0.5">{subscriptions.count} Services</p>
-        </div>
-        <div className="p-3 bg-accent/10 rounded-lg text-accent">
-          <CreditCard size={20} />
-        </div>
+      <div className="border-l border-white/[0.08] py-4 pl-4 sm:border-l-0 sm:pl-5">
+        <p className="text-xs text-zinc-500">Subscriptions</p>
+        <p className="mt-1 text-lg font-semibold tracking-tight text-zinc-100 tabular-nums">
+          {subscriptions.formattedMonthlyTotal}
+        </p>
       </div>
-    </div>
+    </section>
   );
 }

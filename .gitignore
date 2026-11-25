@@ -51,3 +51,7 @@ aws/__pycache__/
 # Playwright Test Artifacts
 playwright-report/
 test-results/
+
+# Ad Studio transient artifacts
+ad-studio/.tmp-captures/
+ad-studio/out/*.mp4

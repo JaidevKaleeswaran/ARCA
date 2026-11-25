@@ -12,7 +12,7 @@ export default function IncomeSourceModal({ isOpen, onClose, source = null }) {
     isBorrowed: false,
   });
 
-  const isEditing = !!source;
+  const isEditing = Boolean(source && source.id);
 
   useEffect(() => {
     if (isOpen) {
@@ -31,12 +31,12 @@ export default function IncomeSourceModal({ isOpen, onClose, source = null }) {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     const payload = {
       name: formData.name,
       amount: Number(formData.amount),
@@ -51,12 +51,12 @@ export default function IncomeSourceModal({ isOpen, onClose, source = null }) {
       dispatch({ type: 'ADD_INCOME_SOURCE', payload: { ...payload, id: Date.now().toString() } });
       toast.success('Income source added');
     }
-    
+
     onClose();
   };
 
   const handleDelete = () => {
-    if (window.confirm('Are you sure you want to delete this income source?')) {
+    if (window.confirm('Delete this income source?')) {
       dispatch({ type: 'DELETE_INCOME_SOURCE', payload: source.id });
       toast.success('Income source deleted');
       onClose();
@@ -64,82 +64,85 @@ export default function IncomeSourceModal({ isOpen, onClose, source = null }) {
   };
 
   return (
-    <Modal 
-      isOpen={isOpen} 
-      onClose={onClose} 
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
       title={isEditing ? 'Edit Income Source' : 'Add Income Source'}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm text-text-muted mb-1">Source Name</label>
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-zinc-400">Name</label>
           <input
             type="text"
             name="name"
             value={formData.name}
             onChange={handleChange}
-            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
-            placeholder="e.g. Primary Job"
+            className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#090908] px-3 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
+            placeholder="e.g. Freelance"
             required
           />
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-text-muted mb-1">Amount</label>
-          <input
-            type="number"
-            name="amount"
-            value={formData.amount}
-            onChange={handleChange}
-            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
-            placeholder="0.00"
-            min="0"
-            step="0.01"
-            required
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-zinc-400">Amount</label>
+            <input
+              type="number"
+              name="amount"
+              value={formData.amount}
+              onChange={handleChange}
+              className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#090908] px-3 text-base sm:text-sm text-zinc-100 tabular-nums placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
+              placeholder="0.00"
+              min="0"
+              step="0.01"
+              required
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-zinc-400">Frequency</label>
+            <select
+              name="frequency"
+              value={formData.frequency}
+              onChange={handleChange}
+              className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#090908] px-3 text-base sm:text-sm text-zinc-100 focus:border-[#E7B956] focus:outline-none"
+            >
+              <option value="weekly">Weekly</option>
+              <option value="bi-weekly">Bi-weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="one-time">One-time</option>
+            </select>
+          </div>
         </div>
 
-        <div>
-          <label className="block text-sm text-text-muted mb-1">Frequency</label>
-          <select
-            name="frequency"
-            value={formData.frequency}
-            onChange={handleChange}
-            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
-          >
-            <option value="weekly">Weekly</option>
-            <option value="bi-weekly">Bi-weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="one-time">One-time</option>
-          </select>
-        </div>
-
-        <div className="flex items-center space-x-2 pt-2">
+        <label
+          htmlFor="isBorrowedModal"
+          className="flex items-center gap-2.5 pt-1 text-xs text-zinc-400 select-none cursor-pointer"
+        >
           <input
             type="checkbox"
             id="isBorrowedModal"
             name="isBorrowed"
             checked={formData.isBorrowed}
             onChange={handleChange}
-            className="w-4 h-4 rounded border-border text-accent bg-primary focus:ring-accent focus:ring-offset-primary"
+            className="h-4 w-4 rounded border-white/20 bg-[#090908] accent-[#E7B956]"
           />
-          <label htmlFor="isBorrowedModal" className="text-sm text-text-muted select-none cursor-pointer">
-            Is this money borrowed? (Needs to be paid back)
-          </label>
-        </div>
+          <span>Borrowed funds (debt)</span>
+        </label>
 
-        <div className="pt-4 flex space-x-3">
+        <div className="pt-2 flex items-center gap-2.5">
           <button
             type="submit"
-            className="flex-1 bg-accent text-primary font-medium py-2 rounded-lg hover:bg-accent-hover transition-colors"
+            className="h-10 sm:h-9 flex-1 rounded-full bg-[#E7B956] text-xs font-semibold text-[#090908] hover:bg-[#d8aa45] cursor-pointer"
           >
-            {isEditing ? 'Save Changes' : 'Add Source'}
+            {isEditing ? 'Save changes' : 'Add source'}
           </button>
-          
+
           {isEditing && (
             <button
               type="button"
               onClick={handleDelete}
-              className="px-4 bg-red-500/10 text-red-500 border border-red-500/20 font-medium py-2 rounded-lg hover:bg-red-500/20 transition-colors"
+              className="h-10 sm:h-9 rounded-full border border-rose-500/25 bg-rose-500/10 px-4 text-xs font-medium text-rose-400 hover:bg-rose-500/20 cursor-pointer"
             >
               Delete
             </button>

@@ -2,40 +2,48 @@ import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
 export function Modal({ isOpen, onClose, title, children }) {
-  // Prevent scrolling when modal is open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
     }
-    return () => { document.body.style.overflow = 'unset'; };
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+      <div
+        className="fixed inset-0 bg-black/75 transition-opacity"
         onClick={onClose}
       />
-      
-      {/* Modal Content */}
-      <div className="bg-card border border-border rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col relative z-10 animate-in zoom-in-95 duration-200">
-        <div className="flex justify-between items-center p-4 border-b border-border shrink-0">
-          <h2 className="text-lg font-semibold text-text">{title}</h2>
-          <button 
+
+      <div className="relative z-10 flex max-h-[90vh] w-full max-w-md flex-col rounded-lg border border-white/[0.1] bg-[#111110] animate-step-enter">
+        <div className="flex shrink-0 items-center justify-between border-b border-white/[0.08] px-5 py-3.5">
+          <h2 className="text-sm font-semibold tracking-tight text-zinc-100">{title}</h2>
+          <button
+            type="button"
             onClick={onClose}
-            className="text-text-muted hover:text-text transition-colors p-1"
+            aria-label="Close modal"
+            className="rounded-md p-1 text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-200 cursor-pointer"
           >
-            <X size={20} />
+            <X className="h-4 w-4" strokeWidth={1.5} />
           </button>
         </div>
-        <div className="p-4 sm:p-6 overflow-y-auto">
-          {children}
-        </div>
+        <div className="overflow-y-auto p-5">{children}</div>
       </div>
     </div>
   );

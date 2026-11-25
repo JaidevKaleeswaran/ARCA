@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Card } from '../ui/Card';
 import toast from 'react-hot-toast';
-import { MailCheck, RefreshCw, LogOut, CheckCircle2, HelpCircle, ArrowRight } from 'lucide-react';
+import { RefreshCw, LogOut, HelpCircle, ArrowRight } from 'lucide-react';
+import Logo from '../ui/Logo';
+import LeavingSoonBadge from './LeavingSoonBadge';
 
-export default function VerifyEmailPage() {
+export default function VerifyEmailPage({ onBackToHome }) {
   const { user, resendVerificationEmail, refreshUserStatus, logout, loginAsGuest } = useAuth();
   const [checking, setChecking] = useState(false);
   const [resending, setResending] = useState(false);
@@ -21,8 +22,10 @@ export default function VerifyEmailPage() {
         localStorage.setItem(`arca_activation_pending_${user.uid}`, 'true');
       }
       localStorage.setItem('arca_user_session', JSON.stringify(updated));
-    } catch (e) {}
-    toast.success(`Welcome to ARCA, ${user.displayName || user.email}!`);
+    } catch {
+      // Ignore storage failures
+    }
+    toast.success(`Welcome to ARCA, ${user.displayName || user.email}.`);
     window.location.reload();
   };
 
@@ -31,7 +34,7 @@ export default function VerifyEmailPage() {
     try {
       const isVerified = await refreshUserStatus();
       if (isVerified) {
-        toast.success('Email verified successfully! Welcome to ARCA.');
+        toast.success('Email verified. Welcome to ARCA.');
       } else {
         toast.error('Email not verified yet. Please check your inbox and click the link.');
       }
@@ -47,7 +50,7 @@ export default function VerifyEmailPage() {
     setResending(true);
     try {
       await resendVerificationEmail();
-      toast.success('Activation email resent! Please check your spam folder if not found.');
+      toast.success('Activation email resent. Check your spam folder if not found.');
     } catch (err) {
       console.error(err);
       toast.error(err.message || 'Failed to resend verification email');
@@ -57,100 +60,115 @@ export default function VerifyEmailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-primary flex flex-col items-center justify-center px-4 py-8 selection:bg-accent selection:text-primary">
-      <div className="w-full max-w-md text-center">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-accent/15 border border-accent/30 mb-6 text-accent">
-          <MailCheck size={40} />
-        </div>
+    <div className="min-h-screen flex flex-col bg-[#090908] text-zinc-100">
+      <header className="mx-auto flex h-14 w-full max-w-6xl items-center px-4 sm:px-6">
+        <button
+          type="button"
+          onClick={onBackToHome}
+          title="Back to ARCA overview"
+          aria-label="Back to ARCA overview"
+          className="inline-flex items-center rounded-md focus:outline-none hover:opacity-80 transition-opacity cursor-pointer"
+        >
+          <Logo size="sm" />
+        </button>
+      </header>
 
-        <h1 className="text-3xl font-bold text-text tracking-tight mb-2">
-          Verify Your Email
-        </h1>
-        <p className="text-text-muted text-sm mb-6 max-w-sm mx-auto">
-          We sent an account activation link to <br />
-          <span className="text-accent font-semibold">{user?.email}</span>
-        </p>
+      <div className="flex flex-1 flex-col items-center justify-center px-4 py-10">
+        <div className="w-full max-w-md space-y-6">
+          <div className="space-y-1.5">
+            <h1 className="text-xl font-semibold tracking-tight text-zinc-100">
+              Verify your email
+            </h1>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              We sent an activation link to{' '}
+              <span className="font-medium text-[#E7B956]">{user?.email}</span>.
+            </p>
+          </div>
 
-        <Card className="backdrop-blur-xl bg-card/90 border-border shadow-2xl p-6 text-left space-y-4">
-          <div className="bg-primary border border-border rounded-lg p-4 space-y-2">
-            <div className="flex items-center space-x-2 text-xs font-semibold text-zinc-300 uppercase tracking-wider">
-              <CheckCircle2 size={16} className="text-accent" />
-              <span>Next steps to activate your account:</span>
+          <div className="divide-y divide-white/[0.08] border-y border-white/[0.08] text-xs text-zinc-400">
+            <div className="py-4 space-y-2">
+              <p className="font-medium text-zinc-200">Next steps</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Open your inbox for <strong className="text-zinc-200">{user?.email}</strong></li>
+                <li>Click the activation link from ARCA / Firebase</li>
+                <li>Return here and confirm activation</li>
+              </ol>
             </div>
-            <ol className="list-decimal list-inside text-xs text-text-muted space-y-1.5 pl-1">
-              <li>Open your email inbox for <strong className="text-zinc-200">{user?.email}</strong></li>
-              <li>Click the activation link inside the email from <strong>ARCA / Firebase</strong></li>
-              <li>Return here and click <strong>"I've Activated My Account"</strong></li>
-            </ol>
+
+            <div className="py-4 space-y-1.5">
+              <p className="font-medium text-[#E7B956]">Check Spam / Junk folder</p>
+              <p className="leading-relaxed text-zinc-500">
+                Messages from <code className="text-zinc-300">noreply@arca-budgeting.firebaseapp.com</code> can occasionally land in Spam or Promotions. Mark as Not Spam to ensure future alerts arrive.
+              </p>
+            </div>
           </div>
 
-          {/* Spam Prevention & Inbox Tips Box */}
-          <div className="bg-card border border-border rounded-lg p-3.5 space-y-2 text-xs text-text-muted">
-            <p className="font-semibold flex items-center gap-1 text-accent">
-              Check your Spam / Junk folder
-            </p>
-            <p className="text-text-muted leading-relaxed text-[11px]">
-              Verification emails from <code className="bg-primary px-1 py-0.5 rounded text-accent">ARCA-support@arca-budgeting.com</code> (or <code className="bg-primary px-1 py-0.5 rounded text-accent">noreply@arca-budgeting.firebaseapp.com</code>) are sometimes flagged by Spam filters (Gmail, Outlook, Yahoo).
-            </p>
-            <ul className="list-disc list-inside text-[11px] text-text-muted space-y-1 pl-1">
-              <li>Check your <strong>Spam / Junk / Promotions</strong> folder</li>
-              <li>Click <strong>"Not Spam"</strong> in Gmail to move it to your Primary inbox</li>
-              <li>Add <code className="bg-primary px-1 py-0.5 rounded text-accent">ARCA-support@arca-budgeting.com</code> to your contacts</li>
-            </ul>
-          </div>
-
-          <div className="space-y-3 pt-2">
+          <div className="space-y-2.5">
             <button
               type="button"
               onClick={handleRefresh}
               disabled={checking}
-              className="w-full bg-accent hover:bg-accent-hover text-primary font-semibold py-3 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm shadow-md disabled:opacity-50"
+              className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#E7B956] text-xs font-semibold text-[#090908] hover:bg-[#d8aa45] disabled:opacity-50 cursor-pointer"
             >
-              <RefreshCw size={18} className={checking ? 'animate-spin' : ''} />
-              <span>{checking ? 'Checking Status...' : "I've Activated My Account"}</span>
+              <RefreshCw className={`h-3.5 w-3.5 ${checking ? 'animate-spin' : ''}`} strokeWidth={1.75} />
+              <span>{checking ? 'Checking status...' : "I've activated my account"}</span>
             </button>
 
             <button
               type="button"
               onClick={handleResend}
               disabled={resending}
-              className="w-full bg-primary hover:bg-card-hover border border-border text-zinc-300 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center space-x-2 text-xs"
+              className="flex h-9 w-full items-center justify-center rounded-md border border-white/[0.1] bg-[#111110] text-xs font-medium text-zinc-200 hover:bg-[#171715] cursor-pointer"
             >
-              <span>{resending ? 'Sending...' : 'Resend Activation Email'}</span>
+              {resending ? 'Sending...' : 'Resend activation email'}
             </button>
 
             <button
               type="button"
               onClick={handleDeferVerification}
-              className="w-full bg-[#2e5b45]/30 hover:bg-[#2e5b45]/40 border border-[#2e5b45]/60 text-zinc-200 font-semibold py-2.5 rounded-lg transition-all flex items-center justify-center space-x-2 text-xs shadow-sm cursor-pointer"
+              className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-white/[0.1] text-xs font-medium text-zinc-300 hover:border-white/[0.2] hover:text-zinc-100 cursor-pointer"
             >
-              <ArrowRight size={15} className="text-accent shrink-0" />
-              <span>Continue to My Dashboard (Activate Later) →</span>
+              <span>Continue to dashboard (activate later)</span>
+              <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
             </button>
 
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Explore as Guest"
               onClick={() => {
                 loginAsGuest();
-                toast.success('Switched to Guest mode! Welcome to ARCA.');
+                toast.success('Switched to Guest mode.');
               }}
-              className="w-full bg-card hover:bg-card-hover border border-accent/40 text-accent font-semibold py-2.5 rounded-lg transition-all flex items-center justify-center space-x-2 text-xs shadow-sm cursor-pointer"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  loginAsGuest();
+                  toast.success('Switched to Guest mode.');
+                }
+              }}
+              className="flex min-h-[38px] w-full items-center justify-between gap-2 rounded-full border border-[#E7B956]/30 px-4 py-1.5 text-xs font-medium text-[#E7B956] hover:border-[#E7B956] cursor-pointer"
             >
-              <HelpCircle size={15} className="text-accent" />
-              <span>Explore as Guest & Launch Tutorial →</span>
-            </button>
+              <span className="inline-flex items-center gap-1.5 min-w-0">
+                <HelpCircle className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                <span className="truncate">Explore as Guest</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 shrink-0">
+                <LeavingSoonBadge />
+                <ArrowRight className="h-3.5 w-3.5 text-zinc-500" strokeWidth={1.5} />
+              </span>
+            </div>
 
             <button
               type="button"
               onClick={logout}
-              className="w-full text-xs text-zinc-500 hover:text-red-400 transition-colors text-center py-2 flex items-center justify-center space-x-1"
+              className="flex w-full items-center justify-center gap-1.5 py-2 text-xs text-zinc-500 hover:text-rose-400 cursor-pointer"
             >
-              <LogOut size={14} />
-              <span>Sign out / Back to Login</span>
+              <LogOut className="h-3.5 w-3.5" strokeWidth={1.5} />
+              <span>Sign out</span>
             </button>
           </div>
-        </Card>
-
+        </div>
       </div>
     </div>
   );

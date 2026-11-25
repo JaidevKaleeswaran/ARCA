@@ -3,46 +3,47 @@ import { ArrowLeft } from 'lucide-react';
 
 export default function PrivacyPage({ navigate }) {
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8 bg-primary text-text">
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-12 sm:py-16 space-y-8">
       {/* Back button */}
       <button
+        type="button"
         onClick={() => {
           navigate('/');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        className="inline-flex items-center space-x-2 text-xs font-medium text-text-muted hover:text-accent transition-colors cursor-pointer"
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-950 transition-colors cursor-pointer"
       >
-        <ArrowLeft size={14} />
-        <span>Back to Overview</span>
+        <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.5} />
+        <span>Back to overview</span>
       </button>
 
-      <div className="bg-card border border-border rounded-xl p-6 sm:p-10 space-y-8">
+      <div className="rounded-lg border border-zinc-200/80 bg-white p-6 sm:p-10 space-y-8">
         {/* Header */}
-        <div className="border-b border-border pb-6 space-y-2">
-          <p className="text-xs uppercase tracking-widest text-accent font-mono">
+        <div className="border-b border-zinc-200/80 pb-6 space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
             Legal Documentation
           </p>
-          <h1 className="text-2xl sm:text-4xl font-semibold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-zinc-950">
             Privacy Policy
           </h1>
-          <p className="text-xs font-mono text-text-muted">
+          <p className="text-xs font-mono text-zinc-500 tabular-nums">
             Last updated: November 14, 2026
           </p>
         </div>
 
         {/* Verbatim Privacy Policy Content */}
-        <div className="text-xs sm:text-sm text-text-muted space-y-6 leading-relaxed">
-          <div className="bg-primary p-3.5 rounded-lg border border-accent/30 text-xs font-mono space-y-1">
-            <p><strong className="text-white">Application Name:</strong> ARCA ("We," "Our," or "Us")</p>
-            <p><strong className="text-white">Operated By:</strong> <span className="text-accent">ARCA Budgeting</span></p>
+        <div className="text-xs sm:text-sm text-zinc-600 space-y-6 leading-relaxed">
+          <div className="rounded-md border border-zinc-200/80 bg-[#F8F8F7] p-3.5 text-xs font-mono space-y-1">
+            <p><strong className="text-zinc-950">Application Name:</strong> ARCA (&quot;We,&quot; &quot;Our,&quot; or &quot;Us&quot;)</p>
+            <p><strong className="text-zinc-950">Operated By:</strong> <span className="text-zinc-900">ARCA Budgeting</span></p>
           </div>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               1. Who We Are
             </h2>
             <p>
-              ARCA Budgeting ("we," "us," "our") operates ARCA (the "App"), an AI-powered budgeting app. This Privacy Policy explains what information we collect, how we use it, who we share it with, and the choices you have. Questions? Contact us at ARCAbudgeting@gmail.com.
+              ARCA Budgeting (&quot;we,&quot; &quot;us,&quot; &quot;our&quot;) operates ARCA (the &quot;App&quot;), an AI-powered budgeting app. This Privacy Policy explains what information we collect, how we use it, who we share it with, and the choices you have. Questions? Contact us at ARCAbudgeting@gmail.com.
             </p>
             <p>
               By using the App, you agree to this Privacy Policy. If you do not agree, please do not use the App.
@@ -50,7 +51,7 @@ export default function PrivacyPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               2. Who Can Use the App
             </h2>
             <p>
@@ -59,40 +60,40 @@ export default function PrivacyPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               3. Information We Collect
             </h2>
 
-            <h3 className="text-sm font-semibold text-white pt-1">Information you give us</h3>
+            <h3 className="text-xs font-semibold text-zinc-900 pt-1">Information you give us</h3>
             <ul className="list-disc pl-5 space-y-2">
-              <li><strong className="text-white">Account information:</strong> name or nickname, email address, password (stored in hashed form), and your date of birth or age confirmation.</li>
-              <li><strong className="text-white">Budgeting and transaction data:</strong> transactions, amounts, categories, merchants, budgets, goals, and notes that you enter or approve.</li>
-              <li><strong className="text-white">Voice input:</strong> if you use the microphone feature to log a transaction, we process your audio to convert it into text and a transaction entry. We delete the audio immediately after it is transcribed. We keep only the resulting transaction details.</li>
-              <li><strong className="text-white">Receipt images:</strong> if you use the receipt scanner, we process the image to extract items, totals, dates, and merchants. We delete receipt images immediately after they are processed. We keep only the transaction details extracted from them.</li>
-              <li><strong className="text-white">AI assistant conversations:</strong> the questions you ask the AI financial assistant and its responses.</li>
+              <li><strong className="text-zinc-900">Account information:</strong> name or nickname, email address, password (stored in hashed form), and your date of birth or age confirmation.</li>
+              <li><strong className="text-zinc-900">Budgeting and transaction data:</strong> transactions, amounts, categories, merchants, budgets, goals, and notes that you enter or approve.</li>
+              <li><strong className="text-zinc-900">Voice input:</strong> if you use the microphone feature to log a transaction, we process your audio to convert it into text and a transaction entry. We delete the audio immediately after it is transcribed. We keep only the resulting transaction details.</li>
+              <li><strong className="text-zinc-900">Receipt images:</strong> if you use the receipt scanner, we process the image to extract items, totals, dates, and merchants. We delete receipt images immediately after they are processed. We keep only the transaction details extracted from them.</li>
+              <li><strong className="text-zinc-900">AI assistant conversations:</strong> the questions you ask the AI financial assistant and its responses.</li>
               <li>Support messages and feedback you send us.</li>
             </ul>
 
-            <h3 className="text-sm font-semibold text-white pt-1">Information collected automatically</h3>
+            <h3 className="text-xs font-semibold text-zinc-900 pt-1">Information collected automatically</h3>
             <ul className="list-disc pl-5 space-y-2">
-              <li><strong className="text-white">Device and usage information:</strong> device type, operating system, browser, IP address, language, pages and features used, crash reports, and timestamps.</li>
-              <li><strong className="text-white">Cookies and similar technologies:</strong> we do not use advertising or analytics cookies. We use browser storage only to keep you signed in. See Section 8.</li>
+              <li><strong className="text-zinc-900">Device and usage information:</strong> device type, operating system, browser, IP address, language, pages and features used, crash reports, and timestamps.</li>
+              <li><strong className="text-zinc-900">Cookies and similar technologies:</strong> we do not use advertising or analytics cookies. We use browser storage only to keep you signed in. See Section 8.</li>
             </ul>
 
-            <h3 className="text-sm font-semibold text-white pt-1">Information from third parties</h3>
+            <h3 className="text-xs font-semibold text-zinc-900 pt-1">Information from third parties</h3>
             <ul className="list-disc pl-5 space-y-2">
               <li>We do not currently connect to your bank accounts or receive data from banks.</li>
               <li>Market data providers send us market information. We do not send them your personal financial data.</li>
             </ul>
 
-            <h3 className="text-sm font-semibold text-white pt-1">Permissions</h3>
+            <h3 className="text-xs font-semibold text-zinc-900 pt-1">Permissions</h3>
             <p>
               The App will ask for permission to use your microphone and camera. You can decline or revoke these permissions in your device or browser settings. Some features will not work without them.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               4. How We Use Your Information
             </h2>
             <p>We use your information to:</p>
@@ -108,12 +109,12 @@ export default function PrivacyPage({ navigate }) {
               <li>Comply with legal obligations.</li>
             </ul>
             <p>
-              <strong className="text-white">AI training:</strong> We do not use your personal financial data, voice recordings, receipt images, or AI conversations to train AI models. Our AI provider is Google (Gemini). Google processes the information we send it under Google's own terms and privacy practices, which we do not control.
+              <strong className="text-zinc-900">AI training:</strong> We do not use your personal financial data, voice recordings, receipt images, or AI conversations to train AI models. Our AI provider is Google (Gemini). Google processes the information we send it under Google&apos;s own terms and privacy practices, which we do not control.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               5. How We Share Information
             </h2>
             <p>
@@ -121,10 +122,10 @@ export default function PrivacyPage({ navigate }) {
             </p>
             <p>We share information only in these situations:</p>
             <ul className="list-disc pl-5 space-y-2">
-              <li><strong className="text-white">Service providers</strong> who help us run the App, under confidentiality and data-protection obligations. These include: hosting (Vercel), database and user authentication (Google Firebase, including Firestore and Firebase Authentication), and AI processing, including converting voice to text and reading receipts (Google Gemini).</li>
-              <li><strong className="text-white">Legal and safety reasons:</strong> to comply with law, respond to lawful requests, enforce our Terms, or protect the rights, safety, and security of users, us, or others.</li>
-              <li><strong className="text-white">Business transfers:</strong> if we are involved in a merger, acquisition, financing, or sale of assets, your information may be transferred. We will notify you of any change in ownership or use of your information.</li>
-              <li><strong className="text-white">With your direction:</strong> when you ask us to share information or give us consent.</li>
+              <li><strong className="text-zinc-900">Service providers</strong> who help us run the App, under confidentiality and data-protection obligations. These include: hosting (Vercel), database and user authentication (Google Firebase, including Firestore and Firebase Authentication), and AI processing, including converting voice to text and reading receipts (Google Gemini).</li>
+              <li><strong className="text-zinc-900">Legal and safety reasons:</strong> to comply with law, respond to lawful requests, enforce our Terms, or protect the rights, safety, and security of users, us, or others.</li>
+              <li><strong className="text-zinc-900">Business transfers:</strong> if we are involved in a merger, acquisition, financing, or sale of assets, your information may be transferred. We will notify you of any change in ownership or use of your information.</li>
+              <li><strong className="text-zinc-900">With your direction:</strong> when you ask us to share information or give us consent.</li>
             </ul>
             <p>
               We may share aggregated or de-identified information that cannot reasonably be used to identify you.
@@ -132,7 +133,7 @@ export default function PrivacyPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               6. How Long We Keep Information
             </h2>
             <p>
@@ -141,7 +142,7 @@ export default function PrivacyPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               7. Your Choices and Rights
             </h2>
             <p>You can:</p>
@@ -153,24 +154,24 @@ export default function PrivacyPage({ navigate }) {
               <li>Revoke microphone, camera, or bank-connection permissions at any time.</li>
             </ul>
             <p>
-              <strong className="text-white">US state privacy rights.</strong> Depending on where you live (including California, Colorado, Connecticut, Virginia, Texas, and other states), you may have the right to know what personal information we collect, access it, correct it, delete it, receive a copy, and not be discriminated against for exercising these rights. To make a request, email ARCAbudgeting@gmail.com. We may need to verify your identity. You may use an authorized agent, and you may appeal a denial by replying to our decision.
+              <strong className="text-zinc-900">US state privacy rights.</strong> Depending on where you live (including California, Colorado, Connecticut, Virginia, Texas, and other states), you may have the right to know what personal information we collect, access it, correct it, delete it, receive a copy, and not be discriminated against for exercising these rights. To make a request, email ARCAbudgeting@gmail.com. We may need to verify your identity. You may use an authorized agent, and you may appeal a denial by replying to our decision.
             </p>
             <p>
-              <strong className="text-white">Users in the EEA, UK, or Switzerland.</strong> Where those laws apply, our legal bases for processing are performance of our contract with you, our legitimate interests (such as security and improving the App), your consent (such as for optional marketing or microphone and camera features), and legal obligations. You may also have the right to object to or restrict processing and to complain to your local data protection authority.
+              <strong className="text-zinc-900">Users in the EEA, UK, or Switzerland.</strong> Where those laws apply, our legal bases for processing are performance of our contract with you, our legitimate interests (such as security and improving the App), your consent (such as for optional marketing or microphone and camera features), and legal obligations. You may also have the right to object to or restrict processing and to complain to your local data protection authority.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               8. Cookies and Browser Storage
             </h2>
             <p>
-              We do not use advertising or analytics cookies, and the App does not ask you to accept cookies. To keep you signed in, our authentication provider (Firebase Authentication) stores a login token in your browser's local storage. This is strictly necessary for the App to work. You can remove it by signing out or clearing your browser data, after which you will need to sign in again.
+              We do not use advertising or analytics cookies, and the App does not ask you to accept cookies. To keep you signed in, our authentication provider (Firebase Authentication) stores a login token in your browser&apos;s local storage. This is strictly necessary for the App to work. You can remove it by signing out or clearing your browser data, after which you will need to sign in again.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               9. Security
             </h2>
             <p>
@@ -179,7 +180,7 @@ export default function PrivacyPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               10. Financial Information and AI
             </h2>
             <p>
@@ -188,7 +189,7 @@ export default function PrivacyPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               11. Information for Parents and Guardians
             </h2>
             <p>
@@ -197,7 +198,7 @@ export default function PrivacyPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               12. International Transfers
             </h2>
             <p>
@@ -206,7 +207,7 @@ export default function PrivacyPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               13. Third-Party Links and Services
             </h2>
             <p>
@@ -215,16 +216,16 @@ export default function PrivacyPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               14. Changes to This Policy
             </h2>
             <p>
-              We may update this Privacy Policy from time to time. We will post the new version with a new "Last updated" date and, for material changes, notify you in the App or by email before they take effect.
+              We may update this Privacy Policy from time to time. We will post the new version with a new &quot;Last updated&quot; date and, for material changes, notify you in the App or by email before they take effect.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               15. Contact Us
             </h2>
             <p>

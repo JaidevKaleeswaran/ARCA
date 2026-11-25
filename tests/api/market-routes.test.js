@@ -52,6 +52,37 @@ describe('Market Data & Financial News Routes (/api/markets)', () => {
     expect(res.body.marketCap).toMatch(/^\$[\d\.]+[BTM]/);
   });
 
+  it('GET /api/markets/history/AAPL returns accurate live price and historical chart points', async () => {
+    const res = await request(app).get('/api/markets/history/AAPL?range=3mo');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('symbol', 'AAPL');
+    expect(res.body).toHaveProperty('range', '3mo');
+    expect(typeof res.body.price).toBe('number');
+    expect(res.body.price).toBeGreaterThan(0);
+    expect(typeof res.body.periodChange).toBe('number');
+    expect(typeof res.body.periodChangePercent).toBe('number');
+    expect(res.body.sinceDate).toBeTruthy();
+    expect(Array.isArray(res.body.points)).toBe(true);
+    expect(res.body.points.length).toBeGreaterThan(10);
+    expect(res.body.stats).toHaveProperty('marketCap');
+  });
+
+  it('GET /api/markets/history/BRK.B?range=1d normalizes dual-class tickers and slices intraday session', async () => {
+    const res = await request(app).get('/api/markets/history/BRK.B?range=1d');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('symbol', 'BRK.B');
+    expect(res.body).toHaveProperty('range', '1d');
+    expect(res.body.price).toBeGreaterThan(0);
+    expect(Array.isArray(res.body.points)).toBe(true);
+    expect(res.body.points.length).toBeGreaterThan(0);
+  });
+
+  it('GET /api/markets/history/:symbol rejects invalid symbols with 400', async () => {
+    const res = await request(app).get('/api/markets/history/INVALID$$$TICKER');
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('error');
+  });
+
   it('POST /api/markets/quotes returns batch quote dictionary', async () => {
     const res = await request(app)
       .post('/api/markets/quotes')

@@ -7,20 +7,22 @@ import AboutPage from './pages/AboutPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 
+const VALID_PATHS = ['/', '/why-arca', '/about', '/privacy', '/terms'];
+
 export default function App() {
   const [currentPath, setCurrentPath] = useState(() => {
     if (typeof window !== 'undefined') {
       const pathname = window.location.pathname;
-      const validPaths = ['/', '/why-arca', '/about', '/privacy', '/terms'];
-      return validPaths.includes(pathname) ? pathname : '/';
+      return VALID_PATHS.includes(pathname) ? pathname : '/';
     }
     return '/';
   });
 
-  // App redirect URL: points to the main ARCA webapp
-  const appUrl = (typeof window !== 'undefined' && window.location.hostname === 'localhost')
-    ? 'http://localhost:5173'
-    : (import.meta.env.VITE_APP_URL || 'https://arca-budgeting.vercel.app');
+  // Points to the main ARCA webapp
+  const appUrl =
+    typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      ? 'http://localhost:5173'
+      : import.meta.env.VITE_APP_URL || 'https://arca-budgeting.vercel.app';
 
   const navigate = (path) => {
     setCurrentPath(path);
@@ -32,7 +34,7 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const pathname = window.location.pathname;
-      setCurrentPath(pathname || '/');
+      setCurrentPath(VALID_PATHS.includes(pathname) ? pathname : '/');
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -40,7 +42,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-primary text-text">
+    <div className="min-h-screen flex flex-col bg-[#F8F8F7] text-zinc-950 antialiased">
       <Navbar currentPath={currentPath} navigate={navigate} appUrl={appUrl} />
 
       <main className="flex-1">

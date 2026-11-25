@@ -1,80 +1,103 @@
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { useBudget } from '../../contexts/BudgetContext';
-import { Card } from '../ui/Card';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { getCyclePaceMetrics } from '../../utils/cycleUtils';
+import PaceArc from '../ui/PaceArc';
 
+/**
+ * Chamfered Cash Flow & Allocation instrument panel with semicircular PaceArc.
+ */
 export default function MainBalanceChart() {
-  const { totalIncome, totalSpent } = useBudget();
-  const moneyLeft = Math.max(0, totalIncome - totalSpent);
-  
-  const data = [
-    { name: 'Total Spent', value: Math.min(totalSpent, totalIncome), color: '#e7b956' }, // Gold (Accent)
-    { name: 'Remaining', value: Math.max(0, totalIncome - totalSpent), color: '#2e5b45' }, // Forest Green
-  ];
+  const {
+    totalIncome = 0,
+    totalAllocated = 0,
+    totalSpent = 0,
+    portfolioCurrentValue = 0,
+    cycleStartDate,
+    cycleFrequency,
+  } = useBudget();
 
-  // If no income and no spent, show empty state
-  const isEmpty = totalIncome === 0 && totalSpent === 0;
-  
-  if (isEmpty) {
-    data[0] = { name: 'No Data', value: 1, color: '#2c2a24' };
-  }
-
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length && !isEmpty) {
-      return (
-        <div className="bg-card border border-border p-3 rounded-lg shadow-xl">
-          <p className="text-sm text-text-muted">{payload[0].name}</p>
-          <p className="font-semibold text-text" style={{ color: payload[0].payload.color }}>
-            {formatCurrency(payload[0].value)}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
+  const pace = getCyclePaceMetrics(cycleStartDate, cycleFrequency);
+  const remaining = Math.max(0, totalIncome - totalSpent);
+  const spentPct = totalIncome > 0 ? Math.min(100, (totalSpent / totalIncome) * 100) : 0;
+  const allocatedPct = totalIncome > 0 ? Math.min(100, (totalAllocated / totalIncome) * 100) : 0;
+  const totalAssets = remaining + portfolioCurrentValue;
+  const cashShare = totalAssets > 0 ? (remaining / totalAssets) * 100 : 0;
+  const equityShare = totalAssets > 0 ? (portfolioCurrentValue / totalAssets) * 100 : 0;
 
   return (
-    <Card className="h-full flex flex-col justify-center items-center min-h-[400px] relative">
-      <h2 className="text-xl font-semibold text-text absolute top-6 left-6">Balance Overview</h2>
-      
-      <div className="w-full h-[300px] mt-8">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              innerRadius={80}
-              outerRadius={110}
-              paddingAngle={0}
-              startAngle={90}
-              endAngle={-270}
-              dataKey="value"
-              stroke="none"
-              cornerRadius={0}
-            >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip content={<CustomTooltip />} cursor={{fill: 'transparent'}} />
-            <Legend verticalAlign="bottom" height={36} wrapperStyle={{ paddingTop: '20px' }} />
-          </PieChart>
-        </ResponsiveContainer>
+    <section className="arca-chamfer rounded-xl border border-white/[0.08] bg-[#111110]">
+      <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+          Cash Flow
+        </h2>
+        <span className="text-[11px] text-zinc-500 tabular-nums">
+          {Math.round(spentPct)}% spent
+        </span>
       </div>
 
-      {!isEmpty && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none mt-4">
-          <p className="text-sm text-text-muted">Remaining</p>
-          <p className="text-2xl font-bold text-text">{formatCurrency(moneyLeft)}</p>
+      {totalIncome === 0 && totalSpent === 0 && portfolioCurrentValue === 0 ? (
+        <div className="px-4 py-10 text-center text-xs text-zinc-500">No income set</div>
+      ) : (
+        <div className="divide-y divide-white/[0.06]">
+          <div className="flex items-center justify-between gap-4 p-4">
+            <div>
+              <span className="text-xs text-zinc-500">Remaining cash</span>
+              <p className="mt-1 text-2xl font-semibold text-zinc-100 tabular-nums">
+                {formatCurrency(remaining)}
+              </p>
+              <p className="mt-0.5 text-[11px] text-zinc-500 tabular-nums">
+                {formatCurrency(totalSpent)} / {formatCurrency(totalIncome)}
+              </p>
+            </div>
+            <PaceArc
+              spentPct={spentPct}
+              pacePct={pace.pacePct}
+              isOver={totalSpent > totalIncome}
+              size={72}
+            />
+          </div>
+
+          <div className="p-4 space-y-2">
+            <div className="flex items-baseline justify-between text-xs">
+              <span className="text-zinc-400">Assigned</span>
+              <span className="font-medium text-zinc-200 tabular-nums">
+                {formatCurrency(totalAllocated)} ({Math.round(allocatedPct)}%)
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  totalAllocated > totalIncome ? 'bg-rose-500' : 'bg-[#E7B956]'
+                }`}
+                style={{ width: `${Math.min(100, allocatedPct)}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="p-4 space-y-2">
+            <div className="flex items-baseline justify-between text-xs">
+              <span className="text-zinc-400">Cash vs. stocks</span>
+              <span className="font-medium text-zinc-200 tabular-nums">
+                {formatCurrency(totalAssets)}
+              </span>
+            </div>
+            <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
+              <div
+                className="h-full bg-zinc-200 transition-all duration-300"
+                style={{ width: `${cashShare}%` }}
+              />
+              <div
+                className="h-full bg-[#E7B956] transition-all duration-300"
+                style={{ width: `${equityShare}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-zinc-500 tabular-nums">
+              <span>Cash {Math.round(cashShare)}%</span>
+              <span>Stocks {Math.round(equityShare)}%</span>
+            </div>
+          </div>
         </div>
       )}
-      {isEmpty && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none mt-4">
-          <p className="text-sm text-text-muted">Setup income</p>
-          <p className="text-lg font-bold text-text">No Data</p>
-        </div>
-      )}
-    </Card>
+    </section>
   );
 }

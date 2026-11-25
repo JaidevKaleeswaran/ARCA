@@ -26,6 +26,9 @@ let cachedOverview = null;
 let lastOverviewTime = 0;
 const OVERVIEW_CACHE_TTL = 30 * 1000; // 30 seconds cache to stay real-time
 
+const historyCache = new Map();
+const HISTORY_CACHE_TTL = 30 * 1000; // 30 seconds per symbol+range
+
 const newsCache = new Map();
 const NEWS_CACHE_TTL = 2 * 60 * 1000; // 2 minutes news cache per topic
 
@@ -33,6 +36,46 @@ const NEWS_CACHE_TTL = 2 * 60 * 1000; // 2 minutes news cache per topic
 let cachedScreenerStocks = null;
 let lastScreenerFetchTime = 0;
 const SCREENER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+const HISTORY_RANGE_CONFIG = {
+  '1d':  { key: '1d',  days: 5,           interval: '5m',  includePrePost: false, label: '1D' },
+  '5d':  { key: '5d',  days: 10,          interval: '15m', includePrePost: false, label: '1W' },
+  '1w':  { key: '5d',  days: 10,          interval: '15m', includePrePost: false, label: '1W' },
+  '1mo': { key: '1mo', days: 32,          interval: '1d',  includePrePost: false, label: '1M' },
+  '1m':  { key: '1mo', days: 32,          interval: '1d',  includePrePost: false, label: '1M' },
+  '3mo': { key: '3mo', days: 95,          interval: '1d',  includePrePost: false, label: '3M' },
+  '3m':  { key: '3mo', days: 95,          interval: '1d',  includePrePost: false, label: '3M' },
+  '1y':  { key: '1y',  days: 370,         interval: '1d',  includePrePost: false, label: '1Y' },
+  '5y':  { key: '5y',  days: 365 * 5 + 8, interval: '1wk', includePrePost: false, label: '5Y' },
+};
+
+async function fetchQuotesSafely(symbols) {
+  if (!Array.isArray(symbols) || symbols.length === 0) return [];
+  try {
+    const res = await yf.quote(symbols);
+    return Array.isArray(res) ? res.filter(Boolean) : res ? [res] : [];
+  } catch (err) {
+    console.warn('Batch yf.quote failed, retrying in resilient chunks:', err.message);
+    const chunkSize = 50;
+    const chunks = [];
+    for (let i = 0; i < symbols.length; i += chunkSize) {
+      chunks.push(symbols.slice(i, i + chunkSize));
+    }
+    const settled = await Promise.allSettled(chunks.map((chunk) => yf.quote(chunk)));
+    const combined = [];
+    for (const item of settled) {
+      if (item.status === 'fulfilled' && item.value) {
+        if (Array.isArray(item.value)) {
+          combined.push(...item.value.filter(Boolean));
+        } else {
+          combined.push(item.value);
+        }
+      }
+    }
+    if (combined.length === 0) throw err;
+    return combined;
+  }
+}
 
 // ── Helper formatters ──
 function formatCap(cap) {
@@ -266,20 +309,20 @@ async function fetchRealMarketOverview() {
   const indexSymbols = ['^GSPC', '^IXIC', '^DJI', '^RUT'];
   const commoditySymbols = ['BTC-USD', 'ETH-USD', 'GC=F', 'CL=F'];
   const yieldSymbols = ['^TNX', '^IRX'];
-  const catalogSymbols = STOCK_CATALOG.map((s) => s.symbol === 'BRK.B' ? 'BRK-B' : s.symbol);
+  const catalogSymbols = STOCK_CATALOG.map((s) => toYahooSymbol(s.symbol));
 
   const allSymbols = [...indexSymbols, ...commoditySymbols, ...yieldSymbols, ...catalogSymbols];
 
   try {
     // Concurrently fetch Yahoo Finance quotes, FRED macro rates, and real news
     const [rawQuotes, macroData, newsDigest] = await Promise.all([
-      yf.quote(allSymbols),
+      fetchQuotesSafely(allSymbols),
       getMacroRates(),
       fetchRealMarketNews('general', 1),
     ]);
 
     const quoteMap = new Map();
-    (Array.isArray(rawQuotes) ? rawQuotes : [rawQuotes]).forEach((q) => {
+    rawQuotes.forEach((q) => {
       if (q && q.symbol) quoteMap.set(q.symbol, q);
     });
 
@@ -330,7 +373,7 @@ async function fetchRealMarketOverview() {
       const sym = toYahooSymbol(item.symbol);
       const q = quoteMap.get(sym);
       if (!q || !q.regularMarketPrice) {
-        return item;
+        return { ...item, isLive: false };
       }
       return {
         symbol: item.symbol,
@@ -344,6 +387,13 @@ async function fetchRealMarketOverview() {
         marketCap: formatCap(q.marketCap || q.netAssets || q.totalAssets) || item.marketCap || 'N/A',
         high52: q.fiftyTwoWeekHigh ? Number(q.fiftyTwoWeekHigh.toFixed(2)) : item.high52,
         low52: q.fiftyTwoWeekLow ? Number(q.fiftyTwoWeekLow.toFixed(2)) : item.low52,
+        previousClose: q.regularMarketPreviousClose ? Number(q.regularMarketPreviousClose.toFixed(2)) : null,
+        open: q.regularMarketOpen ? Number(q.regularMarketOpen.toFixed(2)) : null,
+        dayHigh: q.regularMarketDayHigh ? Number(q.regularMarketDayHigh.toFixed(2)) : null,
+        dayLow: q.regularMarketDayLow ? Number(q.regularMarketDayLow.toFixed(2)) : null,
+        exchange: q.fullExchangeName || q.exchange || 'US',
+        marketState: q.marketState || null,
+        isLive: true,
       };
     });
 
@@ -357,6 +407,8 @@ async function fetchRealMarketOverview() {
       economicIndicators: macroData.economicIndicators,
       budgetAdviceHighlights: macroData.budgetAdviceHighlights,
       macroRaw: macroData.raw,
+      isLive: true,
+      asOf: new Date().toISOString(),
     };
 
     cachedOverview = overviewData;
@@ -578,6 +630,217 @@ router.get('/quote/:symbol', marketsLimiter, async (req, res) => {
 });
 
 /**
+ * GET /api/markets/history/:symbol
+ * Fetches accurate live quote + real historical price series from Yahoo Finance
+ * Supported ?range=1d|5d|1mo|3mo|1y|5y (default 3mo)
+ */
+router.get('/history/:symbol', marketsLimiter, async (req, res) => {
+  const rawSym = String(req.params.symbol || '').toUpperCase().trim();
+  if (!rawSym || !/^[A-Z0-9.\-^=]{1,12}$/.test(rawSym)) {
+    return res.status(400).json({ error: 'Invalid ticker symbol' });
+  }
+
+  const rangeParam = String(req.query.range || '3mo').toLowerCase().trim();
+  const cfg = HISTORY_RANGE_CONFIG[rangeParam] || HISTORY_RANGE_CONFIG['3mo'];
+  const yahooSym = toYahooSymbol(rawSym);
+  const displaySym = normalizeTickerDisplay(rawSym);
+  const cacheKey = `${yahooSym}_${cfg.key}`;
+  const nowMs = Date.now();
+
+  const cached = historyCache.get(cacheKey);
+  if (cached && (nowMs - cached.time) < HISTORY_CACHE_TTL) {
+    return res.json(cached.data);
+  }
+
+  const now = new Date(nowMs);
+  const period1 = new Date(nowMs - cfg.days * 86400 * 1000);
+
+  try {
+    const [chartRes, quoteRes] = await Promise.allSettled([
+      yf.chart(yahooSym, {
+        period1,
+        period2: now,
+        interval: cfg.interval,
+        includePrePost: cfg.includePrePost,
+      }),
+      yf.quote(yahooSym),
+    ]);
+
+    const chart = chartRes.status === 'fulfilled' ? chartRes.value : null;
+    const q = quoteRes.status === 'fulfilled' ? quoteRes.value : null;
+
+    let rawPoints = (chart?.quotes || []).filter(
+      (p) => p && p.date && typeof p.close === 'number' && !Number.isNaN(p.close) && p.close > 0
+    );
+
+    // Slice clean regular trading days for intraday ranges (handles weekends/holidays)
+    if ((cfg.key === '1d' || cfg.key === '5d') && rawPoints.length > 0) {
+      const nyDayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' });
+      const byDay = new Map();
+      for (const p of rawPoints) {
+        const dayKey = nyDayFmt.format(new Date(p.date));
+        if (!byDay.has(dayKey)) byDay.set(dayKey, []);
+        byDay.get(dayKey).push(p);
+      }
+      const sortedDays = Array.from(byDay.keys()).sort();
+      if (cfg.key === '1d' && sortedDays.length > 0) {
+        rawPoints = byDay.get(sortedDays[sortedDays.length - 1]) || rawPoints;
+      } else if (cfg.key === '5d' && sortedDays.length > 5) {
+        const recent5 = sortedDays.slice(-5);
+        rawPoints = recent5.flatMap((d) => byDay.get(d) || []);
+      }
+    }
+
+    const points = rawPoints.map((p) => {
+      const dt = new Date(p.date);
+      return {
+        t: dt.getTime(),
+        date: dt.toISOString(),
+        price: Number(p.close.toFixed(2)),
+        open: typeof p.open === 'number' && !Number.isNaN(p.open) ? Number(p.open.toFixed(2)) : null,
+        high: typeof p.high === 'number' && !Number.isNaN(p.high) ? Number(p.high.toFixed(2)) : null,
+        low: typeof p.low === 'number' && !Number.isNaN(p.low) ? Number(p.low.toFixed(2)) : null,
+        volume: typeof p.volume === 'number' ? p.volume : null,
+      };
+    });
+
+    const livePriceRaw =
+      q?.regularMarketPrice ??
+      chart?.meta?.regularMarketPrice ??
+      points[points.length - 1]?.price;
+
+    if (typeof livePriceRaw !== 'number' || Number.isNaN(livePriceRaw) || livePriceRaw <= 0) {
+      return res.status(404).json({ error: `Historical data unavailable for ${displaySym}` });
+    }
+
+    const price = Number(livePriceRaw.toFixed(2));
+
+    // Align final point to exact live market price so chart tip matches headline price
+    if (points.length > 0) {
+      const lastPt = points[points.length - 1];
+      if (Math.abs(lastPt.price - price) >= 0.01) {
+        const quoteTimeMs = q?.regularMarketTime ? new Date(q.regularMarketTime).getTime() : nowMs;
+        if (quoteTimeMs > lastPt.t + 60 * 1000) {
+          points.push({
+            t: quoteTimeMs,
+            date: new Date(quoteTimeMs).toISOString(),
+            price,
+            open: null,
+            high: null,
+            low: null,
+            volume: null,
+          });
+        } else {
+          points[points.length - 1] = { ...lastPt, price };
+        }
+      }
+    }
+
+    const prevClose =
+      typeof q?.regularMarketPreviousClose === 'number'
+        ? Number(q.regularMarketPreviousClose.toFixed(2))
+        : typeof chart?.meta?.previousClose === 'number'
+          ? Number(chart.meta.previousClose.toFixed(2))
+          : typeof chart?.meta?.chartPreviousClose === 'number'
+            ? Number(chart.meta.chartPreviousClose.toFixed(2))
+            : null;
+
+    const firstPoint = points[0] || null;
+    const referencePrice =
+      cfg.key === '1d'
+        ? (prevClose ?? firstPoint?.price ?? price)
+        : (firstPoint?.price ?? prevClose ?? price);
+
+    const periodChange = Number((price - referencePrice).toFixed(2));
+    const periodChangePercent =
+      referencePrice > 0 ? Number(((periodChange / referencePrice) * 100).toFixed(2)) : 0;
+
+    const dayChange =
+      typeof q?.regularMarketChange === 'number'
+        ? Number(q.regularMarketChange.toFixed(2))
+        : prevClose
+          ? Number((price - prevClose).toFixed(2))
+          : periodChange;
+    const dayChangePercent =
+      typeof q?.regularMarketChangePercent === 'number'
+        ? Number(q.regularMarketChangePercent.toFixed(2))
+        : prevClose && prevClose > 0
+          ? Number((((price - prevClose) / prevClose) * 100).toFixed(2))
+          : periodChangePercent;
+
+    const sinceDate =
+      cfg.key === '1d'
+        ? 'prev close'
+        : firstPoint
+          ? new Intl.DateTimeFormat('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+              timeZone: 'America/New_York',
+            }).format(new Date(firstPoint.t))
+          : '';
+
+    const pricesOnly = points.map((p) => p.price);
+    const periodHigh = pricesOnly.length > 0 ? Math.max(...pricesOnly) : price;
+    const periodLow = pricesOnly.length > 0 ? Math.min(...pricesOnly) : price;
+
+    const foundCatalog = STOCK_CATALOG.find((s) => s.symbol.toUpperCase() === displaySym);
+
+    const payload = {
+      symbol: displaySym,
+      name: q?.shortName || q?.longName || chart?.meta?.shortName || foundCatalog?.name || displaySym,
+      sector: q?.sectorDisp || q?.sector || foundCatalog?.sector || (q?.quoteType === 'ETF' ? 'ETFs' : 'Equities'),
+      range: cfg.key,
+      rangeLabel: cfg.label,
+      price,
+      referencePrice: Number(referencePrice.toFixed(2)),
+      periodChange,
+      periodChangePercent,
+      sinceDate,
+      dayChange,
+      dayChangePercent,
+      periodHigh: Number(periodHigh.toFixed(2)),
+      periodLow: Number(periodLow.toFixed(2)),
+      points,
+      stats: {
+        open: typeof q?.regularMarketOpen === 'number' ? Number(q.regularMarketOpen.toFixed(2)) : null,
+        previousClose: prevClose,
+        dayHigh: typeof q?.regularMarketDayHigh === 'number' ? Number(q.regularMarketDayHigh.toFixed(2)) : null,
+        dayLow: typeof q?.regularMarketDayLow === 'number' ? Number(q.regularMarketDayLow.toFixed(2)) : null,
+        high52: typeof q?.fiftyTwoWeekHigh === 'number' ? Number(q.fiftyTwoWeekHigh.toFixed(2)) : (foundCatalog?.high52 ?? null),
+        low52: typeof q?.fiftyTwoWeekLow === 'number' ? Number(q.fiftyTwoWeekLow.toFixed(2)) : (foundCatalog?.low52 ?? null),
+        marketCap: formatCap(q?.marketCap || q?.netAssets || q?.totalAssets) || foundCatalog?.marketCap || 'N/A',
+        pe: typeof q?.trailingPE === 'number' ? Number(q.trailingPE.toFixed(1)) : (foundCatalog?.pe ?? null),
+        volume: formatVol(q?.regularMarketVolume),
+        avgVolume: formatVol(q?.averageDailyVolume3Month || q?.averageDailyVolume10Day),
+        exchange: q?.fullExchangeName || q?.exchange || chart?.meta?.exchangeName || 'US',
+        currency: q?.currency || chart?.meta?.currency || 'USD',
+        marketState: q?.marketState || null,
+        postMarketPrice: typeof q?.postMarketPrice === 'number' ? Number(q.postMarketPrice.toFixed(2)) : null,
+        postMarketChange: typeof q?.postMarketChange === 'number' ? Number(q.postMarketChange.toFixed(2)) : null,
+        postMarketChangePercent: typeof q?.postMarketChangePercent === 'number' ? Number(q.postMarketChangePercent.toFixed(2)) : null,
+        preMarketPrice: typeof q?.preMarketPrice === 'number' ? Number(q.preMarketPrice.toFixed(2)) : null,
+        preMarketChange: typeof q?.preMarketChange === 'number' ? Number(q.preMarketChange.toFixed(2)) : null,
+        preMarketChangePercent: typeof q?.preMarketChangePercent === 'number' ? Number(q.preMarketChangePercent.toFixed(2)) : null,
+      },
+      asOf: new Date().toISOString(),
+      isLive: true,
+    };
+
+    if (historyCache.size > 200) {
+      const oldestKey = historyCache.keys().next().value;
+      if (oldestKey) historyCache.delete(oldestKey);
+    }
+    historyCache.set(cacheKey, { time: nowMs, data: payload });
+
+    return res.json(payload);
+  } catch (err) {
+    console.warn(`History fetch error for ${displaySym}:`, err.message);
+    return res.status(500).json({ error: `Could not fetch price history for ${displaySym}` });
+  }
+});
+
+/**
  * POST /api/markets/quotes
  * Batch live quotes for arbitrary symbols (e.g. user portfolio holdings)
  */
@@ -589,27 +852,27 @@ router.post('/quotes', marketsLimiter, async (req, res) => {
 
   try {
     const cleanSymbols = symbols.map(s => toYahooSymbol(String(s))).filter(Boolean);
-    const rawQuotes = await yf.quote(cleanSymbols);
-    const quoteList = Array.isArray(rawQuotes) ? rawQuotes : [rawQuotes];
+    const quoteList = await fetchQuotesSafely(cleanSymbols);
     const quotes = {};
 
     quoteList.forEach(q => {
-      if (q && q.symbol) {
+      if (q && q.symbol && typeof q.regularMarketPrice === 'number' && q.regularMarketPrice > 0) {
         const originalSym = normalizeTickerDisplay(q.symbol);
         const found = STOCK_CATALOG.find(s => s.symbol.toUpperCase() === originalSym);
         quotes[originalSym] = {
           symbol: originalSym,
           name: q.shortName || q.longName || originalSym,
-          price: Number((q.regularMarketPrice ?? 0).toFixed(2)),
+          price: Number(q.regularMarketPrice.toFixed(2)),
           change: Number((q.regularMarketChange ?? 0).toFixed(2)),
           changePercent: Number((q.regularMarketChangePercent ?? 0).toFixed(2)),
           volume: formatVol(q.regularMarketVolume),
           marketCap: formatCap(q.marketCap || q.netAssets || q.totalAssets) || found?.marketCap || 'N/A',
+          isLive: true,
         };
       }
     });
 
-    return res.json({ quotes });
+    return res.json({ quotes, asOf: new Date().toISOString() });
   } catch (err) {
     console.warn('Batch quote error:', err.message);
     return res.status(500).json({ error: 'Could not fetch quotes' });
@@ -654,29 +917,31 @@ router.get('/search', marketsLimiter, async (req, res) => {
       if (sec) sectorMap.set(normalizeTickerDisplay(i.symbol), sec);
     });
 
-    const liveQuotes = await yf.quote(symbols.map(s => toYahooSymbol(s)));
-    const quoteList = Array.isArray(liveQuotes) ? liveQuotes : [liveQuotes];
+    const quoteList = await fetchQuotesSafely(symbols.map(s => toYahooSymbol(s)));
 
-    const results = quoteList.map(q => {
-      const cleanSym = normalizeTickerDisplay(q.symbol);
-      const dynamicSector = sectorMap.get(cleanSym)
-        || getSectorForSymbol(cleanSym)
-        || (q.quoteType === 'ETF' ? 'ETFs' : 'Equities');
+    const results = quoteList
+      .filter((q) => q && typeof q.regularMarketPrice === 'number' && q.regularMarketPrice > 0)
+      .map(q => {
+        const cleanSym = normalizeTickerDisplay(q.symbol);
+        const dynamicSector = sectorMap.get(cleanSym)
+          || getSectorForSymbol(cleanSym)
+          || (q.quoteType === 'ETF' ? 'ETFs' : 'Equities');
 
-      const foundCatalog = STOCK_CATALOG.find(s => s.symbol.toUpperCase() === cleanSym);
+        const foundCatalog = STOCK_CATALOG.find(s => s.symbol.toUpperCase() === cleanSym);
 
-      return {
-        symbol: cleanSym,
-        name: q.shortName || q.longName || cleanSym,
-        sector: dynamicSector,
-        price: Number(q.regularMarketPrice ? q.regularMarketPrice.toFixed(2) : 0),
-        change: Number(q.regularMarketChange ? q.regularMarketChange.toFixed(2) : 0),
-        changePercent: Number(q.regularMarketChangePercent ? q.regularMarketChangePercent.toFixed(2) : 0),
-        volume: formatVol(q.regularMarketVolume),
-        marketCap: formatCap(q.marketCap || q.netAssets || q.totalAssets) || foundCatalog?.marketCap || 'N/A',
-        pe: q.trailingPE ? Number(q.trailingPE.toFixed(1)) : null,
-      };
-    });
+        return {
+          symbol: cleanSym,
+          name: q.shortName || q.longName || cleanSym,
+          sector: dynamicSector,
+          price: Number(q.regularMarketPrice.toFixed(2)),
+          change: Number((q.regularMarketChange ?? 0).toFixed(2)),
+          changePercent: Number((q.regularMarketChangePercent ?? 0).toFixed(2)),
+          volume: formatVol(q.regularMarketVolume),
+          marketCap: formatCap(q.marketCap || q.netAssets || q.totalAssets) || foundCatalog?.marketCap || 'N/A',
+          pe: q.trailingPE ? Number(q.trailingPE.toFixed(1)) : null,
+          isLive: true,
+        };
+      });
 
     return res.json({ results });
   } catch (err) {

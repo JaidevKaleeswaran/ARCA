@@ -3,7 +3,7 @@ import {
   TrendingUp, TrendingDown, RefreshCw, DollarSign,
   Percent, Newspaper, Activity, ShieldCheck, ArrowUpRight,
   ArrowDownRight, Building2, Flame, Clock, Info, CheckCircle2,
-  ExternalLink, Search, Plus, Trash2, PieChart, Globe, AlertCircle
+  ExternalLink, Search, Plus, Trash2, PieChart, Globe, AlertCircle, Star
 } from 'lucide-react';
 import Reveal from '../ui/Reveal';
 import NumberTicker from '../ui/reactbits/NumberTicker';
@@ -14,11 +14,13 @@ import { formatCurrency } from '../../utils/formatCurrency';
 import { STOCK_CATALOG, DEFAULT_MARKET_DATA } from '../../data/marketData.js';
 import ArticleReaderModal from './ArticleReaderModal';
 import InvestStockModal from './InvestStockModal';
+import StockDetailDrawer from './StockDetailDrawer';
 import { toast } from 'react-hot-toast';
 
-export default function MarketTrackerTab() {
+export default function MarketTrackerTab({ mobileView = 'markets' }) {
   const {
     investments = [],
+    watchlist = [],
     portfolioCurrentValue = 0,
     portfolioTotalInvested = 0,
     portfolioTotalGain = 0,
@@ -26,9 +28,28 @@ export default function MarketTrackerTab() {
     dispatch,
   } = useBudget();
 
-  // State
+  // Detect mobile (< 768px) to split Markets and Financial pages on mobile ONLY
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 767px)');
+    const onChange = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const isMobileMarketsPage = isMobile && mobileView === 'markets';
+  const isMobileFinancialPage = isMobile && mobileView === 'financial';
+  const showMarketsSections = !isMobileFinancialPage;
+  const showFinancialSections = !isMobileMarketsPage;
+
+  // State — start empty until live Yahoo Finance quotes load so stale baseline prices never flash
   const [overview, setOverview] = useState(null);
-  const [catalog, setCatalog] = useState(STOCK_CATALOG);
+  const [catalog, setCatalog] = useState([]);
+  const [isFallbackBaseline, setIsFallbackBaseline] = useState(false);
   const [stockPage, setStockPage] = useState(1);
   const [isLoadingMoreStocks, setIsLoadingMoreStocks] = useState(false);
   const [hasMoreStocks, setHasMoreStocks] = useState(true);
@@ -37,23 +58,33 @@ export default function MarketTrackerTab() {
   const [isLoadingMoreNews, setIsLoadingMoreNews] = useState(false);
   const [selectedNewsTopic, setSelectedNewsTopic] = useState('all');
   const [searchResults, setSearchResults] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [activeTabFilter, setActiveTabFilter] = useState('all'); // 'all' | 'stocks' | 'news' | 'rates'
   const [selectedSector, setSelectedSector] = useState('all');
+  const [sectorGlow, setSectorGlow] = useState({ sector: null, nonce: 0 });
   const [searchQuery, setSearchQuery] = useState('');
   const [aiBriefing, setAiBriefing] = useState(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
   const isInitializedRef = useRef(false);
+  const investmentsRef = useRef(investments);
+  const watchlistRef = useRef(watchlist);
+  useEffect(() => {
+    investmentsRef.current = investments;
+  }, [investments]);
+  useEffect(() => {
+    watchlistRef.current = watchlist;
+  }, [watchlist]);
 
-  // Modals
+  // Modals & In-Depth Stock Drawer
   const [selectedStockToInvest, setSelectedStockToInvest] = useState(null);
   const [selectedArticleToRead, setSelectedArticleToRead] = useState(null);
+  const [selectedStockForDetail, setSelectedStockForDetail] = useState(null);
 
   // Fetch live market data from backend
-  const fetchMarketData = async (showToast = false) => {
+  const fetchMarketData = useCallback(async (showToast = false) => {
     setIsLoading(true);
     try {
       const apiBase = env.apiBaseUrl || '';
@@ -63,12 +94,18 @@ export default function MarketTrackerTab() {
         fetch(`${apiBase}/api/markets/news`),
       ]);
 
+      let loadedLiveStocks = false;
+      let parsedOverview = null;
+
       if (overviewRes.status === 'fulfilled' && overviewRes.value?.ok) {
         const oData = await overviewRes.value.json();
+        parsedOverview = oData;
         setOverview(oData);
+        setIsFallbackBaseline(false);
 
         // Update live prices in-place for existing catalog without truncating loaded pages or resetting view
         if (Array.isArray(oData.stocks) && oData.stocks.length > 0) {
+          loadedLiveStocks = true;
           const liveMap = new Map(oData.stocks.map((s) => [s.symbol.toUpperCase(), s]));
           setCatalog((prev) => {
             if (!prev || prev.length === 0) return oData.stocks.slice(0, 36);
@@ -76,10 +113,18 @@ export default function MarketTrackerTab() {
           });
         }
 
-        // Update user portfolio holdings with live real-time prices
+        // Update user portfolio holdings & favorited watchlist with live real-time quotes
         const quotes = {};
         (oData.stocks || []).forEach((s) => {
-          quotes[s.symbol] = s.price;
+          if (typeof s.price === 'number' && s.price > 0) {
+            quotes[s.symbol] = {
+              price: s.price,
+              change: s.change,
+              changePercent: s.changePercent,
+              marketCap: s.marketCap,
+              name: s.name,
+            };
+          }
         });
         dispatch({ type: 'REFRESH_PORTFOLIO_PRICES', payload: quotes });
       }
@@ -87,11 +132,19 @@ export default function MarketTrackerTab() {
       if (catalogRes.status === 'fulfilled' && catalogRes.value?.ok) {
         const catData = await catalogRes.value.json();
         if (Array.isArray(catData.stocks) && catData.stocks.length > 0) {
+          loadedLiveStocks = true;
           setCatalog(catData.stocks);
           setStockPage(1);
           setHasMoreStocks(catData.hasMore ?? (catData.stocks.length === 36));
+          setIsFallbackBaseline(false);
           isInitializedRef.current = true;
         }
+      }
+
+      // Only fall back to static baseline catalog if both live endpoints failed on initial load
+      if (!loadedLiveStocks && !isInitializedRef.current) {
+        setCatalog((prev) => (prev.length > 0 ? prev : STOCK_CATALOG.slice(0, 36)));
+        setIsFallbackBaseline(true);
       }
 
       if (newsRes.status === 'fulfilled' && newsRes.value?.ok) {
@@ -99,34 +152,40 @@ export default function MarketTrackerTab() {
         if (Array.isArray(newsData.articles) && newsData.articles.length > 0) {
           setArticles(newsData.articles);
         }
-      } else if (overviewRes.status === 'fulfilled' && overviewRes.value?.ok) {
-        const oData = await overviewRes.value.clone().json().catch(() => null);
-        if (oData && Array.isArray(oData.newsDigest)) {
-          setArticles(oData.newsDigest);
-        }
+      } else if (parsedOverview && Array.isArray(parsedOverview.newsDigest)) {
+        setArticles(parsedOverview.newsDigest);
       }
 
-      // Also refresh any custom stock holdings outside default universe
-      if (investments.length > 0) {
+      // Also refresh any custom stock holdings & favorited watchlist symbols outside default universe
+      const currentTrackedSymbols = Array.from(
+        new Set(
+          [
+            ...(investmentsRef.current || []).map((i) => i.symbol),
+            ...(watchlistRef.current || []).map((w) => w.symbol),
+          ].filter(Boolean)
+        )
+      );
+      if (currentTrackedSymbols.length > 0) {
         try {
-          const symbols = investments.map((i) => i.symbol);
           const bRes = await fetch(`${apiBase}/api/markets/quotes`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ symbols }),
+            body: JSON.stringify({ symbols: currentTrackedSymbols }),
           });
           if (bRes.ok) {
             const bData = await bRes.json();
             if (bData.quotes) {
               const liveMap = {};
               Object.values(bData.quotes).forEach((q) => {
-                liveMap[q.symbol] = q.price;
+                if (typeof q.price === 'number' && q.price > 0) {
+                  liveMap[q.symbol] = q;
+                }
               });
               dispatch({ type: 'REFRESH_PORTFOLIO_PRICES', payload: liveMap });
             }
           }
         } catch (hErr) {
-          console.warn('Could not batch refresh custom holdings:', hErr);
+          console.warn('Could not batch refresh tracked stocks:', hErr);
         }
       }
 
@@ -134,11 +193,15 @@ export default function MarketTrackerTab() {
       if (showToast) toast.success('Live quotes & market news refreshed!');
     } catch (err) {
       console.warn('Backend live market fetch failed:', err);
+      if (!isInitializedRef.current) {
+        setCatalog((prev) => (prev.length > 0 ? prev : STOCK_CATALOG.slice(0, 36)));
+        setIsFallbackBaseline(true);
+      }
       if (showToast) toast.error('Failed to refresh live market numbers');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [dispatch]);
 
   // Generate More Articles on Demand
   const handleGenerateMoreArticles = async () => {
@@ -211,6 +274,7 @@ export default function MarketTrackerTab() {
   // Switch Sector Filter
   const handleSelectSector = async (sec) => {
     setSelectedSector(sec);
+    setSectorGlow((prev) => ({ sector: sec, nonce: prev.nonce + 1 }));
     setSearchQuery('');
     setSearchResults(null);
     setStockPage(1);
@@ -258,33 +322,44 @@ export default function MarketTrackerTab() {
     }
   };
 
-  // Debounced live search
+  // Debounced live search with AbortController so clearing input cancels in-flight requests
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) {
       setSearchResults(null);
+      setIsSearching(false);
       return;
     }
 
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
         const apiBase = env.apiBaseUrl || '';
-        const res = await fetch(`${apiBase}/api/markets/search?q=${encodeURIComponent(q)}`);
-        if (res.ok) {
+        const res = await fetch(`${apiBase}/api/markets/search?q=${encodeURIComponent(q)}`, {
+          signal: controller.signal,
+        });
+        if (res.ok && !controller.signal.aborted) {
           const data = await res.json();
-          if (Array.isArray(data.results)) {
+          if (Array.isArray(data.results) && !controller.signal.aborted) {
             setSearchResults(data.results);
           }
         }
       } catch (err) {
-        console.warn('Live search error:', err);
+        if (err.name !== 'AbortError') {
+          console.warn('Live search error:', err);
+        }
       } finally {
-        setIsSearching(false);
+        if (!controller.signal.aborted) {
+          setIsSearching(false);
+        }
       }
     }, 350);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [searchQuery]);
 
   const handleGenerateAiBriefing = async () => {
@@ -321,7 +396,7 @@ export default function MarketTrackerTab() {
       fetchMarketData(false);
     }, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchMarketData]);
 
   // Filter stocks by sector (bypass sector filtering when searching)
   const filteredStocks = useMemo(() => {
@@ -352,8 +427,8 @@ export default function MarketTrackerTab() {
     }
   };
 
-  // Live indices from overview or fallback
-  const liveIndices = overview?.indices || DEFAULT_MARKET_DATA.indices;
+  // Live indices from overview (only show fallback baseline if initial fetch failed)
+  const liveIndices = overview?.indices || (isFallbackBaseline ? DEFAULT_MARKET_DATA.indices : null);
 
   const handleCloseArticleModal = useCallback(() => {
     setSelectedArticleToRead(null);
@@ -362,6 +437,160 @@ export default function MarketTrackerTab() {
   const handleCloseInvestModal = useCallback(() => {
     setSelectedStockToInvest(null);
   }, []);
+
+  const handleCloseDetailDrawer = useCallback(() => {
+    setSelectedStockForDetail(null);
+  }, []);
+
+  // Propagate fresh live quote from StockDetailDrawer into catalog, search results, and portfolio holdings
+  const handleDrawerQuoteLoaded = useCallback(
+    (liveData) => {
+      if (!liveData?.symbol || typeof liveData.price !== 'number' || liveData.price <= 0) return;
+      const symUpper = liveData.symbol.toUpperCase();
+      const patch = {
+        price: liveData.price,
+        change: typeof liveData.dayChange === 'number' ? liveData.dayChange : undefined,
+        changePercent: typeof liveData.dayChangePercent === 'number' ? liveData.dayChangePercent : undefined,
+        marketCap: liveData.stats?.marketCap || undefined,
+        volume: liveData.stats?.volume || undefined,
+        high52: liveData.stats?.high52 ?? undefined,
+        low52: liveData.stats?.low52 ?? undefined,
+      };
+      const applyPatch = (item) => {
+        if (!item || item.symbol?.toUpperCase() !== symUpper) return item;
+        return {
+          ...item,
+          price: patch.price,
+          change: patch.change ?? item.change,
+          changePercent: patch.changePercent ?? item.changePercent,
+          marketCap: patch.marketCap || item.marketCap,
+          volume: patch.volume || item.volume,
+          high52: patch.high52 ?? item.high52,
+          low52: patch.low52 ?? item.low52,
+          isLive: true,
+        };
+      };
+
+      setCatalog((prev) => prev.map(applyPatch));
+      setSearchResults((prev) => (Array.isArray(prev) ? prev.map(applyPatch) : prev));
+      const richQuote = {
+        price: liveData.price,
+        change: typeof liveData.dayChange === 'number' ? liveData.dayChange : undefined,
+        changePercent: typeof liveData.dayChangePercent === 'number' ? liveData.dayChangePercent : undefined,
+        marketCap: liveData.stats?.marketCap || undefined,
+      };
+      dispatch({
+        type: 'REFRESH_PORTFOLIO_PRICES',
+        payload: { [liveData.symbol]: richQuote, [symUpper]: richQuote },
+      });
+    },
+    [dispatch]
+  );
+
+  // Favorited symbols set & toggle handler
+  const favoriteSymbolSet = useMemo(
+    () => new Set(watchlist.map((w) => w.symbol?.toUpperCase()).filter(Boolean)),
+    [watchlist]
+  );
+
+  const handleToggleFavorite = useCallback(
+    (stock) => {
+      if (!stock?.symbol) return;
+      const symUpper = stock.symbol.toUpperCase();
+      const wasFav = favoriteSymbolSet.has(symUpper);
+      dispatch({
+        type: 'TOGGLE_FAVORITE_STOCK',
+        payload: {
+          symbol: symUpper,
+          name: stock.name || symUpper,
+          sector: stock.sector || 'Equities',
+          price: Number(stock.price) || 0,
+          change: Number(stock.change) || 0,
+          changePercent: Number(stock.changePercent) || 0,
+          marketCap: stock.marketCap || 'N/A',
+        },
+      });
+      toast.success(
+        wasFav ? `Removed ${symUpper} from favorites` : `Pinned ${symUpper} to top`
+      );
+    },
+    [dispatch, favoriteSymbolSet]
+  );
+
+  // Unified pinned list at top of Markets: all favorited stocks + any invested holdings (deduplicated)
+  const pinnedItems = useMemo(() => {
+    const liveLookup = new Map();
+    (overview?.stocks || []).forEach((s) => {
+      if (s?.symbol) liveLookup.set(s.symbol.toUpperCase(), s);
+    });
+    catalog.forEach((s) => {
+      if (s?.symbol) liveLookup.set(s.symbol.toUpperCase(), s);
+    });
+
+    const holdingMap = new Map();
+    investments.forEach((inv) => {
+      if (inv?.symbol) holdingMap.set(inv.symbol.toUpperCase(), inv);
+    });
+
+    const ordered = [];
+    const seen = new Set();
+
+    // 1. Favorited stocks first (preserving most recently favorited order)
+    watchlist.forEach((w) => {
+      const sym = w.symbol?.toUpperCase();
+      if (!sym || seen.has(sym)) return;
+      seen.add(sym);
+      const live = liveLookup.get(sym);
+      const holding = holdingMap.get(sym) || null;
+      ordered.push({
+        symbol: sym,
+        name: live?.name || holding?.name || w.name || sym,
+        sector: live?.sector || w.sector || 'Equities',
+        price: live?.price ?? holding?.currentPrice ?? (Number(w.price) || 0),
+        change: live?.change ?? (Number(w.change) || 0),
+        changePercent: live?.changePercent ?? (Number(w.changePercent) || 0),
+        marketCap: live?.marketCap || w.marketCap || 'N/A',
+        isFavorited: true,
+        holding,
+      });
+    });
+
+    // 2. Any owned holdings not already starred
+    investments.forEach((inv) => {
+      const sym = inv.symbol?.toUpperCase();
+      if (!sym || seen.has(sym)) return;
+      seen.add(sym);
+      const live = liveLookup.get(sym);
+      ordered.push({
+        symbol: sym,
+        name: live?.name || inv.name || sym,
+        sector: live?.sector || 'Equities',
+        price: live?.price ?? (Number(inv.currentPrice) || 0),
+        change: live?.change ?? 0,
+        changePercent: live?.changePercent ?? 0,
+        marketCap: live?.marketCap || 'N/A',
+        isFavorited: false,
+        holding: inv,
+      });
+    });
+
+    return ordered;
+  }, [watchlist, investments, catalog, overview?.stocks]);
+
+  const selectedDetailHolding = useMemo(() => {
+    if (!selectedStockForDetail?.symbol) return null;
+    const symUpper = selectedStockForDetail.symbol.toUpperCase();
+    return investments.find((i) => i.symbol?.toUpperCase() === symUpper) || null;
+  }, [investments, selectedStockForDetail]);
+
+  const selectedDetailIsFavorited = Boolean(
+    selectedStockForDetail?.symbol &&
+      favoriteSymbolSet.has(selectedStockForDetail.symbol.toUpperCase())
+  );
+
+  // Filter pill choices depend on whether mobile is showing Financial-only vs unified Desktop
+  const effectiveFilter =
+    isMobileFinancialPage && activeTabFilter === 'stocks' ? 'all' : activeTabFilter;
 
   return (
     <div className="space-y-6 pb-20">
@@ -379,80 +608,58 @@ export default function MarketTrackerTab() {
         onClose={handleCloseInvestModal}
       />
 
-      {/* ── Brand Header Banner ── */}
-      <Reveal delay={0} y={20}>
-        <div
-          data-tutorial="market-header-status"
-          className="relative w-full rounded-2xl overflow-hidden border border-border shadow-lg"
-          style={{
-            background: 'linear-gradient(135deg, rgba(231,185,86,0.14) 0%, rgba(46,91,69,0.2) 50%, rgba(140,109,55,0.18) 100%)',
-          }}
+      {/* ── In-Depth Stock Price Drawer (1/3rd right side, scroll-following below TabNavigation) ── */}
+      <StockDetailDrawer
+        stock={selectedStockForDetail}
+        holding={selectedDetailHolding}
+        isFavorited={selectedDetailIsFavorited}
+        onToggleFavorite={handleToggleFavorite}
+        onClose={handleCloseDetailDrawer}
+        onInvest={(stk) => setSelectedStockToInvest(stk)}
+        onQuoteLoaded={handleDrawerQuoteLoaded}
+      />
+
+      {/* ── Minimal Hairline Page Header ── */}
+      <div
+        data-tutorial="market-header-status"
+        className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-4"
+      >
+        <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-100">
+          {isMobileFinancialPage ? 'Financial' : 'Markets'}
+        </h1>
+
+        <button
+          type="button"
+          onClick={() => fetchMarketData(true)}
+          disabled={isLoading}
+          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/[0.1] bg-[#111110] px-3.5 text-xs font-medium text-zinc-200 transition-colors hover:border-[#E7B956]/50 hover:text-[#E7B956] cursor-pointer"
+          title="Refresh live data"
         >
-          <div className="px-5 py-4 sm:px-6 sm:py-5 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-accent/20 border border-accent/30 rounded-xl text-accent">
-                <TrendingUp size={24} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-white font-extrabold text-xl tracking-tight leading-none">
-                    Market Browser & Live Portfolio
-                  </h1>
-                  <span className="hidden sm:inline-flex text-[10px] bg-emerald-500/20 text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Live Market Data
-                  </span>
-                </div>
-                <p className="text-zinc-300 text-xs mt-1">
-                  Real-time stock quotes, major indices, live news from primary publishers, and portfolio tracking.
-                </p>
-              </div>
-            </div>
+          <RefreshCw
+            className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin text-[#E7B956]' : 'text-zinc-400'}`}
+            strokeWidth={1.5}
+          />
+          <span>{isLoading ? 'Refreshing...' : 'Refresh'}</span>
+        </button>
+      </div>
 
+      {/* ── PINNED FAVORITES & HOLDINGS STRIP (Markets section) ── */}
+      {showMarketsSections && (
+        <div
+          data-testid="pinned-stocks-strip"
+          className="arca-chamfer rounded-xl border border-white/[0.08] bg-[#111110] p-4 sm:p-5 relative overflow-hidden"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] pb-3 mb-3.5">
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 bg-card border border-border px-3 py-1.5 rounded-xl text-xs backdrop-blur-md">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-zinc-300 font-medium text-[11px]">
-                  {overview?.marketStatus?.statusText || 'US Markets Active'}
+              <Star className="h-3.5 w-3.5 fill-[#E7B956] text-[#E7B956]" strokeWidth={1.75} />
+              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+                Favorites &amp; Holdings
+              </h2>
+              {pinnedItems.length > 0 && (
+                <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-zinc-400 tabular-nums">
+                  {pinnedItems.length}
                 </span>
-                <span className="text-zinc-600 text-[10px]">•</span>
-                <span className="text-zinc-400 text-[10px]">{lastUpdated}</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => fetchMarketData(true)}
-                disabled={isLoading}
-                className="flex items-center gap-1.5 bg-card hover:bg-card-hover text-zinc-200 border border-border px-3 py-1.5 rounded-xl text-xs font-medium transition-all shadow-sm active:scale-95 cursor-pointer"
-                title="Refresh live prices"
-              >
-                <RefreshCw size={13} className={isLoading ? 'animate-spin text-accent' : 'text-zinc-400'} />
-                <span>{isLoading ? 'Fetching...' : 'Live Refresh'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </Reveal>
-
-      {/* ── PINNED LIVE UPDATING HOLDINGS TICKER BAR ── */}
-      <Reveal delay={0.05} y={20}>
-        <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3 mb-3.5">
-            <div className="flex items-center gap-2.5">
-              <div className="p-1.5 bg-accent/15 text-accent rounded-lg">
-                <PieChart size={18} />
-              </div>
-              <div>
-                <h2 className="text-sm sm:text-base font-extrabold text-white tracking-tight flex items-center gap-2">
-                  <span>Your Pinned Holdings</span>
-                  <span className="text-[10px] bg-emerald-500/15 text-emerald-400 font-mono px-2 py-0.5 rounded-full border border-emerald-500/20">
-                    Live Prices
-                  </span>
-                </h2>
-                <p className="text-[11px] text-zinc-400">
-                  Real-time equity valuations updating continuously across ARCA.
-                </p>
-              </div>
+              )}
             </div>
 
             {investments.length > 0 && (
@@ -465,7 +672,7 @@ export default function MarketTrackerTab() {
                 </div>
                 <div>
                   <span className="text-[10px] text-zinc-400 block">Total Return</span>
-                  <span className={`text-xs sm:text-sm font-bold font-mono ${portfolioTotalGain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`text-xs sm:text-sm font-bold font-mono ${portfolioTotalGain >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {portfolioTotalGain >= 0 ? '+' : ''}{formatCurrency(portfolioTotalGain)} ({portfolioTotalGain >= 0 ? '+' : ''}{portfolioTotalGainPercent.toFixed(2)}%)
                   </span>
                 </div>
@@ -473,158 +680,271 @@ export default function MarketTrackerTab() {
             )}
           </div>
 
-          {investments.length === 0 ? (
-            <div className="py-6 px-4 text-center rounded-xl bg-card border border-dashed border-border flex flex-col items-center justify-center space-y-2">
-              <Building2 size={26} className="text-accent/60" />
+          {pinnedItems.length === 0 ? (
+            <div className="py-5 px-4 text-center rounded-xl bg-card border border-dashed border-border flex flex-col items-center justify-center space-y-1.5">
+              <Star size={22} className="text-[#E7B956]/70" strokeWidth={1.5} />
               <p className="text-xs sm:text-sm font-semibold text-zinc-300">
-                You haven't added any stocks to your portfolio yet.
+                No favorited stocks yet
               </p>
-              <p className="text-[11px] text-zinc-500 max-w-md">
-                Search any company or ETF in the directory below and click <span className="text-accent font-semibold">"Invest +"</span> to set your investment amount. Your holdings will appear here live and inside the cross-tab <span className="text-accent font-semibold">"Stocks"</span> widget!
+              <p className="hidden md:block text-[11px] text-zinc-500 max-w-md">
+                Tap the <span className="text-[#E7B956] font-semibold">★ star</span> in the bottom-left corner of any stock below to pin it here and track it live — no investment required.
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {investments.map((inv) => {
-                const gain = Number(inv.unrealizedGain) || 0;
-                const gainPct = Number(inv.unrealizedGainPercent) || 0;
-                const isPos = gain >= 0;
+              {pinnedItems.map((item) => {
+                const inv = item.holding;
+                const isInspecting =
+                  selectedStockForDetail?.symbol?.toUpperCase() === item.symbol;
+                const dayPos = (item.changePercent || 0) >= 0;
+                const gain = inv ? Number(inv.unrealizedGain) || 0 : 0;
+                const gainPct = inv ? Number(inv.unrealizedGainPercent) || 0 : 0;
+                const gainPos = gain >= 0;
+
+                const openItemDetail = () => {
+                  const found = catalog.find(
+                    (s) => s.symbol.toUpperCase() === item.symbol
+                  );
+                  setSelectedStockForDetail(
+                    found || {
+                      symbol: item.symbol,
+                      name: item.name,
+                      sector: item.sector,
+                      price: item.price,
+                      change: item.change,
+                      changePercent: item.changePercent,
+                      marketCap: item.marketCap,
+                    }
+                  );
+                };
 
                 return (
                   <SpotlightCard
-                    key={inv.id}
-                    className="p-3 flex flex-col justify-between group relative"
+                    key={item.symbol}
+                    role="button"
+                    tabIndex={0}
+                    data-pinned-symbol={item.symbol}
+                    data-holding-symbol={inv ? item.symbol : undefined}
+                    onClick={openItemDetail}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openItemDetail();
+                      }
+                    }}
+                    className={`p-3 flex flex-col justify-between group relative cursor-pointer transition-colors ${
+                      isInspecting
+                        ? 'border-[#E7B956]/60 bg-[#151513]'
+                        : 'hover:border-white/[0.18]'
+                    }`}
                   >
-                    <div className="flex items-start justify-between">
-                      <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-extrabold text-white text-sm tracking-tight">{inv.symbol}</span>
-                          <span className="text-[10px] text-zinc-400 truncate max-w-[90px]">{inv.name}</span>
+                          <span className="font-extrabold text-white text-sm tracking-tight group-hover:text-[#E7B956] transition-colors">
+                            {item.symbol}
+                          </span>
+                          <span className="text-[10px] text-zinc-400 truncate max-w-[90px]">
+                            {item.name}
+                          </span>
                         </div>
-                        <span className="text-[11px] text-zinc-400 font-mono mt-0.5 block">
-                          {inv.shares} shares @ ${Number(inv.avgCostPerShare || 0).toFixed(2)}
-                        </span>
+                        {inv ? (
+                          <span className="text-[11px] text-zinc-400 font-mono mt-0.5 block tabular-nums">
+                            {inv.shares} sh @ ${Number(inv.avgCostPerShare || 0).toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-zinc-500 mt-0.5 block">
+                            {item.sector || 'Watchlist'}
+                          </span>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5 shrink-0">
                         <button
                           type="button"
-                          onClick={() => {
-                            const found = catalog.find((s) => s.symbol.toUpperCase() === inv.symbol.toUpperCase());
-                            setSelectedStockToInvest(found || { symbol: inv.symbol, name: inv.name, price: inv.currentPrice });
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleFavorite(item);
                           }}
-                          title="Add more to position"
-                          className="p-1 text-zinc-500 hover:text-accent hover:bg-card-hover rounded transition-colors"
+                          title={item.isFavorited ? `Unfavorite ${item.symbol}` : `Favorite ${item.symbol}`}
+                          aria-label={item.isFavorited ? `Remove ${item.symbol} from favorites` : `Favorite ${item.symbol}`}
+                          className={`p-1 rounded transition-colors cursor-pointer ${
+                            item.isFavorited
+                              ? 'text-[#E7B956] hover:bg-card-hover'
+                              : 'text-zinc-500 hover:text-[#E7B956] hover:bg-card-hover'
+                          }`}
+                        >
+                          <Star
+                            size={13}
+                            className={item.isFavorited ? 'fill-[#E7B956] text-[#E7B956]' : ''}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const found = catalog.find((s) => s.symbol.toUpperCase() === item.symbol);
+                            setSelectedStockToInvest(found || { symbol: item.symbol, name: item.name, price: item.price });
+                          }}
+                          title={inv ? 'Add more to position' : `Invest in ${item.symbol}`}
+                          className="p-1 text-zinc-500 hover:text-accent hover:bg-card-hover rounded transition-colors cursor-pointer"
                         >
                           <Plus size={13} />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteHolding(inv.id, inv.symbol)}
-                          title="Remove holding"
-                          className="p-1 text-zinc-500 hover:text-red-400 hover:bg-card-hover rounded transition-colors"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        {inv && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteHolding(inv.id, inv.symbol);
+                            }}
+                            title="Remove holding"
+                            className="p-1 text-zinc-500 hover:text-rose-400 hover:bg-card-hover rounded transition-colors cursor-pointer"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-baseline justify-between pt-2 border-t border-border/40 mt-2">
-                      <div>
-                        <span className="text-[10px] text-zinc-500 block">Live Value</span>
-                        <span className="text-sm font-extrabold font-mono text-white">
-                          {formatCurrency(inv.currentValue)}
-                        </span>
+                    {inv ? (
+                      <div className="flex items-baseline justify-between pt-2 border-t border-border/40 mt-2">
+                        <div>
+                          <span className="text-[10px] text-zinc-500 block">Live Value</span>
+                          <span className="text-sm font-extrabold font-mono text-white tabular-nums">
+                            {formatCurrency(inv.currentValue)}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] text-zinc-500 block">P/L</span>
+                          <span className={`text-sm md:text-[11px] font-bold font-mono tabular-nums ${gainPos ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {gainPos ? '+' : ''}{formatCurrency(gain)} ({gainPos ? '+' : ''}{gainPct.toFixed(2)}%)
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[10px] text-zinc-500 block">P/L</span>
-                        <span className={`text-[11px] font-bold font-mono ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {isPos ? '+' : ''}{formatCurrency(gain)} ({isPos ? '+' : ''}{gainPct.toFixed(2)}%)
-                        </span>
+                    ) : (
+                      <div className="flex items-baseline justify-between pt-2 border-t border-border/40 mt-2">
+                        <div>
+                          <span className="text-[10px] text-zinc-500 block">Live Price</span>
+                          <span className="text-sm font-extrabold font-mono text-white tabular-nums">
+                            ${Number(item.price || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] text-zinc-500 block">Today</span>
+                          <span className={`text-sm md:text-[11px] font-bold font-mono tabular-nums ${dayPos ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {dayPos ? '+' : ''}{Number(item.changePercent || 0).toFixed(2)}%
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </SpotlightCard>
                 );
               })}
             </div>
           )}
         </div>
-      </Reveal>
+      )}
 
-      {/* ── Key Market Indices Row (REAL LIVE PRICES) ── */}
-      <Reveal delay={0.08} y={20}>
-        <div data-tutorial="market-indices-grid" className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          {liveIndices.map((idx) => {
-            const isPos = idx.change >= 0;
-            return (
-              <div
-                key={idx.symbol}
-                className="bg-card border border-border rounded-xl p-3.5 sm:p-4 hover:border-accent/40 transition-all shadow-sm"
-              >
-                <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
-                  <span className="font-bold text-white tracking-tight">{idx.symbol}</span>
-                  <span className="text-[10px] truncate max-w-[90px]">{idx.name}</span>
+      {/* ── Key Market Indices Strip (Markets section) ── */}
+      {showMarketsSections && (
+        <div
+          data-tutorial="market-indices-grid"
+          className="grid grid-cols-2 divide-y divide-white/[0.08] border-y border-white/[0.08] sm:grid-cols-4 sm:divide-x sm:divide-y-0"
+        >
+          {liveIndices ? (
+            liveIndices.map((idx) => {
+              const isPos = idx.change >= 0;
+              return (
+                <div key={idx.symbol} className="p-3.5 sm:p-4">
+                  <div className="flex items-center justify-between text-xs text-zinc-500 mb-1">
+                    <span className="font-semibold text-zinc-200 tracking-tight">{idx.symbol}</span>
+                    <span className="text-[11px] truncate max-w-[100px]">{idx.name}</span>
+                  </div>
+                  <div className="text-lg font-semibold text-zinc-100 tabular-nums">
+                    {idx.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className={`flex items-center gap-1 text-xs font-medium mt-1 tabular-nums ${isPos ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {isPos ? <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.5} /> : <ArrowDownRight className="h-3.5 w-3.5" strokeWidth={1.5} />}
+                    <span>{isPos ? '+' : ''}{Number(idx.change).toFixed(2)}</span>
+                    <span>({isPos ? '+' : ''}{Number(idx.changePercent).toFixed(2)}%)</span>
+                  </div>
                 </div>
-                <div className="text-lg sm:text-xl font-extrabold text-white font-mono">
-                  {idx.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              );
+            })
+          ) : (
+            ['SPX', 'IXIC', 'DJI', 'RUT'].map((sym) => (
+              <div key={sym} className="p-3.5 sm:p-4 animate-pulse">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-zinc-500">{sym}</span>
+                  <span className="h-2.5 w-16 rounded bg-white/[0.06]" />
                 </div>
-                <div className={`flex items-center gap-1 text-xs font-semibold mt-1 ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {isPos ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                  <span>{isPos ? '+' : ''}{Number(idx.change).toFixed(2)}</span>
-                  <span>({isPos ? '+' : ''}{Number(idx.changePercent).toFixed(2)}%)</span>
-                </div>
+                <div className="h-6 w-24 rounded bg-white/[0.08]" />
+                <div className="mt-2 h-3.5 w-20 rounded bg-white/[0.05]" />
               </div>
-            );
-          })}
+            ))
+          )}
         </div>
-      </Reveal>
+      )}
 
       {/* ── Main Filter & Search Control Bar ── */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* View Switcher Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
-          {[
-            { id: 'all', label: 'All Market Intelligence' },
-            { id: 'stocks', label: 'Live Stock Directory' },
-            { id: 'news', label: 'Real News Feed' },
-            { id: 'rates', label: 'Treasury & Rates' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTabFilter(tab.id)}
-              className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-all cursor-pointer ${
-                activeTabFilter === tab.id
-                  ? 'bg-accent text-primary font-bold shadow-md'
-                  : 'bg-card text-zinc-400 hover:text-white border border-border'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* View Switcher Pills (Desktop unified: All/Equities/News/Rates; Mobile Financial: All/Macro & Rates/News; Mobile Markets: search only) */}
+        {!isMobileMarketsPage && (
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
+            {(isMobileFinancialPage
+              ? [
+                  { id: 'all', label: 'All' },
+                  { id: 'rates', label: 'Macro & Rates' },
+                  { id: 'news', label: 'News' },
+                ]
+              : [
+                  { id: 'all', label: 'All' },
+                  { id: 'stocks', label: 'Equities' },
+                  { id: 'news', label: 'News' },
+                  { id: 'rates', label: 'Rates' },
+                ]
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTabFilter(tab.id)}
+                className={`h-8 px-3.5 rounded-full font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                  effectiveFilter === tab.id
+                    ? 'bg-[#E7B956] text-[#090908] font-semibold'
+                    : 'bg-[#111110] text-zinc-400 hover:text-zinc-100 border border-white/[0.08]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Live Search Box */}
-        <div className="relative w-full sm:w-auto sm:min-w-[280px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search any stock (e.g. AAPL, NVDA, Tesla)..."
-            className="w-full bg-card border border-border rounded-xl pl-9 pr-9 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-accent font-medium"
-          />
-          {isSearching && (
-            <RefreshCw size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-accent animate-spin" />
-          )}
-        </div>
+        {/* Live Search Box (Markets section only) */}
+        {showMarketsSections && (
+          <div className="relative w-full sm:w-auto sm:min-w-[280px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search any stock (e.g. AAPL, NVDA, Tesla)..."
+              className="w-full bg-card border border-border rounded-xl pl-9 pr-9 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-accent font-medium"
+            />
+            {isSearching && (
+              <RefreshCw size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-accent animate-spin" />
+            )}
+          </div>
+        )}
       </div>
 
-      {/* ── MAIN CONTENT LAYOUT: STOCK BROWSER & REAL NEWS + AI SIDEBAR ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Columns: Stock Directory & Real News Feed */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* 1. STOCK DIRECTORY (REAL-TIME LIVE PRICES) */}
-          {(activeTabFilter === 'all' || activeTabFilter === 'stocks') && (
+      {/* ── MAIN CONTENT LAYOUT: STOCK BROWSER & REAL NEWS + MACRO SIDEBAR ── */}
+      <div className={`grid grid-cols-1 gap-6 ${showFinancialSections ? 'lg:grid-cols-3' : ''}`}>
+        {/* Left 2 Columns (or full width on mobile Markets): Stock Directory, Real News Feed & Rates */}
+        <div className={`${showFinancialSections ? 'lg:col-span-2' : ''} flex flex-col gap-6`}>
+          {/* 1. STOCK DIRECTORY (REAL-TIME LIVE PRICES) — Markets section */}
+          {showMarketsSections && (effectiveFilter === 'all' || effectiveFilter === 'stocks') && (
             <Reveal delay={0.1} y={20}>
               <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 space-y-4 shadow-md">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3">
@@ -640,84 +960,171 @@ export default function MarketTrackerTab() {
                         )}
                       </h2>
                       <p className="text-[11px] text-zinc-400">
-                        Real-time equity quotes updating continuously.
+                        Star ★ any stock to pin it at the top, or click to inspect live price history.
                       </p>
                     </div>
                   </div>
 
                   {/* Sector Filter Chips */}
                   <div className="flex items-center gap-1 overflow-x-auto no-scrollbar text-[11px]">
-                    {sectors.map((sec) => (
-                      <button
-                        key={sec}
-                        onClick={() => handleSelectSector(sec)}
-                        className={`px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer ${
-                          selectedSector === sec
-                            ? 'bg-accent/20 text-accent border border-accent/40 font-bold'
-                            : 'bg-card text-zinc-400 hover:text-zinc-200 border border-border/60'
-                        }`}
-                      >
-                        {sec === 'all' ? 'All Sectors' : sec}
-                      </button>
-                    ))}
+                    {sectors.map((sec) => {
+                      const shouldGlowMobile =
+                        sectorGlow.sector === sec && sectorGlow.nonce > 0;
+                      return (
+                        <button
+                          key={`${sec}-${isMobile && shouldGlowMobile ? sectorGlow.nonce : 0}`}
+                          type="button"
+                          onClick={() => handleSelectSector(sec)}
+                          className={`px-2.5 py-1 rounded-md font-medium whitespace-nowrap shrink-0 transition-colors cursor-pointer bg-card text-zinc-400 border border-border/60 ${
+                            shouldGlowMobile ? 'arca-sector-glow-once' : ''
+                          } ${
+                            selectedSector === sec
+                              ? 'md:bg-accent/20 md:text-accent md:border-accent/40 md:font-bold'
+                              : 'md:hover:text-zinc-200'
+                          }`}
+                        >
+                          {sec === 'all' ? 'All Sectors' : sec}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Stock Cards Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {filteredStocks.map((stock) => {
-                    const isPos = (stock.change || 0) >= 0;
-                    const isOwned = investments.some((i) => i.symbol.toUpperCase() === stock.symbol.toUpperCase());
-
-                    return (
-                      <SpotlightCard
-                        key={stock.symbol}
-                        className="p-3.5 space-y-2.5 flex flex-col justify-between"
+                {filteredStocks.length === 0 && isLoading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {Array.from({ length: 9 }).map((_, idx) => (
+                      <div
+                        key={`stock-skel-${idx}`}
+                        className="rounded-lg border border-white/[0.08] bg-[#111110] p-3.5 space-y-3 animate-pulse"
                       >
-                        <div>
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-extrabold text-white text-sm">{stock.symbol}</span>
-                                {isOwned && (
-                                  <span className="text-[9px] bg-accent/20 text-accent font-semibold px-1.5 py-0.2 rounded">
-                                    Owned
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1.5">
+                            <div className="h-4 w-12 rounded bg-white/[0.09]" />
+                            <div className="h-3 w-24 rounded bg-white/[0.05]" />
+                          </div>
+                          <div className="h-3.5 w-12 rounded bg-white/[0.07]" />
+                        </div>
+                        <div className="flex items-baseline justify-between pt-1">
+                          <div className="h-5 w-16 rounded bg-white/[0.09]" />
+                          <div className="h-3 w-14 rounded bg-white/[0.05]" />
+                        </div>
+                        <div className="h-7 w-full rounded-lg bg-white/[0.05]" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {filteredStocks.map((stock) => {
+                      const isPos = (stock.change || 0) >= 0;
+                      const symUpper = stock.symbol.toUpperCase();
+                      const isOwned = investments.some((i) => i.symbol.toUpperCase() === symUpper);
+                      const isFavorited = favoriteSymbolSet.has(symUpper);
+                      const isSelected =
+                        selectedStockForDetail?.symbol?.toUpperCase() === symUpper;
+
+                      return (
+                        <SpotlightCard
+                          key={stock.symbol}
+                          role="button"
+                          tabIndex={0}
+                          data-stock-symbol={stock.symbol}
+                          onClick={() => setSelectedStockForDetail(stock)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setSelectedStockForDetail(stock);
+                            }
+                          }}
+                          className={`p-3.5 space-y-2.5 flex flex-col justify-between cursor-pointer transition-colors group ${
+                            isSelected
+                              ? 'border-[#E7B956]/60 bg-[#151513]'
+                              : 'hover:border-white/[0.2]'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-extrabold text-white text-sm group-hover:text-[#E7B956] transition-colors">
+                                    {stock.symbol}
                                   </span>
-                                )}
+                                  {isOwned && (
+                                    <span className="text-[9px] bg-accent/20 text-accent font-semibold px-1.5 py-0.2 rounded">
+                                      Owned
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-zinc-400 text-xs block truncate max-w-[130px]">
+                                  {stock.name}
+                                </span>
                               </div>
-                              <span className="text-zinc-400 text-xs block truncate max-w-[130px]">
-                                {stock.name}
+
+                              <span className={`text-base md:text-xs font-bold font-mono tabular-nums ${isPos ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {isPos ? '+' : ''}{Number(stock.changePercent || 0).toFixed(2)}%
                               </span>
                             </div>
 
-                            <span className={`text-xs font-bold font-mono ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {isPos ? '+' : ''}{Number(stock.changePercent || 0).toFixed(2)}%
-                            </span>
+                            <div className="flex items-baseline justify-between pt-2">
+                              <span className="text-base font-extrabold text-white font-mono tabular-nums">
+                                ${Number(stock.price).toFixed(2)}
+                              </span>
+                              <span className="hidden md:inline text-[10px] text-zinc-500 font-mono tabular-nums">
+                                Cap: {stock.marketCap}
+                              </span>
+                            </div>
                           </div>
 
-                          <div className="flex items-baseline justify-between pt-2">
-                            <span className="text-base font-extrabold text-white font-mono">
-                              ${Number(stock.price).toFixed(2)}
-                            </span>
-                            <span className="text-[10px] text-zinc-500 font-mono">
-                              Cap: {stock.marketCap}
-                            </span>
-                          </div>
-                        </div>
+                          {/* Bottom Actions: Star Favorite (bottom-left) + Invest */}
+                          <div className="flex items-center gap-2 mt-1">
+                            <button
+                              type="button"
+                              data-favorite-toggle={stock.symbol}
+                              aria-label={
+                                isFavorited
+                                  ? `Remove ${stock.symbol} from favorites`
+                                  : `Favorite ${stock.symbol}`
+                              }
+                              aria-pressed={isFavorited}
+                              title={
+                                isFavorited
+                                  ? `Unfavorite ${stock.symbol}`
+                                  : `Favorite ${stock.symbol} to pin at top`
+                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleFavorite(stock);
+                              }}
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors cursor-pointer ${
+                                isFavorited
+                                  ? 'border-[#E7B956]/60 bg-[#E7B956]/15 text-[#E7B956]'
+                                  : 'border-white/[0.1] bg-[#171715] text-zinc-500 hover:border-[#E7B956]/40 hover:text-[#E7B956]'
+                              }`}
+                            >
+                              <Star
+                                size={14}
+                                strokeWidth={1.75}
+                                className={isFavorited ? 'fill-[#E7B956] text-[#E7B956]' : ''}
+                              />
+                            </button>
 
-                        {/* Action: Click to Invest */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedStockToInvest(stock)}
-                          className="w-full flex items-center justify-center gap-1.5 bg-card-hover hover:bg-accent hover:text-primary text-zinc-300 border border-border hover:border-accent text-xs font-semibold py-1.5 rounded-lg transition-all active:scale-98 cursor-pointer mt-1"
-                        >
-                          <Plus size={13} />
-                          <span>Invest in {stock.symbol}</span>
-                        </button>
-                      </SpotlightCard>
-                    );
-                  })}
-                </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedStockToInvest(stock);
+                              }}
+                              className="flex-1 flex items-center justify-center gap-1.5 bg-card-hover hover:bg-accent hover:text-primary text-zinc-300 border border-border hover:border-accent text-xs font-semibold h-8 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Plus size={13} />
+                              <span>Invest in {stock.symbol}</span>
+                            </button>
+                          </div>
+                        </SpotlightCard>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {!searchResults && hasMoreStocks && (
                   <div className="pt-2 text-center">
@@ -736,8 +1143,9 @@ export default function MarketTrackerTab() {
             </Reveal>
           )}
 
-          {/* 2. AUTHENTIC REAL FINANCIAL NEWS FEED (NO AI SLOP) */}
-          {(activeTabFilter === 'all' || activeTabFilter === 'news') && (
+          {/* 2. AUTHENTIC REAL FINANCIAL NEWS FEED (NO AI SLOP) — Financial section */}
+          {showFinancialSections && (effectiveFilter === 'all' || effectiveFilter === 'news') && (
+            <div className={isMobileFinancialPage ? 'order-2' : ''}>
             <Reveal delay={0.15} y={20}>
               <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 space-y-4 shadow-md">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3">
@@ -876,10 +1284,12 @@ export default function MarketTrackerTab() {
                 </div>
               </div>
             </Reveal>
+            </div>
           )}
 
-          {/* 3. BORROWING & INTEREST RATES BENCHMARKS (REAL LIVE YIELDS) */}
-          {(activeTabFilter === 'all' || activeTabFilter === 'rates') && (
+          {/* 3. BORROWING, INTEREST RATES & MACROECONOMIC INDICATORS — Financial section */}
+          {showFinancialSections && (effectiveFilter === 'all' || effectiveFilter === 'rates') && (
+            <div className={isMobileFinancialPage ? 'order-1' : ''}>
             <Reveal delay={0.2} y={20}>
               <div data-tutorial="market-rates-panel" className="bg-card border border-border rounded-2xl p-5 sm:p-6 space-y-5 shadow-md">
                 <div className="flex items-center justify-between border-b border-border/80 pb-3">
@@ -894,9 +1304,6 @@ export default function MarketTrackerTab() {
                       </p>
                     </div>
                   </div>
-                  <span className="text-[10px] bg-emerald-500/15 text-emerald-400 font-mono px-2 py-0.5 rounded border border-emerald-500/30">
-                    Official FRED & Treasury
-                  </span>
                 </div>
 
                 {/* Macroeconomic Indicators */}
@@ -936,17 +1343,19 @@ export default function MarketTrackerTab() {
                 </div>
               </div>
             </Reveal>
+            </div>
           )}
         </div>
 
-        {/* Right Column (1 Col): Dedicated AI Macro Digest & Takeaways Sidebar */}
-        <div className="space-y-6">
-          {/* MACROECONOMIC OUTLOOK CARD */}
-          <Reveal delay={0.12} y={20}>
-            <div
-              data-tutorial="market-ai-digest"
-              className="bg-card border border-border rounded-2xl p-5 space-y-4 shadow-xl sticky top-20"
-            >
+        {/* Right Column (1 Col): Dedicated AI Macro Digest & Takeaways Sidebar — Financial section */}
+        {showFinancialSections && (!isMobile || effectiveFilter === 'all' || effectiveFilter === 'rates') && (
+          <div className="space-y-6">
+            {/* MACROECONOMIC OUTLOOK CARD */}
+            <Reveal delay={0.12} y={20}>
+              <div
+                data-tutorial="market-ai-digest"
+                className="bg-card border border-border rounded-2xl p-5 space-y-4 shadow-xl lg:sticky lg:top-20"
+              >
               <div className="flex items-center justify-between border-b border-border/80 pb-3">
                 <div className="flex items-center gap-2 text-accent">
                   <Activity size={18} />
@@ -1022,6 +1431,7 @@ export default function MarketTrackerTab() {
             </div>
           </Reveal>
         </div>
+        )}
       </div>
     </div>
   );

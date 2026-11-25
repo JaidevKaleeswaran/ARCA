@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Toaster } from 'react-hot-toast';
 import TabNavigation from './components/layout/TabNavigation';
 import HomeTab from './components/home/HomeTab';
@@ -8,14 +8,26 @@ import AIAssistantTab from './components/assistant/AIAssistantTab';
 import MarketTrackerTab from './components/markets/MarketTrackerTab';
 import LoginPage from './components/auth/LoginPage';
 import VerifyEmailPage from './components/auth/VerifyEmailPage';
+import OnboardingShell from './components/onboarding/OnboardingShell';
 import { useCycleCheck } from './hooks/useCycleCheck';
 import { useFirebaseSync } from './hooks/useFirebaseSync';
 import { useAuth } from './contexts/AuthContext';
-import { LogOut, HelpCircle, ExternalLink } from 'lucide-react';
+import { LogOut, HelpCircle, Settings, Plus } from 'lucide-react';
 import Logo from './components/ui/Logo';
-import { env } from './config/env';
+import UserAvatar from './components/ui/UserAvatar';
+import LeavingSoonBadge from './components/auth/LeavingSoonBadge';
+import AccountSettingsDrawer from './components/auth/AccountSettingsDrawer';
 import { TutorialProvider, useTutorial } from './components/tutorial/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
+
+const ONBOARDING_PATHS = ['/', '/why-arca', '/about', '/privacy', '/terms'];
+
+function normalizePath(pathname) {
+  if (!pathname || pathname === '/') return '/';
+  if (pathname.startsWith('/app')) return '/app';
+  if (ONBOARDING_PATHS.includes(pathname)) return pathname;
+  return '/';
+}
 
 function MainApp() {
   useCycleCheck();
@@ -23,94 +35,225 @@ function MainApp() {
   const { user, logout } = useAuth();
   const { startTutorial } = useTutorial();
   const [activeTab, setActiveTab] = useState('home');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [preferSignUp, setPreferSignUp] = useState(false);
+  const [addExpenseTrigger, setAddExpenseTrigger] = useState(0);
+  const [currentPath, setCurrentPath] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return normalizePath(window.location.pathname);
+    }
+    return '/';
+  });
 
-  // Trigger per-tab tutorial whenever active tab changes (or on initial login)
+  const isAppRoute = currentPath === '/app';
+
+  const navigate = useCallback((path) => {
+    const normalized = normalizePath(path);
+    setCurrentPath(normalized);
+    if (typeof window !== 'undefined' && window.location.pathname !== normalized) {
+      window.history.pushState({}, '', normalized);
+    }
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
   useEffect(() => {
-    if (user && (user.emailVerified || user.isGuest)) {
+    const handlePopState = () => {
+      setCurrentPath(normalizePath(window.location.pathname));
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // On desktop (>= md), Financial is unified inside Markets — normalize tab on resize up
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(min-width: 768px)');
+    const handleResize = (e) => {
+      if (e.matches) {
+        setActiveTab((prev) => (prev === 'financial' ? 'markets' : prev));
+      }
+    };
+    mq.addEventListener('change', handleResize);
+    return () => mq.removeEventListener('change', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (isAppRoute && user && (user.emailVerified || user.isGuest)) {
       const timer = setTimeout(() => {
         startTutorial(activeTab);
       }, 350);
       return () => clearTimeout(timer);
     }
-  }, [user, activeTab, startTutorial]);
+  }, [isAppRoute, user, activeTab, startTutorial]);
+
+  if (!isAppRoute) {
+    return (
+      <OnboardingShell
+        currentPath={currentPath}
+        navigate={navigate}
+        onOpenApp={() => navigate('/app')}
+      />
+    );
+  }
 
   return (
     <>
       <TutorialOverlay />
 
-      {/* ── All page content sits above the Beams ── */}
-      <div style={{ position: 'relative', zIndex: 2 }} className="min-h-screen text-text font-sans selection:bg-accent selection:text-primary">
+      <div className="min-h-screen bg-[#090908] text-zinc-100 font-sans antialiased selection:bg-[#E7B956] selection:text-[#090908]">
         {!user ? (
-          <LoginPage />
+          <LoginPage
+            onBackToHome={() => navigate('/')}
+            initialSignUp={preferSignUp}
+          />
         ) : !user.emailVerified && !user.isGuest ? (
-          <VerifyEmailPage />
+          <VerifyEmailPage onBackToHome={() => navigate('/')} />
         ) : (
           <>
-            <header className="py-3 px-4 sm:px-6 border-b border-border/60 flex items-center justify-between max-w-6xl mx-auto backdrop-blur-md bg-primary/80">
-              <div className="flex items-center space-x-3 shrink-0">
-                <Logo size="md" />
-                <a
-                  href={env.onboardingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hidden sm:inline-flex items-center gap-1 text-[11px] text-text-muted hover:text-accent font-medium px-2 py-1 rounded-md hover:bg-card-hover transition-colors"
-                  title="View Onboarding Website"
-                >
-                  <span>Onboarding Site</span>
-                  <ExternalLink size={11} className="text-accent" />
-                </a>
-              </div>
-
-              <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
-                <div className="flex items-center space-x-1.5 sm:space-x-2 bg-card/80 border border-border px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs backdrop-blur-sm min-w-0">
-                  {user.photoURL ? (
-                    <img src={user.photoURL} alt={user.displayName} className="w-4 h-4 sm:w-5 sm:h-5 rounded-full shrink-0" />
-                  ) : (
-                    <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-accent/20 text-accent flex items-center justify-center text-[9px] sm:text-[10px] font-bold shrink-0">
-                      {user.displayName ? user.displayName[0].toUpperCase() : 'U'}
-                    </div>
-                  )}
-                  <span className="font-medium text-text truncate max-w-[110px] sm:max-w-none">{user.displayName || user.email}</span>
-                  {user.isGuest && (
-                    <span className="text-[9px] sm:text-[10px] bg-card-hover text-zinc-400 px-1.5 py-0.2 rounded shrink-0">Guest</span>
-                  )}
-                </div>
-
+            <header className="relative z-30 border-b border-white/[0.06] bg-[#090908]">
+              <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
                 <button
                   type="button"
-                  onClick={async () => {
-                    await logout();
-                    setActiveTab('home');
-                  }}
-                  title="Log Out"
-                  className="p-1.5 sm:p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20 shrink-0 cursor-pointer"
+                  onClick={() => navigate('/')}
+                  title="Back to ARCA overview"
+                  aria-label="Back to ARCA overview"
+                  className="inline-flex items-center rounded-md focus:outline-none hover:opacity-80 transition-opacity cursor-pointer shrink-0"
                 >
-                  <LogOut size={16} />
+                  <Logo size="sm" />
                 </button>
+
+                <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+                  <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-zinc-400 min-w-0">
+                    <UserAvatar
+                      photoURL={user.photoURL}
+                      avatarPreset={user.avatarPreset}
+                      displayName={user.displayName}
+                      email={user.email}
+                      size="xs"
+                    />
+                    <span className="truncate max-w-[68px] sm:max-w-none text-zinc-300">
+                      {user.displayName || user.email}
+                    </span>
+                    {user.isGuest && (
+                      <>
+                        <span className="hidden sm:inline-flex rounded border border-white/[0.1] px-1.5 py-0.2 text-[10px] text-zinc-500 shrink-0">
+                          Guest
+                        </span>
+                        <LeavingSoonBadge placement="bottom" />
+                      </>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    data-testid="account-settings-trigger"
+                    onClick={() => setIsSettingsOpen((prev) => !prev)}
+                    title="Account settings"
+                    aria-label="Account settings"
+                    aria-expanded={isSettingsOpen}
+                    className={`rounded-md p-1.5 transition-colors shrink-0 cursor-pointer ${
+                      isSettingsOpen
+                        ? 'bg-[#E7B956]/15 text-[#E7B956]'
+                        : 'text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100'
+                    }`}
+                  >
+                    <Settings className="h-4 w-4" strokeWidth={1.5} />
+                  </button>
+
+                  <span className="hidden md:block h-3.5 w-px bg-white/[0.1]" aria-hidden="true" />
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsSettingsOpen(false);
+                      setPreferSignUp(false);
+                      await logout();
+                      setActiveTab('home');
+                    }}
+                    title="Sign out"
+                    aria-label="Sign out"
+                    className="hidden md:inline-flex rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-rose-400 shrink-0 cursor-pointer"
+                  >
+                    <LogOut className="h-4 w-4" strokeWidth={1.5} />
+                  </button>
+                </div>
               </div>
             </header>
 
+            {isSettingsOpen && (
+              <AccountSettingsDrawer
+                key={user?.uid}
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                onStartTutorial={() => {
+                  setIsSettingsOpen(false);
+                  startTutorial(activeTab, true);
+                }}
+                onLogout={async () => {
+                  setIsSettingsOpen(false);
+                  setPreferSignUp(false);
+                  await logout();
+                  setActiveTab('home');
+                }}
+                onRequestSignUp={async () => {
+                  setIsSettingsOpen(false);
+                  setPreferSignUp(true);
+                  await logout();
+                  setActiveTab('home');
+                }}
+              />
+            )}
+
             <TabNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
 
-            <main className="max-w-6xl mx-auto p-3 sm:p-6 lg:p-8">
-              <div className="animate-in fade-in duration-300">
-                {activeTab === 'home' && <HomeTab onNavigateToMarkets={() => setActiveTab('markets')} />}
+            <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-5 pb-36 sm:pt-7 md:pb-12">
+              <div className="animate-step-enter">
+                {activeTab === 'home' && (
+                  <HomeTab
+                    onNavigateToMarkets={() => setActiveTab('markets')}
+                    onNavigateToTransactions={() => setActiveTab('transactions')}
+                  />
+                )}
                 {activeTab === 'assistant' && <AIAssistantTab />}
-                {activeTab === 'markets' && <MarketTrackerTab />}
+                {(activeTab === 'markets' || activeTab === 'financial') && (
+                  <MarketTrackerTab
+                    mobileView={activeTab === 'financial' ? 'financial' : 'markets'}
+                  />
+                )}
                 {activeTab === 'summary' && <SummaryTab onNavigateToMarkets={() => setActiveTab('markets')} />}
-                {activeTab === 'transactions' && <TransactionsTab />}
+                {activeTab === 'transactions' && (
+                  <TransactionsTab addExpenseTrigger={addExpenseTrigger} />
+                )}
               </div>
             </main>
 
-            {/* Floating Tutorial quick launcher strictly anchored in the corner, always discoverable regardless of scroll depth */}
+            {/* Mobile floating Log Transaction pill right above the iOS Liquid Glass tab bar */}
+            <button
+              type="button"
+              data-mobile-fab="log-transaction"
+              onClick={() => {
+                setIsSettingsOpen(false);
+                setActiveTab('transactions');
+                setAddExpenseTrigger((n) => n + 1);
+              }}
+              title="Log a new expense"
+              aria-label="Log transaction"
+              className="ios-liquid-glass-bar md:hidden fixed right-3.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.3rem)] z-30 inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-xs font-semibold text-white transition-transform active:scale-95 cursor-pointer"
+            >
+              <Plus className="h-4 w-4 text-[#E7B956] shrink-0" strokeWidth={2.25} />
+              <span>Transaction</span>
+            </button>
+
+            {/* Desktop corner tutorial trigger */}
             <button
               type="button"
               data-tutorial="corner-tutorial-launcher"
               onClick={() => startTutorial(activeTab, true)}
               title="Start interactive tutorial for this page"
-              className="fixed bottom-6 right-6 z-40 bg-[#1e1c18]/95 hover:bg-[#2b2721] border border-accent/40 hover:border-accent text-accent font-semibold text-xs px-3.5 py-2 rounded-full shadow-2xl flex items-center gap-2 transition-all hover:scale-105 backdrop-blur-md cursor-pointer group"
+              className="hidden md:inline-flex fixed bottom-5 right-5 z-40 h-8 items-center gap-1.5 rounded-full border border-[#E7B956]/40 bg-[#111110]/95 px-3 text-xs font-medium text-[#E7B956] backdrop-blur-md transition-colors hover:border-[#E7B956] hover:bg-[#171715] cursor-pointer"
             >
-              <HelpCircle size={16} className="text-accent group-hover:rotate-12 transition-transform shrink-0" />
+              <HelpCircle className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
               <span>Tutorial ?</span>
             </button>
           </>
@@ -124,17 +267,22 @@ export default function App() {
   return (
     <TutorialProvider>
       <Toaster
-        position="bottom-right"
+        position="top-center"
+        containerStyle={{ top: 14 }}
         toastOptions={{
+          duration: 3000,
           style: {
-            background: '#1b1b18',
-            color: '#f5f4ef',
-            border: '1px solid #2c2a24',
+            background: '#111110',
+            color: '#f4f4f0',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '9999px',
+            padding: '8px 16px',
+            fontSize: '12px',
           },
           success: {
             iconTheme: {
               primary: '#e7b956',
-              secondary: '#1b1b18',
+              secondary: '#090908',
             },
           },
         }}

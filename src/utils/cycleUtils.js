@@ -70,3 +70,60 @@ export function getNextCycleStart(currentStartStr, frequency) {
   const dd = String(nextStart.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
+
+export function getCyclePaceMetrics(cycleStartDateStr, cycleFrequency = 'monthly') {
+  const daysInCycle = Math.max(1, frequencyToDays(cycleFrequency));
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  let dayOfCycle;
+  let periodLabel;
+
+  if (cycleStartDateStr) {
+    const { start, end } = getCycleWindow(cycleStartDateStr, cycleFrequency);
+    const elapsedDays = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1;
+    dayOfCycle = Math.min(daysInCycle, Math.max(1, elapsedDays));
+
+    if (cycleFrequency === 'monthly') {
+      periodLabel = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    } else {
+      const endInclusive = new Date(end);
+      endInclusive.setDate(endInclusive.getDate() - 1);
+      const startFmt = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const endFmt = endInclusive.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      periodLabel = `${startFmt} – ${endFmt}`;
+    }
+  } else {
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const totalInMonth = new Date(year, month + 1, 0).getDate();
+    if (cycleFrequency === 'monthly') {
+      dayOfCycle = Math.min(totalInMonth, now.getDate());
+      periodLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const pacePct = Math.round((dayOfCycle / totalInMonth) * 100);
+      return {
+        dayOfCycle,
+        daysInCycle: totalInMonth,
+        daysRemaining: Math.max(1, totalInMonth - dayOfCycle),
+        pacePct,
+        periodLabel,
+        unitLabel: 'month',
+      };
+    }
+    dayOfCycle = Math.min(daysInCycle, Math.max(1, now.getDate() % daysInCycle || daysInCycle));
+    periodLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  const pacePct = Math.min(100, Math.max(1, Math.round((dayOfCycle / daysInCycle) * 100)));
+  const unitLabel =
+    cycleFrequency === 'weekly' ? 'week' : cycleFrequency === 'bi-weekly' ? 'cycle' : 'month';
+
+  return {
+    dayOfCycle,
+    daysInCycle,
+    daysRemaining: Math.max(1, daysInCycle - dayOfCycle),
+    pacePct,
+    periodLabel,
+    unitLabel,
+  };
+}

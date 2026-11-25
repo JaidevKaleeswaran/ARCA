@@ -1,37 +1,331 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useBudget } from '../../contexts/BudgetContext';
-import { Card } from '../ui/Card';
 import { formatCurrency } from '../../utils/formatCurrency';
 import TransactionModal from './TransactionModal';
 import ReceiptScannerModal from './ReceiptScannerModal';
 import VoiceInputPanel from '../assistant/VoiceInputPanel';
-import { speakTransactionDetails, stopSpeech } from '../../services/agents/voiceAgent';
 import { processTransaction } from '../../services/agents/managerAgent';
 import { reviewSuspiciousTransaction } from '../../services/agents/assistantAgent';
-import toast from 'react-hot-toast'
-import { Plus, Edit2, Receipt, Volume2, VolumeX, Mic, Loader2, RefreshCw, AlertTriangle, Repeat, Download } from 'lucide-react';
-import MaskedHeading from '../ui/MaskedHeading';
-import Reveal from '../ui/Reveal';
+import toast from 'react-hot-toast';
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Receipt,
+  Mic,
+  Loader2,
+  RefreshCw,
+  AlertTriangle,
+  Repeat,
+  Download,
+  Search,
+  X,
+} from 'lucide-react';
 
-export default function TransactionsTab() {
+function MobileLedgerItem({
+  tx,
+  isExpanded,
+  onToggleExpand,
+  categories,
+  getCategoryName,
+  getCategoryColor,
+  formatDate,
+  isSuspicious,
+  reviewingTxId,
+  onAIReview,
+  dispatch,
+}) {
+  const [formData, setFormData] = useState({
+    amount: tx.amount ?? '',
+    categoryId: tx.categoryId || (categories[0]?.id ?? ''),
+    description: tx.description || '',
+    date: tx.date || new Date().toISOString().split('T')[0],
+    isSubscription: Boolean(tx.isSubscription || tx.recurring),
+  });
+
+  useEffect(() => {
+    setFormData({
+      amount: tx.amount ?? '',
+      categoryId: tx.categoryId || (categories[0]?.id ?? ''),
+      description: tx.description || '',
+      date: tx.date || new Date().toISOString().split('T')[0],
+      isSubscription: Boolean(tx.isSubscription || tx.recurring),
+    });
+  }, [tx.id, tx.amount, tx.categoryId, tx.description, tx.date, tx.isSubscription, tx.recurring, categories]);
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    if (!formData.description.trim()) {
+      toast.error('Merchant / description is required');
+      return;
+    }
+
+    let targetCategoryId = formData.categoryId;
+    if (!targetCategoryId && categories.length === 0) {
+      targetCategoryId = `cat_general_${Date.now()}`;
+      dispatch({
+        type: 'ADD_CATEGORY',
+        payload: {
+          id: targetCategoryId,
+          name: 'General',
+          limit: Math.max(200, Math.round(Number(formData.amount) || 100)),
+          color: '#e7b956',
+          endOfCycleAction: 'none',
+        },
+      });
+    }
+
+    dispatch({
+      type: 'UPDATE_TRANSACTION',
+      payload: {
+        id: tx.id,
+        amount: Number(formData.amount) || 0,
+        categoryId: targetCategoryId,
+        description: formData.description.trim(),
+        date: formData.date,
+        isSubscription: formData.isSubscription,
+        recurring: formData.isSubscription,
+        source: tx.source,
+      },
+    });
+    toast.success('Expense updated');
+    onToggleExpand();
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(`Delete "${tx.description}"?`)) {
+      dispatch({ type: 'DELETE_TRANSACTION', payload: tx.id });
+      toast.success('Expense deleted');
+    }
+  };
+
+  const activeColor = getCategoryColor(formData.categoryId || tx.categoryId);
+
+  return (
+    <div
+      data-mobile-tx-id={tx.id}
+      className={`rounded-2xl border transition-colors ${
+        isExpanded
+          ? 'border-[#E7B956]/45 bg-[#151513]'
+          : isSuspicious
+          ? 'border-amber-500/35 bg-amber-500/[0.04]'
+          : 'border-white/[0.08] bg-[#111110]'
+      }`}
+    >
+      <button
+        type="button"
+        aria-expanded={isExpanded}
+        onClick={onToggleExpand}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left cursor-pointer"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-base font-semibold text-zinc-100">
+              {tx.description}
+            </span>
+            {isSuspicious && (
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" strokeWidth={1.75} />
+            )}
+          </div>
+          <div className="mt-1 flex items-center gap-1.5 text-xs text-zinc-400">
+            <span
+              className="h-2 w-2 rounded-full shrink-0"
+              style={{ backgroundColor: getCategoryColor(tx.categoryId) }}
+            />
+            <span className="truncate">{getCategoryName(tx.categoryId)}</span>
+            <span className="text-zinc-600">·</span>
+            <span className="tabular-nums shrink-0">{formatDate(tx.date)}</span>
+          </div>
+        </div>
+
+        <span className="shrink-0 text-lg font-extrabold tracking-tight text-white tabular-nums">
+          {formatCurrency(Math.abs(Number(tx.amount) || 0))}
+        </span>
+      </button>
+
+      {/* Expandable Inline Dropdown Editor */}
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-250 ease-out ${
+          isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <form
+            onSubmit={handleSave}
+            onClick={(e) => e.stopPropagation()}
+            className="space-y-3.5 border-t border-white/[0.08] px-4 pt-3.5 pb-4"
+          >
+            <div className="space-y-1">
+              <label className="block text-[11px] font-medium text-zinc-400">
+                Merchant / Name
+              </label>
+              <input
+                type="text"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, description: e.target.value }))
+                }
+                className="h-10 w-full rounded-xl border border-white/[0.1] bg-[#090908] px-3 text-base text-zinc-100 placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
+                placeholder="Merchant name"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-zinc-400">
+                  Amount
+                </label>
+                <input
+                  type="number"
+                  value={formData.amount}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, amount: e.target.value }))
+                  }
+                  className="h-10 w-full rounded-xl border border-white/[0.1] bg-[#090908] px-3 text-base text-zinc-100 tabular-nums placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
+                  placeholder="0.00"
+                  min="0.01"
+                  step="0.01"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-zinc-400">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, date: e.target.value }))
+                  }
+                  className="h-10 w-full rounded-xl border border-white/[0.1] bg-[#090908] px-3 text-base text-zinc-100 tabular-nums focus:border-[#E7B956] focus:outline-none [color-scheme:dark]"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-400">
+                <span
+                  className="h-2.5 w-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: activeColor }}
+                />
+                <span>Category</span>
+              </label>
+              <select
+                value={formData.categoryId}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, categoryId: e.target.value }))
+                }
+                className="h-10 w-full rounded-xl border border-white/[0.1] bg-[#090908] px-3 text-base text-zinc-100 focus:border-[#E7B956] focus:outline-none"
+                required={categories.length > 0}
+              >
+                {categories.length === 0 && (
+                  <option value="">General (Auto-created)</option>
+                )}
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center justify-between border-y border-white/[0.08] py-2.5">
+              <span className="text-xs font-medium text-zinc-300">
+                Recurring subscription
+              </span>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={formData.isSubscription}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      isSubscription: e.target.checked,
+                    }))
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-zinc-800 rounded-full peer peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-200 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#E7B956] peer-checked:after:bg-[#090908]" />
+              </label>
+            </div>
+
+            {isSuspicious && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onAIReview(tx)}
+                  disabled={reviewingTxId === tx.id}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-400/10 px-3 text-xs font-medium text-amber-300 disabled:opacity-40 cursor-pointer"
+                >
+                  {reviewingTxId === tx.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  )}
+                  <span>AI Review</span>
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="submit"
+                className="h-10 flex-1 rounded-full bg-[#E7B956] text-xs font-semibold text-[#090908] transition-colors hover:bg-[#d8aa45] cursor-pointer"
+              >
+                Save changes
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="inline-flex h-10 items-center gap-1.5 rounded-full border border-rose-500/25 bg-rose-500/10 px-4 text-xs font-medium text-rose-400 transition-colors hover:bg-rose-500/20 cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                <span>Delete</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function TransactionsTab({ addExpenseTrigger = 0 }) {
   const budgetState = useBudget();
   const { transactions, categories, dispatch } = budgetState;
   const [selectedTx, setSelectedTx] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [showVoicePanel, setShowVoicePanel] = useState(false);
-  const [speakingTxId, setSpeakingTxId] = useState(null);
   const [reviewingTxId, setReviewingTxId] = useState(null);
+  const [query, setQuery] = useState('');
+  const [selectedCatId, setSelectedCatId] = useState('');
+  const [expandedMobileTxId, setExpandedMobileTxId] = useState(null);
 
-  const getCategoryName = (id) => {
-    const cat = categories.find(c => c.id === id);
-    return cat ? cat.name : 'Unknown';
-  };
+  useEffect(() => {
+    if (addExpenseTrigger > 0) {
+      setSelectedTx(null);
+      setIsModalOpen(true);
+    }
+  }, [addExpenseTrigger]);
 
-  const getCategoryColor = (id) => {
-    const cat = categories.find(c => c.id === id);
-    return cat ? cat.color : '#27272a';
-  };
+  const categoryMap = useMemo(
+    () => Object.fromEntries(categories.map((c) => [c.id, c.name])),
+    [categories]
+  );
+
+  const categoryColorMap = useMemo(
+    () => Object.fromEntries(categories.map((c) => [c.id, c.color || '#e4e4e7'])),
+    [categories]
+  );
+
+  const getCategoryName = (id) => categoryMap[id] || 'Uncategorized';
+  const getCategoryColor = (id) => categoryColorMap[id] || '#71717a';
 
   const handleAddClick = () => {
     setSelectedTx(null);
@@ -43,31 +337,11 @@ export default function TransactionsTab() {
     setIsModalOpen(true);
   };
 
-  const handleSpeakTransaction = async (tx) => {
-    if (speakingTxId === tx.id) {
-      stopSpeech();
-      setSpeakingTxId(null);
-      return;
-    }
-
-    setSpeakingTxId(tx.id);
-    const categoryName = getCategoryName(tx.categoryId);
-
-    await speakTransactionDetails(tx, categoryName, {
-      onStart: () => setSpeakingTxId(tx.id),
-      onEnd: () => setSpeakingTxId(null),
-      onError: (err) => {
-        toast.error('Failed to play voice transaction.');
-        setSpeakingTxId(null);
-      },
-    });
-  };
-
   const handleVoiceTransaction = async (parsedData) => {
     setShowVoicePanel(false);
     try {
       const result = await processTransaction(parsedData, budgetState, dispatch);
-      toast.success(result.message || 'Voice receipt expense added!');
+      toast.success(result.message || 'Voice expense added.');
     } catch (err) {
       console.error('Voice transaction processing error:', err);
       toast.error('Failed to add voice expense');
@@ -82,39 +356,37 @@ export default function TransactionsTab() {
       toast(result.verdict, {
         duration: 6000,
         style: {
-          background: result.isSuspicious ? 'rgba(234,88,12,0.15)' : 'rgba(16,185,129,0.1)',
-          borderColor: result.isSuspicious ? 'rgba(234,88,12,0.3)' : 'rgba(16,185,129,0.3)',
+          background: '#111110',
+          borderColor: result.isSuspicious ? 'rgba(244,63,94,0.4)' : 'rgba(16,185,129,0.35)',
           border: '1px solid',
-          color: '#f3f4f6',
+          color: '#f4f4f0',
           maxWidth: '380px',
         },
       });
-    } catch (err) {
+    } catch {
       toast.error('AI review failed');
     } finally {
       setReviewingTxId(null);
     }
   };
 
-  // Export transactions to CSV
   const handleExportCSV = () => {
     const rawTxs = budgetState.transactions || [];
-    // Sort transactions by date descending for clean exported ledger
     const txs = [...rawTxs].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     const headers = ['Date', 'Description', 'Amount', 'Category', 'Source'];
-    const rows = txs.map(tx => {
-      const cat = budgetState.categories?.find(c => c.id === tx.categoryId);
+    const rows = txs.map((tx) => {
+      const cat = budgetState.categories?.find((c) => c.id === tx.categoryId);
       return [
         tx.date || '',
         tx.description || '',
         tx.amount,
         cat?.name || 'Unassigned',
-        tx.source || 'manual'
+        tx.source || 'manual',
       ];
     });
 
     const csvContent = [headers, ...rows]
-      .map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      .map((row) => row.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(','))
       .join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -126,101 +398,120 @@ export default function TransactionsTab() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    toast.success(rawTxs.length > 0 ? 'CSV export downloaded!' : 'Exported expense template.');
+    toast.success(rawTxs.length > 0 ? 'CSV exported.' : 'Exported template.');
   };
-
-  // Sort transactions by date (newest first)
-  const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Today';
     try {
       const d = new Date(dateStr);
-      return !isNaN(d.getTime()) ? d.toLocaleDateString() : String(dateStr);
+      return !isNaN(d.getTime())
+        ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : String(dateStr);
     } catch {
       return String(dateStr);
     }
   };
 
-  // Detect suspicious transactions via heuristics
-  const suspiciousIds = new Set();
-  const txMap = {};
-  transactions.forEach(tx => {
-    const key = `${tx.description?.toLowerCase()}_${tx.amount}`;
-    if (!txMap[key]) txMap[key] = [];
-    txMap[key].push(tx);
-  });
-  Object.values(txMap).forEach(group => {
-    if (group.length > 1) {
-      // Check if duplicates are within 24 hours
-      group.sort((a, b) => new Date(a.date) - new Date(b.date));
-      for (let i = 1; i < group.length; i++) {
-        const diff = Math.abs(new Date(group[i].date) - new Date(group[i - 1].date));
-        if (diff < 24 * 60 * 60 * 1000) {
-          suspiciousIds.add(group[i].id);
+  const suspiciousIds = useMemo(() => {
+    const ids = new Set();
+    const txMap = {};
+    transactions.forEach((tx) => {
+      const key = `${tx.description?.toLowerCase()}_${tx.amount}`;
+      if (!txMap[key]) txMap[key] = [];
+      txMap[key].push(tx);
+    });
+    Object.values(txMap).forEach((group) => {
+      if (group.length > 1) {
+        group.sort((a, b) => new Date(a.date) - new Date(b.date));
+        for (let i = 1; i < group.length; i++) {
+          const diff = Math.abs(new Date(group[i].date) - new Date(group[i - 1].date));
+          if (diff < 24 * 60 * 60 * 1000) ids.add(group[i].id);
         }
       }
-    }
-  });
-  // Also flag amounts > 3x category avg
-  categories.forEach(cat => {
-    const catTxs = transactions.filter(tx => tx.categoryId === cat.id);
-    if (catTxs.length < 2) return;
-    const avg = catTxs.reduce((s, t) => s + Number(t.amount), 0) / catTxs.length;
-    catTxs.forEach(tx => {
-      if (Number(tx.amount) > avg * 3) suspiciousIds.add(tx.id);
     });
-  });
+    categories.forEach((cat) => {
+      const catTxs = transactions.filter((tx) => tx.categoryId === cat.id);
+      if (catTxs.length < 2) return;
+      const avg = catTxs.reduce((s, t) => s + Number(t.amount), 0) / catTxs.length;
+      catTxs.forEach((tx) => {
+        if (Number(tx.amount) > avg * 3) ids.add(tx.id);
+      });
+    });
+    return ids;
+  }, [transactions, categories]);
+
+  const filteredTransactions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return [...transactions]
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+      .filter((tx) => {
+        const matchesCat = !selectedCatId || tx.categoryId === selectedCatId;
+        const catName = categoryMap[tx.categoryId] || 'Uncategorized';
+        const matchesQuery =
+          !q ||
+          (tx.description || '').toLowerCase().includes(q) ||
+          catName.toLowerCase().includes(q);
+        return matchesCat && matchesQuery;
+      });
+  }, [transactions, query, selectedCatId, categoryMap]);
+
+  const totalDisplayed = useMemo(
+    () => filteredTransactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0),
+    [filteredTransactions]
+  );
 
   return (
-    <Card className="min-h-[500px] space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <MaskedHeading
-          text="Expenses"
-          tag="h2"
-          reveal="rise"
-          trigger="view"
-          fillColor="var(--color-text)"
-          align="left"
-          className="text-xl font-semibold"
-        />
+    <div className="space-y-6">
+      {/* Header + Pill Capture Controls */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-100">Ledger</h1>
+          <span className="text-xs text-zinc-500 tabular-nums">
+            {filteredTransactions.length} · {formatCurrency(totalDisplayed)}
+          </span>
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             data-tutorial="expense-speak-btn"
             onClick={() => setShowVoicePanel(!showVoicePanel)}
-            className="flex items-center space-x-1.5 text-xs sm:text-sm bg-accent/15 text-accent border border-accent/30 px-2.5 sm:px-3 py-1.5 rounded-lg hover:bg-accent/25 transition-colors font-medium"
+            className="inline-flex h-9 sm:h-8 items-center gap-1.5 rounded-full border border-white/[0.1] px-3 text-xs font-medium text-zinc-200 transition-colors hover:border-[#E7B956]/50 hover:text-[#E7B956] cursor-pointer"
           >
-            <Mic size={16} className="text-accent shrink-0" />
-            <span>Speak Receipt</span>
+            <Mic className="h-3.5 w-3.5" strokeWidth={1.5} />
+            <span>Speak</span>
           </button>
+
           <button
             type="button"
             data-tutorial="expense-scan-btn"
             onClick={() => setIsScannerOpen(true)}
-            className="flex items-center space-x-1.5 text-xs sm:text-sm bg-card hover:bg-card-hover text-text border border-border hover:border-accent/40 px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors font-medium cursor-pointer"
+            className="inline-flex h-9 sm:h-8 items-center gap-1.5 rounded-full border border-white/[0.1] px-3 text-xs font-medium text-zinc-200 transition-colors hover:border-white/[0.2] hover:text-zinc-100 cursor-pointer"
           >
-            <Receipt size={16} className="text-text-muted shrink-0" />
-            <span>Scan Receipt</span>
+            <Receipt className="h-3.5 w-3.5" strokeWidth={1.5} />
+            <span>Scan</span>
           </button>
-          <button
-            type="button"
-            data-tutorial="expense-add-btn"
-            onClick={handleAddClick}
-            className="flex items-center space-x-1 text-xs sm:text-sm bg-accent text-primary px-2.5 sm:px-3 py-1.5 rounded-lg hover:bg-accent-hover transition-colors font-medium cursor-pointer"
-          >
-            <Plus size={16} className="shrink-0" />
-            <span>Add Expense</span>
-          </button>
+
           <button
             type="button"
             data-tutorial="expense-export-btn"
             onClick={handleExportCSV}
-            title="Export transactions as CSV"
-            className="flex items-center space-x-1.5 text-xs sm:text-sm bg-primary hover:bg-card-hover text-zinc-300 hover:text-white border border-border px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors font-medium cursor-pointer"
+            title="Export CSV"
+            className="inline-flex h-9 sm:h-8 items-center gap-1.5 rounded-full border border-white/[0.1] px-3 text-xs font-medium text-zinc-400 transition-colors hover:border-white/[0.2] hover:text-zinc-100 cursor-pointer"
           >
-            <Download size={15} className="shrink-0" />
-            <span>Export CSV</span>
+            <Download className="h-3.5 w-3.5" strokeWidth={1.5} />
+            <span>CSV</span>
+          </button>
+
+          <button
+            type="button"
+            data-tutorial="expense-add-btn"
+            onClick={handleAddClick}
+            className="inline-flex h-9 sm:h-8 items-center gap-1.5 rounded-full bg-[#E7B956] px-4 text-xs font-semibold text-[#090908] transition-colors hover:bg-[#d8aa45] cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+            <span>Add expense</span>
           </button>
         </div>
       </div>
@@ -232,132 +523,206 @@ export default function TransactionsTab() {
         />
       )}
 
-      <div data-tutorial="expense-table" className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="text-text-muted border-b border-border">
-            <tr>
-              <th className="pb-3 font-medium px-4">Date</th>
-              <th className="pb-3 font-medium px-4">Description</th>
-              <th className="pb-3 font-medium px-4">Category</th>
-              <th className="pb-3 font-medium px-4 text-right">Amount</th>
-              <th className="pb-3 font-medium px-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {sortedTransactions.length === 0 && (
-              <tr>
-                <td colSpan="5" className="py-8 text-center text-text-muted">
-                  No expenses found.
-                </td>
-              </tr>
+      {/* Open Hairline Ledger Area */}
+      <section data-tutorial="expense-table" className="border-t border-white/[0.08] pt-4">
+        {/* Filter Bar */}
+        {transactions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pb-4">
+            <div className="relative flex-1 sm:flex-none">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500"
+                strokeWidth={1.5}
+              />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Filter merchant..."
+                className="h-9 sm:h-8 w-full sm:w-52 rounded-full border border-white/[0.1] bg-[#111110] pl-8 pr-3 text-base sm:text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
+              />
+            </div>
+
+            {categories.length > 0 && (
+              <select
+                value={selectedCatId}
+                onChange={(e) => setSelectedCatId(e.target.value)}
+                aria-label="Filter by category"
+                className="h-9 sm:h-8 rounded-full border border-white/[0.1] bg-[#111110] px-3 text-base sm:text-xs text-zinc-300 focus:border-[#E7B956] focus:outline-none"
+              >
+                <option value="">All categories</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
             )}
-            {sortedTransactions.map((tx, index) => {
-              const isSuspicious = suspiciousIds.has(tx.id);
-              return (
-                <tr
+
+            {(query || selectedCatId) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('');
+                  setSelectedCatId('');
+                }}
+                className="inline-flex h-8 items-center gap-1 rounded-full bg-white/[0.08] px-2.5 text-xs text-zinc-300 hover:bg-white/[0.14] cursor-pointer"
+              >
+                <span>Clear</span>
+                <X className="h-3 w-3" strokeWidth={1.5} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {filteredTransactions.length === 0 ? (
+          <div className="py-16 text-center space-y-3">
+            <p className="text-xs text-zinc-500">
+              {transactions.length === 0 ? 'No expenses yet' : 'No matching expenses'}
+            </p>
+            {transactions.length === 0 && (
+              <button
+                type="button"
+                onClick={handleAddClick}
+                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#E7B956] px-4 text-xs font-semibold text-[#090908] hover:bg-[#d8aa45] cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+                <span>Add expense</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Mobile Expandable Dropdown Ledger Items */}
+            <div className="space-y-2.5 md:hidden">
+              {filteredTransactions.map((tx) => (
+                <MobileLedgerItem
                   key={tx.id}
-                  className={`group hover:bg-card-hover/40 transition-colors animate-row ${isSuspicious ? 'bg-orange-500/5' : ''}`}
-                  style={{ animationDelay: `${index * 60}ms` }}
-                >
-                  <td className="py-4 px-4 text-text-muted whitespace-nowrap">
-                    {formatDate(tx.date)}
-                  </td>
-                  <td className="py-4 px-4 text-text font-medium">
-                    <div className="flex items-center flex-wrap gap-1.5">
-                      <span>{tx.description}</span>
-                      {tx.source === 'receipt_scan' && (
-                        <span
-                          title="Scanned from receipt"
-                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-card text-text-muted border border-border"
-                        >
-                          <Receipt size={10} className="mr-1" /> Receipt
-                        </span>
-                      )}
-                      {tx.source === 'voice' && (
-                        <span
-                          title="Added via voice receipt"
-                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-accent/15 text-accent border border-accent/30"
-                        >
-                          <Mic size={10} className="mr-1" /> Voice
-                        </span>
-                      )}
-                      {(tx.recurring || tx.isSubscription) && (
-                        <span
-                          title="Recurring subscription"
-                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        >
-                          <Repeat size={10} className="mr-1" /> Sub
-                        </span>
-                      )}
-                      {isSuspicious && (
-                        <span
-                          title="Flagged as potentially suspicious"
-                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-accent/15 text-accent border border-accent/30"
-                        >
-                          <AlertTriangle size={10} className="mr-1" /> Review
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span 
-                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border border-border"
-                      style={{ color: getCategoryColor(tx.categoryId), borderColor: `${getCategoryColor(tx.categoryId)}40`, backgroundColor: `${getCategoryColor(tx.categoryId)}10` }}
-                    >
-                      {getCategoryName(tx.categoryId)}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4 text-right font-medium text-text">
-                    {formatCurrency(tx.amount)}
-                  </td>
-                  <td className="py-4 px-4 text-right">
-                    <div className="flex items-center justify-end space-x-1">
-                      {/* Speaker Button - TTS */}
-                      <button
-                        onClick={() => handleSpeakTransaction(tx)}
-                        title="Speak transaction with ElevenLabs voice"
-                        className={`p-1.5 rounded-md transition-all ${
-                          speakingTxId === tx.id
-                            ? 'bg-accent/20 text-accent border border-accent/40 animate-pulse opacity-100'
-                            : 'text-text-muted hover:text-accent opacity-80 sm:opacity-60 sm:group-hover:opacity-100 hover:bg-card-hover'
+                  tx={tx}
+                  isExpanded={expandedMobileTxId === tx.id}
+                  onToggleExpand={() =>
+                    setExpandedMobileTxId((prev) => (prev === tx.id ? null : tx.id))
+                  }
+                  categories={categories}
+                  getCategoryName={getCategoryName}
+                  getCategoryColor={getCategoryColor}
+                  formatDate={formatDate}
+                  isSuspicious={suspiciousIds.has(tx.id)}
+                  reviewingTxId={reviewingTxId}
+                  onAIReview={handleAIReview}
+                  dispatch={dispatch}
+                />
+              ))}
+            </div>
+
+            {/* Desktop Dense Hairline Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-white/[0.07] text-[11px] font-medium text-zinc-500">
+                    <th className="py-2 pr-3 font-medium">Merchant</th>
+                    <th className="px-3 py-2 font-medium">Category</th>
+                    <th className="px-3 py-2 font-medium">Date</th>
+                    <th className="py-2 pl-3 pr-14 text-right font-medium">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.06] text-sm">
+                  {filteredTransactions.map((tx) => {
+                    const isSuspicious = suspiciousIds.has(tx.id);
+                    return (
+                      <tr
+                        key={tx.id}
+                        className={`group transition-colors hover:bg-white/[0.025] ${
+                          isSuspicious ? 'bg-amber-500/[0.04]' : ''
                         }`}
                       >
-                        {speakingTxId === tx.id ? (
-                          <VolumeX size={16} />
-                        ) : (
-                          <Volume2 size={16} />
-                        )}
-                      </button>
+                        <td className="py-2.5 pr-3 font-medium text-zinc-100">
+                          <div className="flex items-center flex-wrap gap-1.5">
+                            <span>{tx.description}</span>
+                            {tx.source === 'receipt_scan' && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.1] px-2 py-0.2 text-[10px] font-normal text-zinc-400">
+                                <Receipt className="h-2.5 w-2.5" strokeWidth={1.5} />
+                                Receipt
+                              </span>
+                            )}
+                            {tx.source === 'voice' && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-[#E7B956]/30 px-2 py-0.2 text-[10px] font-normal text-[#E7B956]">
+                                <Mic className="h-2.5 w-2.5" strokeWidth={1.5} />
+                                Voice
+                              </span>
+                            )}
+                            {(tx.recurring || tx.isSubscription) && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.1] px-2 py-0.2 text-[10px] font-normal text-zinc-400">
+                                <Repeat className="h-2.5 w-2.5" strokeWidth={1.5} />
+                                Recurring
+                              </span>
+                            )}
+                            {isSuspicious && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 px-2 py-0.2 text-[10px] font-medium text-amber-400">
+                                <AlertTriangle className="h-2.5 w-2.5" strokeWidth={1.5} />
+                                Review
+                              </span>
+                            )}
+                          </div>
+                        </td>
 
-                      {/* AI Suspicious Review Button */}
-                      {isSuspicious && (
-                        <button
-                          onClick={() => handleAIReview(tx)}
-                          disabled={reviewingTxId === tx.id}
-                          title="Run AI review on this suspicious expense"
-                          className="p-1.5 rounded-md transition-all text-orange-400 hover:bg-orange-500/10 opacity-85 sm:opacity-70 sm:group-hover:opacity-100 disabled:opacity-40"
-                        >
-                          {reviewingTxId === tx.id
-                            ? <Loader2 size={16} className="animate-spin" />
-                            : <RefreshCw size={16} />
-                          }
-                        </button>
-                      )}
+                        <td className="px-3 py-2.5">
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white/[0.06] px-2 py-0.5 text-xs text-zinc-300">
+                            <span
+                              className="h-1.5 w-1.5 rounded-full shrink-0"
+                              style={{ backgroundColor: getCategoryColor(tx.categoryId) }}
+                            />
+                            <span>{getCategoryName(tx.categoryId)}</span>
+                          </span>
+                        </td>
 
-                      <button
-                        onClick={() => handleEditClick(tx)}
-                        className="p-1.5 text-zinc-400 sm:text-zinc-500 hover:text-accent opacity-80 sm:opacity-60 sm:group-hover:opacity-100 transition-all rounded-md hover:bg-card-hover"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-xs text-zinc-500 tabular-nums">
+                          {formatDate(tx.date)}
+                        </td>
+
+                        <td className="whitespace-nowrap py-2.5 pl-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="font-medium text-zinc-100 tabular-nums">
+                              {formatCurrency(Math.abs(Number(tx.amount) || 0))}
+                            </span>
+
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                              {isSuspicious && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAIReview(tx)}
+                                  disabled={reviewingTxId === tx.id}
+                                  title="AI anomaly check"
+                                  className="rounded p-1 text-amber-400 hover:bg-amber-400/10 disabled:opacity-40 cursor-pointer"
+                                >
+                                  {reviewingTxId === tx.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
+                                  )}
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleEditClick(tx)}
+                                title="Edit expense"
+                                aria-label={`Edit ${tx.description}`}
+                                className="rounded p-1 text-zinc-500 hover:bg-white/[0.08] hover:text-zinc-200 cursor-pointer"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </section>
 
       <TransactionModal
         isOpen={isModalOpen}
@@ -369,6 +734,6 @@ export default function TransactionsTab() {
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
       />
-    </Card>
+    </div>
   );
 }

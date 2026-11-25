@@ -1,91 +1,92 @@
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useBudget } from '../../contexts/BudgetContext';
-import { Card } from '../ui/Card';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { getCyclePaceMetrics } from '../../utils/cycleUtils';
 
+/**
+ * Open borderless Category Velocity Bars directly on obsidian black.
+ */
 export default function CategoryCharts() {
-  const { categories, categorySpending } = useBudget();
+  const { categories, categorySpending, cycleStartDate, cycleFrequency } = useBudget();
+  const pace = getCyclePaceMetrics(cycleStartDate, cycleFrequency);
 
-  if (categories.length === 0) {
-    return (
-      <Card className="h-full flex items-center justify-center min-h-[400px]">
-        <p className="text-text-muted">No budget categories defined.</p>
-      </Card>
-    );
-  }
-
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-card border border-border p-2 rounded-lg shadow-xl text-sm">
-          <p className="text-text-muted">{payload[0].name}</p>
-          <p className="font-semibold" style={{ color: payload[0].payload.color }}>
-            {formatCurrency(payload[0].value)}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
+  const sorted = [...categories].sort((a, b) => {
+    const pctA = Number(a.limit) > 0 ? (categorySpending[a.id] || 0) / Number(a.limit) : 0;
+    const pctB = Number(b.limit) > 0 ? (categorySpending[b.id] || 0) / Number(b.limit) : 0;
+    return pctB - pctA;
+  });
 
   return (
-    <Card className="h-full min-h-[400px]">
-      <h2 className="text-xl font-semibold text-text mb-6">Category Budgets</h2>
-      
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-        {categories.map(category => {
-          const spent = categorySpending[category.id] || 0;
-          const limit = Number(category.limit) || 0;
-          const remaining = Math.max(0, limit - spent);
-          const percentUsed = limit > 0 ? (spent / limit) * 100 : (spent > 0 ? 100 : 0);
-          
-          let spentColor = category.color; // Normal
-          if (percentUsed >= 100) spentColor = '#ef4444'; // Red if exceeded
-          else if (percentUsed >= 80) spentColor = '#e7b956'; // Gold if warning
-
-          const data = [
-            { name: 'Spent', value: spent, color: spentColor },
-            { name: 'Remaining', value: remaining, color: '#2c2a24' }, // Subtle border track for unused
-          ];
-
-          // If totally empty, avoid rechart rendering bug
-          if (spent === 0 && remaining === 0) {
-             data[0] = { name: 'Empty', value: 1, color: '#2c2a24' };
-          }
-
-          return (
-            <div key={category.id} className="flex flex-col items-center">
-              <div className="w-24 h-24 relative">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                  <PieChart>
-                    <Pie
-                      data={data}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={30}
-                      outerRadius={45}
-                      paddingAngle={0}
-                      dataKey="value"
-                      stroke="none"
-                    >
-                      {data.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <p className="text-sm font-medium mt-2 text-center text-text truncate w-full px-2" title={category.name}>
-                {category.name}
-              </p>
-              <p className="text-xs text-text-muted text-center mt-1">
-                {Math.round(percentUsed)}% Used
-              </p>
-            </div>
-          );
-        })}
+    <section>
+      <div className="flex items-center justify-between pb-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+          Category Velocity
+        </h2>
+        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 tabular-nums">
+          <span className="inline-block h-2.5 w-px bg-[#E7B956]/80" />
+          <span>{pace.pacePct}% pace</span>
+        </div>
       </div>
-    </Card>
+
+      {sorted.length === 0 ? (
+        <div className="border-t border-white/[0.08] py-10 text-center text-xs text-zinc-500">
+          No categories yet
+        </div>
+      ) : (
+        <div className="divide-y divide-white/[0.06] border-t border-white/[0.08]">
+          {sorted.map((category) => {
+            const spent = categorySpending[category.id] || 0;
+            const limit = Number(category.limit) || 0;
+            const remaining = limit - spent;
+            const pct = limit > 0 ? (spent / limit) * 100 : spent > 0 ? 100 : 0;
+            const isOver = remaining < 0;
+            const accentHex = category.color || '#e4e4e7';
+            const barHex = isOver ? '#f43f5e' : accentHex;
+
+            return (
+              <div key={category.id} className="py-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="h-2 w-2 rounded-full shrink-0"
+                      style={{ backgroundColor: accentHex }}
+                    />
+                    <span className="truncate text-sm font-medium text-zinc-100">
+                      {category.name}
+                    </span>
+                  </div>
+                  <span
+                    className={`shrink-0 text-xs font-medium tabular-nums ${
+                      isOver ? 'text-rose-400' : 'text-zinc-300'
+                    }`}
+                  >
+                    {isOver
+                      ? `${formatCurrency(Math.abs(remaining))} over`
+                      : `${formatCurrency(remaining)} left`}
+                  </span>
+                </div>
+
+                <div className="relative mt-2 h-1.5 w-full rounded-full bg-white/[0.08]">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: barHex }}
+                  />
+                  <div
+                    className="absolute -top-0.5 h-2.5 w-px bg-[#E7B956]/70"
+                    style={{ left: `${pace.pacePct}%` }}
+                  />
+                </div>
+
+                <div className="mt-1.5 flex items-center justify-between text-[11px] text-zinc-500 tabular-nums">
+                  <span>
+                    {formatCurrency(spent)} / {formatCurrency(limit)}
+                  </span>
+                  <span>{Math.round(pct)}%</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }

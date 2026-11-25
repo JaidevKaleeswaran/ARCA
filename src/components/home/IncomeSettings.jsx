@@ -1,40 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { useBudget } from '../../contexts/BudgetContext';
-import { Card } from '../ui/Card';
-import { Edit2, Plus, DollarSign, Briefcase } from 'lucide-react';
+import { Edit2, Plus } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatCurrency';
 import IncomeSourceModal from './IncomeSourceModal';
 import SalaryModal from './SalaryModal';
 
+/**
+ * Open, non-blocky Income & Cycle configuration directly on the black canvas.
+ */
 export default function IncomeSettings() {
-  const { incomeSources, primarySalary, cycleStartDate, cycleFrequency, totalIncome, dispatch } = useBudget();
+  const { incomeSources, primarySalary, cycleStartDate, cycleFrequency, totalIncome, dispatch } =
+    useBudget();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState(null);
 
   const [cycleConfig, setCycleConfig] = useState({
     frequency: cycleFrequency || 'monthly',
-    startDate: cycleStartDate ? cycleStartDate.split('T')[0] : new Date().toISOString().split('T')[0]
+    startDate: cycleStartDate
+      ? cycleStartDate.split('T')[0]
+      : new Date().toISOString().split('T')[0],
   });
 
   useEffect(() => {
     setCycleConfig({
       frequency: cycleFrequency,
-      startDate: cycleStartDate ? cycleStartDate.split('T')[0] : new Date().toISOString().split('T')[0]
+      startDate: cycleStartDate
+        ? cycleStartDate.split('T')[0]
+        : new Date().toISOString().split('T')[0],
     });
   }, [cycleFrequency, cycleStartDate]);
 
-  const handleCycleChange = (e) => {
-    const { name, value } = e.target;
-    setCycleConfig(prev => ({ ...prev, [name]: value }));
-    
-    // Dispatch whenever it changes
+  const handleCycleChange = (name, value) => {
+    const next = { ...cycleConfig, [name]: value };
+    setCycleConfig(next);
     dispatch({
       type: 'SET_CYCLE_CONFIG',
       payload: {
-        cycleFrequency: name === 'frequency' ? value : cycleConfig.frequency,
-        cycleStartDate: name === 'startDate' ? value : cycleConfig.startDate,
-      }
+        cycleFrequency: next.frequency,
+        cycleStartDate: next.startDate,
+      },
     });
   };
 
@@ -48,132 +53,133 @@ export default function IncomeSettings() {
     setIsModalOpen(true);
   };
 
+  const additionalSources = incomeSources.filter(
+    (s) => !s.isSalary && s.id !== 'salary_source' && s.name?.toLowerCase() !== 'primary salary'
+  );
+
   return (
-    <div className="space-y-6">
-      {/* ── Income Sources Widget ── */}
-      <Card data-tutorial="income-card">
-        <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-          <div>
-            <h2 className="text-xl font-semibold text-text">Income Sources</h2>
-            <p className="text-xs text-text-muted mt-0.5">Base salary & additional earnings</p>
-          </div>
-          <button
-            type="button"
-            data-tutorial="income-source-add"
-            onClick={handleAddClick}
-            className="flex items-center space-x-1 text-xs bg-accent text-primary px-3 py-1.5 rounded-lg hover:bg-accent-hover transition-colors font-semibold"
-          >
-            <Plus size={14} />
-            <span>Add Source</span>
-          </button>
-        </div>
+    <section data-tutorial="income-card">
+      <div className="flex items-center justify-between pb-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+          Income &amp; Cycle
+        </h2>
+        <button
+          type="button"
+          data-tutorial="income-source-add"
+          onClick={handleAddClick}
+          className="inline-flex h-8 sm:h-7 items-center gap-1 rounded-full border border-white/[0.1] px-3 text-xs font-medium text-zinc-300 transition-colors hover:border-[#E7B956]/50 hover:text-[#E7B956] cursor-pointer"
+        >
+          <Plus className="h-3 w-3" strokeWidth={1.75} />
+          <span>Add source</span>
+        </button>
+      </div>
 
-        {/* Primary Salary Row / Highlight */}
-        <div className="space-y-3">
+      <div className="divide-y divide-white/[0.06] border-t border-white/[0.08]">
+        <div
+          data-tutorial="salary-set"
+          className="group flex items-center justify-between gap-3 py-3"
+        >
           {primarySalary ? (
-            <div data-tutorial="salary-set" className="bg-[#2e5b45]/15 border border-[#2e5b45]/30 rounded-xl p-3.5 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-[#2e5b45]/25 text-[#3a7056] rounded-lg shrink-0">
-                  <Briefcase size={18} />
+            <>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium text-zinc-100">
+                    {primarySalary.name}
+                  </span>
+                  <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-zinc-400">
+                    Base
+                  </span>
                 </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <h3 className="font-bold text-sm text-text">{primarySalary.name}</h3>
-                    <span className="text-[10px] bg-[#2e5b45]/25 text-[#3a7056] px-1.5 py-0.2 rounded font-semibold border border-[#2e5b45]/30">
-                      Primary Base
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#3a7056] font-semibold mt-0.5">
-                    {formatCurrency(primarySalary.amount)} / {primarySalary.frequency}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsSalaryModalOpen(true)}
-                className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-md hover:bg-primary flex items-center gap-1 text-xs"
-                title="Edit Base Salary"
-              >
-                <Edit2 size={14} />
-                <span className="hidden sm:inline">Edit</span>
-              </button>
-            </div>
-          ) : (
-            <div data-tutorial="salary-set" className="p-4 border border-dashed border-[#2e5b45]/40 bg-[#2e5b45]/10 rounded-xl text-center space-y-2">
-              <p className="text-xs text-text-muted">No primary base salary configured yet.</p>
-              <button
-                type="button"
-                onClick={() => setIsSalaryModalOpen(true)}
-                className="inline-flex items-center space-x-1.5 text-xs bg-[#2e5b45] text-white px-3.5 py-2 rounded-lg font-semibold hover:bg-[#3a7056] transition-colors shadow-sm"
-              >
-                <DollarSign size={14} />
-                <span>Set Base Salary</span>
-              </button>
-            </div>
-          )}
-
-          {/* Other Income Sources List */}
-          {incomeSources.filter(s => !s.isSalary && s.id !== 'salary_source' && s.name?.toLowerCase() !== 'primary salary').map(source => (
-            <div key={source.id} className="bg-primary border border-border rounded-lg p-3 flex justify-between items-center group">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <h3 className="font-medium text-sm text-text">{source.name}</h3>
-                  {source.isBorrowed && (
-                    <span className="text-[10px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded border border-red-500/20">
-                      Debt
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-text-muted mt-0.5">
-                  {formatCurrency(source.amount)} / {source.frequency}
+                <p className="mt-0.5 text-xs text-zinc-500 tabular-nums">
+                  {formatCurrency(primarySalary.amount)} / {primarySalary.frequency}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => handleEditClick(source)}
-                className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-md hover:bg-card"
+                onClick={() => setIsSalaryModalOpen(true)}
+                title="Edit Base Salary"
+                className="rounded p-1.5 text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-100 cursor-pointer"
               >
-                <Edit2 size={15} />
+                <Edit2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </button>
+            </>
+          ) : (
+            <div className="flex w-full items-center justify-between gap-3">
+              <span className="text-xs text-zinc-500">Base salary</span>
+              <button
+                type="button"
+                onClick={() => setIsSalaryModalOpen(true)}
+                className="inline-flex h-8 sm:h-7 items-center rounded-full bg-[#E7B956] px-3.5 text-xs font-semibold text-[#090908] hover:bg-[#d8aa45] cursor-pointer"
+              >
+                Set Base Salary
               </button>
             </div>
-          ))}
+          )}
         </div>
 
-        <div className="pt-4 mt-4 border-t border-border flex justify-between items-end">
-          <p className="text-sm text-text-muted">Total Master Cycle Income</p>
-          <p className="text-2xl font-bold text-accent">{formatCurrency(totalIncome)}</p>
-        </div>
-      </Card>
+        {additionalSources.map((source) => (
+          <div
+            key={source.id}
+            className="group flex items-center justify-between gap-3 py-2.5"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="truncate text-sm font-medium text-zinc-200">{source.name}</span>
+                {source.isBorrowed && (
+                  <span className="rounded-full border border-rose-500/30 px-2 py-0.2 text-[10px] text-rose-400">
+                    Debt
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-zinc-500 tabular-nums">
+                {formatCurrency(source.amount)} / {source.frequency}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleEditClick(source)}
+              aria-label={`Edit ${source.name}`}
+              className="rounded p-1.5 text-zinc-500 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-white/[0.06] hover:text-zinc-100 transition-all cursor-pointer"
+            >
+              <Edit2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+            </button>
+          </div>
+        ))}
 
-      {/* ── Cycle Configuration Widget ── */}
-      <Card>
-        <h2 className="text-xl font-semibold text-text mb-4">Cycle Configuration</h2>
-        <div className="space-y-4">
-          <div data-tutorial="cycle-frequency">
-            <label className="block text-sm text-text-muted mb-1">Master Cycle Frequency</label>
+        <div className="flex items-baseline justify-between py-3">
+          <span className="text-xs text-zinc-500">Total income</span>
+          <span className="text-sm font-semibold text-[#E7B956] tabular-nums">
+            {formatCurrency(totalIncome)}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 pt-3.5">
+          <div data-tutorial="cycle-frequency" className="space-y-1.5">
+            <label className="block text-[11px] text-zinc-500">Schedule</label>
             <select
               name="frequency"
               value={cycleConfig.frequency}
-              onChange={handleCycleChange}
-              className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors text-sm"
+              onChange={(e) => handleCycleChange('frequency', e.target.value)}
+              className="h-9 sm:h-8 w-full rounded-lg border border-white/[0.1] bg-[#111110] px-2.5 text-base sm:text-xs text-zinc-200 focus:border-[#E7B956] focus:outline-none"
             >
               <option value="weekly">Weekly</option>
               <option value="bi-weekly">Bi-weekly</option>
               <option value="monthly">Monthly</option>
             </select>
           </div>
-          <div>
-            <label className="block text-sm text-text-muted mb-1">Cycle Start Date</label>
+
+          <div className="space-y-1.5">
+            <label className="block text-[11px] text-zinc-500">Start</label>
             <input
               type="date"
               name="startDate"
               value={cycleConfig.startDate}
-              onChange={handleCycleChange}
-              className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors text-sm [color-scheme:dark]"
+              onChange={(e) => handleCycleChange('startDate', e.target.value)}
+              className="h-9 sm:h-8 w-full rounded-lg border border-white/[0.1] bg-[#111110] px-2.5 text-base sm:text-xs text-zinc-200 tabular-nums focus:border-[#E7B956] focus:outline-none [color-scheme:dark]"
             />
           </div>
         </div>
-      </Card>
+      </div>
 
       <IncomeSourceModal
         isOpen={isModalOpen}
@@ -185,7 +191,6 @@ export default function IncomeSettings() {
         isOpen={isSalaryModalOpen}
         onClose={() => setIsSalaryModalOpen(false)}
       />
-    </div>
+    </section>
   );
 }
-

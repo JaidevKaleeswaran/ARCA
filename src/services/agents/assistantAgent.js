@@ -119,6 +119,52 @@ export async function answerQuery(question, financialSnapshot) {
 function tryFallbackAnswer(question, snapshot) {
   const q = question.toLowerCase();
 
+  const tutorialReminder =
+    '\n\n**Tip:** Remember to walk through the interactive **Tutorial** for a guided tour! To start it anytime, open **Settings** (the **gear icon** in the top-right corner) and tap **Start Tutorial** (on a computer, you can also click the **Tutorial ?** button in the bottom-right corner).';
+
+  const isNavigationQuery =
+    q.includes('where') ||
+    q.includes('how do i') ||
+    q.includes('how to') ||
+    q.includes('find') ||
+    q.includes('navigate') ||
+    q.includes('tutorial') ||
+    q.includes('log out') ||
+    q.includes('logout') ||
+    q.includes('sign out') ||
+    q.includes('settings');
+
+  if (isNavigationQuery) {
+    if (q.includes('tutorial') || q.includes('walkthrough') || q.includes('guide')) {
+      return `You can start or replay the interactive **Tutorial** for your current page by tapping the **Settings** gear icon in the top-right header and selecting **Start Tutorial**. On a computer, you can also click the **Tutorial ?** button in the bottom-right corner.`;
+    }
+    if (q.includes('log out') || q.includes('logout') || q.includes('sign out')) {
+      return `To log out of ARCA, tap the **Settings** gear icon in the top-right corner of the header and select **Log out** at the bottom of the drawer (on a computer, there is also a Sign out icon in the top-right header).${tutorialReminder}`;
+    }
+    if (q.includes('expense') || q.includes('transaction') || q.includes('receipt') || q.includes('scan') || q.includes('csv') || q.includes('ledger')) {
+      return `You can manage all expenses in the **Ledger** tab:\n\n• **Quick Add (Mobile):** Tap the floating **+ Transaction** button above the bottom-right of the Liquid Glass navigation bar.\n• **Manual / Voice / Scan / CSV:** Open the **Ledger** tab and use **+ Add expense**, **Speak**, **Scan**, or **CSV** at the top.\n• **Edit or Delete:** On mobile, tap any item in the Ledger to expand its dropdown editor; on computer, hover a row and click the Edit icon.${tutorialReminder}`;
+    }
+    if (q.includes('category') || q.includes('categories') || q.includes('quick-fill') || q.includes('envelope')) {
+      return `Budget envelopes live in the **Budget** tab under **Categories**:\n\n• Tap **+ Add** to create a category or **Quick-Fill** to apply a preset split like 50/30/20.\n• **Edit or Delete:** On mobile, tap any category widget to extend its dropdown editor (name, amount, color, and delete); on computer, hover the category row for Edit and Delete buttons.${tutorialReminder}`;
+    }
+    if (q.includes('salary') || q.includes('income') || q.includes('cycle')) {
+      return `Go to the **Budget** tab and scroll to **Income & Cycle** to click **Set Base Salary**, **+ Add source** for extra income streams, or adjust your pay cycle **Schedule** and **Start** date.${tutorialReminder}`;
+    }
+    if (q.includes('rate') || q.includes('news') || q.includes('macro') || q.includes('treasury') || q.includes('fed')) {
+      return `On **mobile**, open the **Financial** tab in the bottom Liquid Glass bar to view Interest Rates & Treasury Benchmarks, Macroeconomic Outlook, and Live Financial News. On a **computer**, these sections are unified inside the **Markets** tab.${tutorialReminder}`;
+    }
+    if (q.includes('stock') || q.includes('market') || q.includes('invest') || q.includes('watchlist') || q.includes('favorite')) {
+      return `Open the **Markets** tab to search stocks, tap the **★ star** to favorite and pin tickers at the top, click **+ Invest**, or tap any stock card to open its interactive price history drawer.${tutorialReminder}`;
+    }
+    if (q.includes('chart') || q.includes('net worth') || q.includes('summary') || q.includes('alert')) {
+      return `Open the **Summary** tab to view your **Financial Health Cards** (Net Worth, Cash Flow, Savings Rate), **Master Balance Allocation**, **Category Breakdown** charts, and **Alerts & Cycle Hub**.${tutorialReminder}`;
+    }
+    if (q.includes('password') || q.includes('profile') || q.includes('avatar') || q.includes('settings')) {
+      return `Tap the **Settings** gear icon in the top-right corner of the header to update your **Profile** (display name & avatar), manage your **Password**, **Start Tutorial**, or **Log out**.${tutorialReminder}`;
+    }
+    return `Here is how ARCA is organized:\n\n• **Budget:** Left-to-spend overview, Categories, and Income & Cycle.\n• **Ledger:** Add, speak, scan, export, or edit expenses (or tap the floating **+ Transaction** button on mobile).\n• **Summary:** Net worth, health scorecards, charts, and alerts.\n• **Markets:** Live stock quotes, favorites, charts, and portfolio holdings.\n• **Financial (Mobile) / Markets (Computer):** Official interest rates, macro outlook, and financial news.\n• **Settings (top-right gear icon):** Profile, password, **Start Tutorial**, and **Log out**.${tutorialReminder}`;
+  }
+
   if (q.includes('total spent') || q.includes('how much') && q.includes('spent')) {
     return `You've spent **$${snapshot.summary.totalSpent.toFixed(2)}** in the current budget cycle.`;
   }

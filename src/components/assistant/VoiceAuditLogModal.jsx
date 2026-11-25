@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Mic, Calendar, FileText, Search, Trash2, CheckCircle2, Tag } from 'lucide-react';
 import { useBudget } from '../../contexts/BudgetContext';
 
@@ -6,6 +6,15 @@ export default function VoiceAuditLogModal({ isOpen, onClose }) {
   const { voiceLogs = [], dispatch } = useBudget();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLog, setSelectedLog] = useState(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -26,37 +35,35 @@ export default function VoiceAuditLogModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-card border border-border rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden relative">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <div className="bg-[#111110] border border-white/[0.1] rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden relative animate-step-enter">
         {/* Header */}
-        <div className="p-5 border-b border-border flex items-center justify-between bg-card-hover">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-accent/15 text-accent rounded-xl border border-accent/30">
-              <Mic size={20} />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-text">
-                Voice Entry History & Logs
-              </h3>
-              <p className="text-xs text-text-muted">Speech transcripts and structured transaction data logs.</p>
-            </div>
-          </div>
+        <div className="px-5 py-3.5 border-b border-white/[0.08] flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-zinc-100">Voice Logs</h3>
 
           <div className="flex items-center space-x-2">
             {voiceLogs.length > 0 && (
               <button
+                type="button"
                 onClick={handleClearLogs}
-                className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg border border-transparent hover:border-red-500/20 transition-colors"
+                className="p-1.5 text-zinc-400 hover:text-rose-400 rounded-md transition-colors cursor-pointer"
                 title="Clear Voice Logs"
               >
-                <Trash2 size={16} />
+                <Trash2 className="h-4 w-4" strokeWidth={1.5} />
               </button>
             )}
             <button
+              type="button"
               onClick={onClose}
-              className="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-card-hover rounded-lg transition-colors cursor-pointer"
+              aria-label="Close voice logs"
+              className="p-1.5 text-zinc-400 hover:text-zinc-100 rounded-md transition-colors cursor-pointer"
             >
-              <X size={18} />
+              <X className="h-4 w-4" strokeWidth={1.5} />
             </button>
           </div>
         </div>

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { useBudget } from '../../contexts/BudgetContext';
-import { Repeat } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function TransactionModal({ isOpen, onClose, transaction = null }) {
@@ -14,7 +13,7 @@ export default function TransactionModal({ isOpen, onClose, transaction = null }
     isSubscription: false,
   });
 
-  const isEditing = !!transaction;
+  const isEditing = Boolean(transaction && transaction.id);
 
   useEffect(() => {
     if (isOpen) {
@@ -40,7 +39,7 @@ export default function TransactionModal({ isOpen, onClose, transaction = null }
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleSubmit = (e) => {
@@ -48,7 +47,6 @@ export default function TransactionModal({ isOpen, onClose, transaction = null }
 
     let targetCategoryId = formData.categoryId;
 
-    // Auto-create a General category if user logs an expense before creating categories
     if (!targetCategoryId && categories.length === 0) {
       targetCategoryId = `cat_general_${Date.now()}`;
       dispatch({
@@ -82,12 +80,12 @@ export default function TransactionModal({ isOpen, onClose, transaction = null }
       dispatch({ type: 'ADD_TRANSACTION', payload: { ...payload, id: Date.now().toString() } });
       toast.success('Expense added');
     }
-    
+
     onClose();
   };
 
   const handleDelete = () => {
-    if (window.confirm('Are you sure you want to delete this expense?')) {
+    if (window.confirm('Delete this expense?')) {
       dispatch({ type: 'DELETE_TRANSACTION', payload: transaction.id });
       toast.success('Expense deleted');
       onClose();
@@ -95,75 +93,75 @@ export default function TransactionModal({ isOpen, onClose, transaction = null }
   };
 
   return (
-    <Modal 
-      isOpen={isOpen} 
-      onClose={onClose} 
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
       title={isEditing ? 'Edit Expense' : 'Add Expense'}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-xs font-medium text-text-muted mb-1">Amount</label>
-          <input
-            type="number"
-            name="amount"
-            value={formData.amount}
-            onChange={handleChange}
-            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
-            placeholder="0.00"
-            min="0.01"
-            step="0.01"
-            required
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-zinc-400">Amount</label>
+            <input
+              type="number"
+              name="amount"
+              value={formData.amount}
+              onChange={handleChange}
+              className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#090908] px-3 text-base sm:text-sm text-zinc-100 tabular-nums placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
+              placeholder="0.00"
+              min="0.01"
+              step="0.01"
+              required
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-zinc-400">Date</label>
+            <input
+              type="date"
+              name="date"
+              value={formData.date}
+              onChange={handleChange}
+              className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#090908] px-3 text-base sm:text-sm text-zinc-100 tabular-nums focus:border-[#E7B956] focus:outline-none [color-scheme:dark]"
+              required
+            />
+          </div>
         </div>
 
-        <div>
-          <label className="block text-sm text-text-muted mb-1">Category</label>
-          <select
-            name="categoryId"
-            value={formData.categoryId}
-            onChange={handleChange}
-            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
-            required={categories.length > 0}
-          >
-            {categories.length === 0 && <option value="">General (Auto-created)</option>}
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm text-text-muted mb-1">Description</label>
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-zinc-400">Merchant / Description</label>
           <input
             type="text"
             name="description"
             value={formData.description}
             onChange={handleChange}
-            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors"
-            placeholder="e.g. Weekly groceries"
+            className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#090908] px-3 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
+            placeholder="e.g. Trader Joe’s"
             required
           />
         </div>
 
-        <div>
-          <label className="block text-sm text-text-muted mb-1">Date</label>
-          <input
-            type="date"
-            name="date"
-            value={formData.date}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-zinc-400">Category</label>
+          <select
+            name="categoryId"
+            value={formData.categoryId}
             onChange={handleChange}
-            className="w-full bg-primary border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:border-accent transition-colors [color-scheme:dark]"
-            required
-          />
+            className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#090908] px-3 text-base sm:text-sm text-zinc-100 focus:border-[#E7B956] focus:outline-none"
+            required={categories.length > 0}
+          >
+            {categories.length === 0 && <option value="">General (Auto-created)</option>}
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* Subscription toggle */}
-        <div className="flex items-center justify-between bg-primary border border-border rounded-lg px-3 py-3">
-          <div>
-            <p className="text-sm text-text font-medium">Mark as Subscription</p>
-            <p className="text-xs text-text-muted mt-0.5">Recurring monthly charge (Netflix, gym, etc.)</p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer ml-4 shrink-0">
+        <div className="flex items-center justify-between border-y border-white/[0.08] py-3">
+          <span className="text-xs font-medium text-zinc-300">Recurring subscription</span>
+          <label className="relative inline-flex items-center cursor-pointer shrink-0">
             <input
               type="checkbox"
               name="isSubscription"
@@ -171,30 +169,23 @@ export default function TransactionModal({ isOpen, onClose, transaction = null }
               onChange={handleChange}
               className="sr-only peer"
             />
-            <div className="w-10 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+            <div className="w-9 h-5 bg-zinc-800 rounded-full peer peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-200 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#E7B956] peer-checked:after:bg-[#090908]" />
           </label>
         </div>
 
-        {formData.isSubscription && (
-          <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
-            <Repeat size={14} className="shrink-0" />
-            <span>This expense will be tracked as a recurring subscription and counted in your subscription total.</span>
-          </div>
-        )}
-
-        <div className="pt-4 flex space-x-3">
+        <div className="pt-2 flex items-center gap-2.5">
           <button
             type="submit"
-            className="flex-1 bg-accent text-primary font-medium py-2 rounded-lg hover:bg-accent-hover transition-colors"
+            className="h-10 sm:h-9 flex-1 rounded-full bg-[#E7B956] text-xs font-semibold text-[#090908] hover:bg-[#d8aa45] cursor-pointer"
           >
-            {isEditing ? 'Save Changes' : 'Add Expense'}
+            {isEditing ? 'Save changes' : 'Add expense'}
           </button>
-          
+
           {isEditing && (
             <button
               type="button"
               onClick={handleDelete}
-              className="px-4 bg-red-500/10 text-red-500 border border-red-500/20 font-medium py-2 rounded-lg hover:bg-red-500/20 transition-colors"
+              className="h-10 sm:h-9 rounded-full border border-rose-500/25 bg-rose-500/10 px-4 text-xs font-medium text-rose-400 hover:bg-rose-500/20 cursor-pointer"
             >
               Delete
             </button>

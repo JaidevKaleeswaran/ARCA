@@ -1,5 +1,21 @@
 {
   "firestore": {
     "rules": "firestore.rules"
+  },
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "ARCA Budgeting",
+        "supportEmail": "kaleeswaranjaidev@gmail.com",
+        "authorizedRedirectUris": [
+          "https://arca-budgeting.firebaseapp.com/__/auth/handler",
+          "https://arca-budgeting.web.app/__/auth/handler",
+          "https://stacked-budgeting.firebaseapp.com/__/auth/handler",
+          "https://arca-budgeting.vercel.app/__/auth/handler",
+          "http://localhost:5173"
+        ]
+      }
+    }
   }
 }

@@ -33,6 +33,7 @@ const defaultState = {
   categories: [],
   transactions: [],
   investments: [], // User stock portfolio holdings
+  watchlist: [], // User favorited/starred stocks pinned at top of Markets
   voiceLogs: [],
   chatMessages: [],
   quotaUsage: {
@@ -99,11 +100,28 @@ function sanitizeState(state) {
     }
   }
 
+  const seenWatchSymbols = new Set();
+  const cleanedWatchlist = [];
+  if (Array.isArray(state.watchlist)) {
+    for (const item of state.watchlist) {
+      const rawSym = typeof item === 'string' ? item : item?.symbol;
+      const sym = String(rawSym || '').toUpperCase().trim();
+      if (!sym || seenWatchSymbols.has(sym)) continue;
+      seenWatchSymbols.add(sym);
+      if (typeof item === 'string') {
+        cleanedWatchlist.push({ symbol: sym, name: sym, price: 0, change: 0, changePercent: 0 });
+      } else {
+        cleanedWatchlist.push({ ...item, symbol: sym });
+      }
+    }
+  }
+
   return {
     ...state,
     categories: cleanedCategories,
     transactions: cleanedTransactions,
     investments: Array.isArray(state.investments) ? state.investments : [],
+    watchlist: cleanedWatchlist,
     chatMessages: cleanedMessages,
     quotaUsage: normalizeQuotaState(state?.quotaUsage),
     isSubscribed: false,
@@ -392,29 +410,106 @@ function internalBudgetReducer(state, action) {
       };
     }
 
+    case 'TOGGLE_FAVORITE_STOCK': {
+      const item = action.payload || {};
+      const upperSym = String(typeof item === 'string' ? item : item.symbol || '').toUpperCase().trim();
+      if (!upperSym) return state;
+
+      const existing = state.watchlist || [];
+      const alreadyFav = existing.some((w) => w.symbol?.toUpperCase() === upperSym);
+      if (alreadyFav) {
+        return {
+          ...state,
+          watchlist: existing.filter((w) => w.symbol?.toUpperCase() !== upperSym),
+        };
+      }
+
+      const newFav = {
+        symbol: upperSym,
+        name: item.name || upperSym,
+        sector: item.sector || 'Equities',
+        price: Number(item.price) || 0,
+        change: Number(item.change) || 0,
+        changePercent: Number(item.changePercent) || 0,
+        marketCap: item.marketCap || 'N/A',
+        addedAt: new Date().toISOString(),
+      };
+      return {
+        ...state,
+        watchlist: [newFav, ...existing],
+      };
+    }
+
+    case 'REMOVE_FAVORITE_STOCK': {
+      const upperSym = String(action.payload?.symbol || action.payload || '').toUpperCase().trim();
+      if (!upperSym) return state;
+      return {
+        ...state,
+        watchlist: (state.watchlist || []).filter((w) => w.symbol?.toUpperCase() !== upperSym),
+      };
+    }
+
+    case 'SET_WATCHLIST': {
+      const incoming = Array.isArray(action.payload) ? action.payload : [];
+      return sanitizeState({
+        ...state,
+        watchlist: incoming,
+      });
+    }
+
     case 'REFRESH_PORTFOLIO_PRICES': {
       const quotes = action.payload || {};
       if (Object.keys(quotes).length === 0) return state;
 
+      const resolveQuote = (sym) => {
+        if (!sym) return null;
+        const raw = quotes[sym] ?? quotes[sym.toUpperCase()];
+        if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+          return { price: raw };
+        }
+        if (raw && typeof raw === 'object' && typeof raw.price === 'number' && raw.price > 0) {
+          return raw;
+        }
+        return null;
+      };
+
+      const nextInvestments = (state.investments || []).map((inv) => {
+        const q = resolveQuote(inv.symbol);
+        if (!q) return inv;
+
+        const latestPrice = q.price;
+        const currentValue = Number((inv.shares * latestPrice).toFixed(2));
+        const unrealizedGain = Number((currentValue - inv.investedAmount).toFixed(2));
+        const unrealizedGainPercent = inv.investedAmount > 0 ? Number(((unrealizedGain / inv.investedAmount) * 100).toFixed(2)) : 0;
+
+        return {
+          ...inv,
+          currentPrice: latestPrice,
+          currentValue,
+          unrealizedGain,
+          unrealizedGainPercent,
+          lastUpdated: new Date().toISOString(),
+        };
+      });
+
+      const nextWatchlist = (state.watchlist || []).map((w) => {
+        const q = resolveQuote(w.symbol);
+        if (!q) return w;
+        return {
+          ...w,
+          name: q.name || w.name,
+          price: q.price,
+          change: typeof q.change === 'number' ? q.change : w.change,
+          changePercent: typeof q.changePercent === 'number' ? q.changePercent : w.changePercent,
+          marketCap: q.marketCap || w.marketCap,
+          lastUpdated: new Date().toISOString(),
+        };
+      });
+
       return {
         ...state,
-        investments: (state.investments || []).map((inv) => {
-          const latestPrice = quotes[inv.symbol] || quotes[inv.symbol.toUpperCase()];
-          if (!latestPrice || typeof latestPrice !== 'number') return inv;
-
-          const currentValue = Number((inv.shares * latestPrice).toFixed(2));
-          const unrealizedGain = Number((currentValue - inv.investedAmount).toFixed(2));
-          const unrealizedGainPercent = inv.investedAmount > 0 ? Number(((unrealizedGain / inv.investedAmount) * 100).toFixed(2)) : 0;
-
-          return {
-            ...inv,
-            currentPrice: latestPrice,
-            currentValue,
-            unrealizedGain,
-            unrealizedGainPercent,
-            lastUpdated: new Date().toISOString(),
-          };
-        }),
+        investments: nextInvestments,
+        watchlist: nextWatchlist,
       };
     }
     case 'SET_FULL_STATE': {
@@ -478,6 +573,15 @@ function internalBudgetReducer(state, action) {
         if (inv?.symbol) invMap.set(inv.symbol.toUpperCase(), inv);
       });
 
+      // Merge watchlist favorites by symbol
+      const watchMap = new Map();
+      (state?.watchlist || []).forEach((w) => {
+        if (w?.symbol) watchMap.set(w.symbol.toUpperCase(), w);
+      });
+      (incoming.watchlist || []).forEach((w) => {
+        if (w?.symbol) watchMap.set(w.symbol.toUpperCase(), w);
+      });
+
       return sanitizeState({
         ...defaultState,
         ...state,
@@ -486,6 +590,7 @@ function internalBudgetReducer(state, action) {
         transactions: Array.from(txMap.values()),
         incomeSources: Array.from(sourceMap.values()),
         investments: Array.from(invMap.values()),
+        watchlist: Array.from(watchMap.values()),
         voiceLogs: Array.from(logMap.values()),
         chatMessages: Array.from(msgMap.values()),
         quotaUsage: normalizeQuotaState(incoming.quotaUsage || state.quotaUsage),
@@ -494,6 +599,9 @@ function internalBudgetReducer(state, action) {
     case 'LOAD_USER_STATE': {
       const incoming = action.payload || {};
       const sessionKey = action.meta?.sessionKey !== undefined ? action.meta.sessionKey : state._sessionKey;
+      const incomingWatchlist = Array.isArray(incoming.watchlist)
+        ? incoming.watchlist
+        : (state._sessionKey === sessionKey && Array.isArray(state.watchlist) ? state.watchlist : []);
       return sanitizeState({
         ...defaultState,
         ...incoming,
@@ -501,6 +609,7 @@ function internalBudgetReducer(state, action) {
         transactions: Array.isArray(incoming.transactions) ? incoming.transactions : [],
         incomeSources: Array.isArray(incoming.incomeSources) ? incoming.incomeSources : [],
         investments: Array.isArray(incoming.investments) ? incoming.investments : [],
+        watchlist: incomingWatchlist,
         voiceLogs: Array.isArray(incoming.voiceLogs) ? incoming.voiceLogs : [],
         chatMessages: Array.isArray(incoming.chatMessages) ? incoming.chatMessages : [],
         quotaUsage: normalizeQuotaState(incoming.quotaUsage),
@@ -545,6 +654,7 @@ const NON_MUTATING_ACTIONS = new Set([
   'LOAD_USER_STATE',
   'RESET_STATE',
   'REFRESH_PORTFOLIO_PRICES',
+  'SET_WATCHLIST',
 ]);
 
 function budgetReducer(state, action) {
@@ -663,9 +773,18 @@ export function BudgetProvider({ children }) {
     }
   }, [state, activeSessionKey]);
 
-  // Continuously refresh user stock holdings with accurate live market prices
+  // Continuously refresh user stock holdings & favorited watchlist with accurate live market prices
+  const trackedSymbolsKey = [
+    ...(state.investments || []).map((i) => i.symbol),
+    ...(state.watchlist || []).map((w) => w.symbol),
+  ]
+    .filter(Boolean)
+    .map((s) => s.toUpperCase())
+    .sort()
+    .join(',');
+
   useEffect(() => {
-    const symbols = (state.investments || []).map((i) => i.symbol).filter(Boolean);
+    const symbols = Array.from(new Set(trackedSymbolsKey ? trackedSymbolsKey.split(',') : []));
     if (symbols.length === 0) return;
 
     let isMounted = true;
@@ -682,13 +801,15 @@ export function BudgetProvider({ children }) {
           if (data.quotes && Object.keys(data.quotes).length > 0) {
             const liveMap = {};
             Object.values(data.quotes).forEach((q) => {
-              liveMap[q.symbol] = q.price;
+              if (q && q.symbol && typeof q.price === 'number' && q.price > 0) {
+                liveMap[q.symbol] = q;
+              }
             });
             dispatch({ type: 'REFRESH_PORTFOLIO_PRICES', payload: liveMap });
           }
         }
       } catch (err) {
-        console.warn('BudgetContext failed to refresh holding quotes:', err);
+        console.warn('BudgetContext failed to refresh tracked stock quotes:', err);
       }
     };
 
@@ -698,7 +819,7 @@ export function BudgetProvider({ children }) {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [state.investments?.length]);
+  }, [trackedSymbolsKey]);
 
   // Calculate normalized total income
   const totalIncome = state.incomeSources.reduce((sum, source) => {

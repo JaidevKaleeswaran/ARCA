@@ -3,51 +3,52 @@ import { ArrowLeft } from 'lucide-react';
 
 export default function TermsPage({ navigate }) {
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8 bg-primary text-text">
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-12 sm:py-16 space-y-8">
       {/* Back button */}
       <button
+        type="button"
         onClick={() => {
           navigate('/');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        className="inline-flex items-center space-x-2 text-xs font-medium text-text-muted hover:text-accent transition-colors cursor-pointer"
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-950 transition-colors cursor-pointer"
       >
-        <ArrowLeft size={14} />
-        <span>Back to Overview</span>
+        <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.5} />
+        <span>Back to overview</span>
       </button>
 
-      <div className="bg-card border border-border rounded-xl p-6 sm:p-10 space-y-8">
+      <div className="rounded-lg border border-zinc-200/80 bg-white p-6 sm:p-10 space-y-8">
         {/* Header */}
-        <div className="border-b border-border pb-6 space-y-2">
-          <p className="text-xs uppercase tracking-widest text-accent font-mono">
+        <div className="border-b border-zinc-200/80 pb-6 space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
             Legal Agreement
           </p>
-          <h1 className="text-2xl sm:text-4xl font-semibold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-zinc-950">
             Terms of Service
           </h1>
-          <p className="text-xs font-mono text-text-muted">
+          <p className="text-xs font-mono text-zinc-500 tabular-nums">
             Last updated: November 14, 2026
           </p>
         </div>
 
         {/* Verbatim Terms Content */}
-        <div className="text-xs sm:text-sm text-text-muted space-y-6 leading-relaxed">
-          <div className="bg-primary p-3.5 rounded-lg border border-accent/30 text-xs font-mono space-y-1">
-            <p><strong className="text-white">Application Name:</strong> ARCA ("We," "Our," or "Us")</p>
-            <p><strong className="text-white">Operated By:</strong> <span className="text-accent">ARCA Budgeting</span></p>
+        <div className="text-xs sm:text-sm text-zinc-600 space-y-6 leading-relaxed">
+          <div className="rounded-md border border-zinc-200/80 bg-[#F8F8F7] p-3.5 text-xs font-mono space-y-1">
+            <p><strong className="text-zinc-950">Application Name:</strong> ARCA (&quot;We,&quot; &quot;Our,&quot; or &quot;Us&quot;)</p>
+            <p><strong className="text-zinc-950">Operated By:</strong> <span className="text-zinc-900">ARCA Budgeting</span></p>
           </div>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               1. Agreement to These Terms
             </h2>
             <p>
-              These Terms of Service ("Terms") are a binding agreement between you and ARCA Budgeting ("we," "us," "our") governing your use of ARCA (the "App"), including our website, AI financial assistant, voice transaction input, receipt scanner, market data features, and any related services (together, the "Service"). By creating an account or using the Service, you agree to these Terms and our Privacy Policy. If you do not agree, do not use the Service.
+              These Terms of Service (&quot;Terms&quot;) are a binding agreement between you and ARCA Budgeting (&quot;we,&quot; &quot;us,&quot; &quot;our&quot;) governing your use of ARCA (the &quot;App&quot;), including our website, AI financial assistant, voice transaction input, receipt scanner, market data features, and any related services (together, the &quot;Service&quot;). By creating an account or using the Service, you agree to these Terms and our Privacy Policy. If you do not agree, do not use the Service.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               2. Eligibility
             </h2>
             <p>
@@ -56,7 +57,7 @@ export default function TermsPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               3. Your Account
             </h2>
             <p>
@@ -65,44 +66,44 @@ export default function TermsPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               4. What the Service Does
             </h2>
             <p>
               The Service helps you track spending, create budgets, and learn about personal finance. Features include:
             </p>
             <ul className="list-disc pl-5 space-y-2">
-              <li><strong className="text-white">AI financial assistant:</strong> answers questions and gives suggestions based on information you provide.</li>
-              <li><strong className="text-white">Voice input:</strong> converts speech into transaction entries.</li>
-              <li><strong className="text-white">Receipt scanner:</strong> extracts details from photos of receipts.</li>
-              <li><strong className="text-white">Market data:</strong> displays information about financial markets.</li>
+              <li><strong className="text-zinc-900">AI financial assistant:</strong> answers questions and gives suggestions based on information you provide.</li>
+              <li><strong className="text-zinc-900">Voice input:</strong> converts speech into transaction entries.</li>
+              <li><strong className="text-zinc-900">Receipt scanner:</strong> extracts details from photos of receipts.</li>
+              <li><strong className="text-zinc-900">Market data:</strong> displays information about financial markets.</li>
             </ul>
             <p>We may add, change, or remove features at any time.</p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               5. Not Financial Advice
             </h2>
             <p>
               The Service is for general information and education only. It is not financial, investment, tax, legal, or accounting advice, and we are not a bank, broker-dealer, investment adviser, or financial planner.
             </p>
             <ul className="list-disc pl-5 space-y-2">
-              <li><strong className="text-white">AI limitations:</strong> AI-generated responses can be wrong, incomplete, or out of date, and may misread voice input or receipts. Check entries and suggestions before relying on them.</li>
-              <li><strong className="text-white">Market data:</strong> Market information may be delayed, inaccurate, or incomplete, comes from third parties, and is provided for informational purposes only. It is not a recommendation to buy, sell, or hold any security or asset. Investing involves risk, including loss of principal. Past performance does not guarantee future results.</li>
-              <li><strong className="text-white">Your decisions are yours.</strong> You are solely responsible for your financial decisions. Consider talking to a qualified professional, and for teens, a parent or guardian, before making significant financial choices.</li>
+              <li><strong className="text-zinc-900">AI limitations:</strong> AI-generated responses can be wrong, incomplete, or out of date, and may misread voice input or receipts. Check entries and suggestions before relying on them.</li>
+              <li><strong className="text-zinc-900">Market data:</strong> Market information may be delayed, inaccurate, or incomplete, comes from third parties, and is provided for informational purposes only. It is not a recommendation to buy, sell, or hold any security or asset. Investing involves risk, including loss of principal. Past performance does not guarantee future results.</li>
+              <li><strong className="text-zinc-900">Your decisions are yours.</strong> You are solely responsible for your financial decisions. Consider talking to a qualified professional, and for teens, a parent or guardian, before making significant financial choices.</li>
             </ul>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               6. Your Content and Permissions
             </h2>
             <p>
-              "Your Content" means the information you submit, including transactions, notes, voice input, receipt images, and messages to the AI assistant. You keep ownership of Your Content. You give us a limited, worldwide, non-exclusive license to host, process, and use Your Content only as needed to operate, secure, and improve the Service, as described in our Privacy Policy.
+              &quot;Your Content&quot; means the information you submit, including transactions, notes, voice input, receipt images, and messages to the AI assistant. You keep ownership of Your Content. You give us a limited, worldwide, non-exclusive license to host, process, and use Your Content only as needed to operate, secure, and improve the Service, as described in our Privacy Policy.
             </p>
             <p>
-              You promise that you have the right to submit Your Content and that it does not violate any law or anyone else's rights. Please do not upload receipts or recordings that contain other people's sensitive information, and do not enter full card numbers, Social Security numbers, or passwords.
+              You promise that you have the right to submit Your Content and that it does not violate any law or anyone else&apos;s rights. Please do not upload receipts or recordings that contain other people&apos;s sensitive information, and do not enter full card numbers, Social Security numbers, or passwords.
             </p>
             <p>
               The microphone and camera features work only with your permission, which you can withdraw at any time in your device settings.
@@ -110,7 +111,7 @@ export default function TermsPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               7. Acceptable Use
             </h2>
             <p>You agree not to:</p>
@@ -119,15 +120,15 @@ export default function TermsPage({ navigate }) {
               <li>Access the Service by unauthorized means, probe for vulnerabilities, or interfere with its operation or security.</li>
               <li>Scrape, copy, reverse engineer, or resell the Service or its data, except as the law allows.</li>
               <li>Use the AI assistant to generate harmful, deceptive, or abusive content, or attempt to bypass its safeguards.</li>
-              <li>Share your account, impersonate others, or submit another person's information without permission.</li>
-              <li>Use the Service to harm minors or violate anyone's privacy.</li>
+              <li>Share your account, impersonate others, or submit another person&apos;s information without permission.</li>
+              <li>Use the Service to harm minors or violate anyone&apos;s privacy.</li>
               <li>Use automated tools to overload the Service.</li>
             </ul>
             <p>We may investigate violations and take action, including removing content and suspending accounts.</p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               8. Fees and Subscriptions
             </h2>
             <p>
@@ -136,7 +137,7 @@ export default function TermsPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               9. Third-Party Services
             </h2>
             <p>
@@ -145,7 +146,7 @@ export default function TermsPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               10. Our Intellectual Property
             </h2>
             <p>
@@ -154,7 +155,7 @@ export default function TermsPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               11. Termination
             </h2>
             <p>
@@ -163,25 +164,25 @@ export default function TermsPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               12. Disclaimers
             </h2>
-            <p className="uppercase text-xs text-zinc-400 leading-relaxed font-mono">
-              THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, AND NON-INFRINGEMENT. WE DO NOT GUARANTEE THAT THE SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, OR SECURE, OR THAT AI OUTPUTS, TRANSCRIPTIONS, RECEIPT SCANS, OR MARKET DATA WILL BE ACCURATE OR RELIABLE. Some places do not allow certain disclaimers, so some of these may not apply to you.
+            <p className="uppercase text-xs text-zinc-500 leading-relaxed font-mono">
+              THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE,&quot; WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, AND NON-INFRINGEMENT. WE DO NOT GUARANTEE THAT THE SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, OR SECURE, OR THAT AI OUTPUTS, TRANSCRIPTIONS, RECEIPT SCANS, OR MARKET DATA WILL BE ACCURATE OR RELIABLE. Some places do not allow certain disclaimers, so some of these may not apply to you.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               13. Limitation of Liability
             </h2>
-            <p className="uppercase text-xs text-zinc-400 leading-relaxed font-mono">
+            <p className="uppercase text-xs text-zinc-500 leading-relaxed font-mono">
               TO THE FULLEST EXTENT PERMITTED BY LAW, WE AND OUR AFFILIATES, OFFICERS, AND CONTRACTORS WILL NOT BE LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR FOR LOSS OF PROFITS, DATA, OR GOODWILL, ARISING FROM YOUR USE OF THE SERVICE, INCLUDING FINANCIAL OR INVESTMENT LOSSES BASED ON INFORMATION FROM THE SERVICE. OUR TOTAL LIABILITY FOR ANY CLAIM WILL NOT EXCEED THE GREATER OF THE AMOUNT YOU PAID US IN THE 12 MONTHS BEFORE THE CLAIM OR US$100. Some places do not allow these limits, so they may not apply to you.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               14. Dispute Resolution and Governing Law
             </h2>
             <p>
@@ -190,16 +191,16 @@ export default function TermsPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               15. Changes to These Terms
             </h2>
             <p>
-              We may update these Terms. We will post the new version with a new "Last updated" date and, for material changes, notify you in the App or by email. Continuing to use the Service after changes take effect means you accept them.
+              We may update these Terms. We will post the new version with a new &quot;Last updated&quot; date and, for material changes, notify you in the App or by email. Continuing to use the Service after changes take effect means you accept them.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               16. General
             </h2>
             <p>
@@ -208,7 +209,7 @@ export default function TermsPage({ navigate }) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-accent border-b border-border pb-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 border-b border-zinc-100 pb-1.5">
               17. Contact Us
             </h2>
             <p>
