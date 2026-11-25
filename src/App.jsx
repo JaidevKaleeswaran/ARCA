@@ -65,19 +65,6 @@ function MainApp() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // On desktop (>= md), Financial is unified inside Markets — normalize tab on resize up
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const mq = window.matchMedia('(min-width: 768px)');
-    const handleResize = (e) => {
-      if (e.matches) {
-        setActiveTab((prev) => (prev === 'financial' ? 'markets' : prev));
-      }
-    };
-    mq.addEventListener('change', handleResize);
-    return () => mq.removeEventListener('change', handleResize);
-  }, []);
-
   useEffect(() => {
     if (isAppRoute && user && (user.emailVerified || user.isGuest)) {
       const timer = setTimeout(() => {
@@ -218,7 +205,7 @@ function MainApp() {
                 {activeTab === 'assistant' && <AIAssistantTab />}
                 {(activeTab === 'markets' || activeTab === 'financial') && (
                   <MarketTrackerTab
-                    mobileView={activeTab === 'financial' ? 'financial' : 'markets'}
+                    view={activeTab === 'financial' ? 'financial' : 'markets'}
                   />
                 )}
                 {activeTab === 'summary' && <SummaryTab onNavigateToMarkets={() => setActiveTab('markets')} />}

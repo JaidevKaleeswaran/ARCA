@@ -6,14 +6,14 @@ const TABS = [
   { id: 'transactions', label: 'Ledger', icon: ReceiptText },
   { id: 'summary', label: 'Summary', icon: BarChart3 },
   { id: 'markets', label: 'Markets', icon: TrendingUp },
-  { id: 'financial', label: 'Financial', icon: Landmark, mobileOnly: true },
+  { id: 'financial', label: 'Financial', icon: Landmark },
   { id: 'assistant', label: 'Assistant', icon: MessageSquare },
 ];
 
 /**
  * Adaptive navigation:
- * - Mobile (< md): Clean solid floating bottom pill navigator splitting Markets & Financial
- * - Desktop (>= md): Clean sticky top hairline tab bar (unified Markets tab)
+ * - Mobile (< md): Clean solid floating bottom pill navigator
+ * - Desktop (>= md): Clean sticky top hairline tab bar with separate Markets & Financial tabs
  */
 export default function TabNavigation({ activeTab, setActiveTab }) {
   const activeIdx = Math.max(

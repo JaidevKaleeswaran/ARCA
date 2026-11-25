@@ -88,16 +88,10 @@ export const TUTORIAL_STEPS = {
       description: 'Monitor Federal Reserve benchmark rates, 30-year mortgage rates, and high-yield savings APYs directly impacting your budget.',
     },
     {
-      id: 'market-ai-digest',
-      targetSelector: '[data-tutorial="market-ai-digest"]',
-      title: 'Macroeconomic Outlook',
-      description: 'Review concise bullet points on benchmark rates, inflation, mortgage yields, and high-yield savings to guide your budgeting.',
-    },
-    {
-      id: 'market-budget-impact',
-      targetSelector: '[data-tutorial="market-budget-impact"]',
-      title: 'Actionable Budget Playbook',
-      description: 'Direct zero-based recommendations on how current market conditions should adjust your debt repayment and cash buffers.',
+      id: 'market-indices',
+      targetSelector: '[data-tutorial="market-indices-grid"]',
+      title: 'Live Market Indices & Equities',
+      description: 'Track major market indices, star favorite tickers to pin them above, search companies, or click any stock to inspect its interactive price chart.',
     },
   ],
 
@@ -106,7 +100,7 @@ export const TUTORIAL_STEPS = {
       id: 'financial-header-status',
       targetSelector: '[data-tutorial="market-header-status"]',
       title: 'Financial Overview',
-      description: 'Track macroeconomic indicators, official Federal Reserve rates, Treasury yields, and primary financial news in one dedicated mobile view.',
+      description: 'Track macroeconomic indicators, official Federal Reserve rates, Treasury yields, and primary financial news in one dedicated view.',
     },
     {
       id: 'financial-rates-panel',

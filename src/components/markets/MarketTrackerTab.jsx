@@ -17,7 +17,7 @@ import InvestStockModal from './InvestStockModal';
 import StockDetailDrawer from './StockDetailDrawer';
 import { toast } from 'react-hot-toast';
 
-export default function MarketTrackerTab({ mobileView = 'markets' }) {
+export default function MarketTrackerTab({ view, mobileView = 'markets' }) {
   const {
     investments = [],
     watchlist = [],
@@ -28,7 +28,6 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
     dispatch,
   } = useBudget();
 
-  // Detect mobile (< 768px) to split Markets and Financial pages on mobile ONLY
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 768 : false
   );
@@ -41,10 +40,12 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  const isMobileMarketsPage = isMobile && mobileView === 'markets';
-  const isMobileFinancialPage = isMobile && mobileView === 'financial';
-  const showMarketsSections = !isMobileFinancialPage;
-  const showFinancialSections = !isMobileMarketsPage;
+  // Markets and Financial are distinct pages on both desktop and mobile
+  const activeView = view || mobileView || 'markets';
+  const isMarketsPage = activeView === 'markets';
+  const isFinancialPage = activeView === 'financial';
+  const showMarketsSections = isMarketsPage;
+  const showFinancialSections = isFinancialPage;
 
   // State — start empty until live Yahoo Finance quotes load so stale baseline prices never flash
   const [overview, setOverview] = useState(null);
@@ -588,9 +589,12 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
       favoriteSymbolSet.has(selectedStockForDetail.symbol.toUpperCase())
   );
 
-  // Filter pill choices depend on whether mobile is showing Financial-only vs unified Desktop
-  const effectiveFilter =
-    isMobileFinancialPage && activeTabFilter === 'stocks' ? 'all' : activeTabFilter;
+  // Sub-filter only applies on the Financial page (All / Macro & Rates / News)
+  const effectiveFilter = isMarketsPage
+    ? 'stocks'
+    : activeTabFilter === 'stocks'
+      ? 'all'
+      : activeTabFilter;
 
   return (
     <div className="space-y-6 pb-20">
@@ -625,7 +629,7 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
         className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-4"
       >
         <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-100">
-          {isMobileFinancialPage ? 'Financial' : 'Markets'}
+          {isFinancialPage ? 'Financial' : 'Markets'}
         </h1>
 
         <button
@@ -889,21 +893,13 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
 
       {/* ── Main Filter & Search Control Bar ── */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-white/[0.07] pb-2.5">
-        {!isMobileMarketsPage && (
+        {isFinancialPage && (
           <div className="flex items-center gap-5 overflow-x-auto no-scrollbar text-xs">
-            {(isMobileFinancialPage
-              ? [
-                  { id: 'all', label: 'All' },
-                  { id: 'rates', label: 'Macro & Rates' },
-                  { id: 'news', label: 'News' },
-                ]
-              : [
-                  { id: 'all', label: 'All' },
-                  { id: 'stocks', label: 'Equities' },
-                  { id: 'news', label: 'News' },
-                  { id: 'rates', label: 'Rates' },
-                ]
-            ).map((tab) => {
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'rates', label: 'Macro & Rates' },
+              { id: 'news', label: 'News' },
+            ].map((tab) => {
               const active = effectiveFilter === tab.id;
               return (
                 <button
@@ -928,7 +924,7 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
 
         {/* Live Search Box (Markets section only) */}
         {showMarketsSections && (
-          <div className="relative w-full sm:w-auto sm:min-w-[260px]">
+          <div className="relative w-full sm:w-auto sm:min-w-[300px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
               type="text"
@@ -994,8 +990,8 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
 
                 {/* Stock Cards Grid */}
                 {filteredStocks.length === 0 && isLoading ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {Array.from({ length: 9 }).map((_, idx) => (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {Array.from({ length: 8 }).map((_, idx) => (
                       <div
                         key={`stock-skel-${idx}`}
                         className="rounded-lg border border-white/[0.07] bg-[#131311] p-3.5 space-y-3 animate-pulse"
@@ -1015,7 +1011,7 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
                     ))}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     {filteredStocks.map((stock) => {
                       const isPos = (stock.change || 0) >= 0;
                       const symUpper = stock.symbol.toUpperCase();
@@ -1148,7 +1144,7 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
 
           {/* 2. AUTHENTIC FINANCIAL NEWS FEED — Calm Editorial Layout */}
           {showFinancialSections && (effectiveFilter === 'all' || effectiveFilter === 'news') && (
-            <div className={isMobileFinancialPage ? 'order-2' : ''}>
+            <div className={isFinancialPage ? 'order-2' : ''}>
               <Reveal delay={0.15} y={20}>
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/[0.08] pb-3">
@@ -1266,7 +1262,7 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
 
           {/* 3. BORROWING, INTEREST RATES & MACROECONOMIC INDICATORS — Calm Hairline Grid */}
           {showFinancialSections && (effectiveFilter === 'all' || effectiveFilter === 'rates') && (
-            <div className={isMobileFinancialPage ? 'order-1' : ''}>
+            <div className={isFinancialPage ? 'order-1' : ''}>
               <Reveal delay={0.2} y={20}>
                 <div data-tutorial="market-rates-panel" className="space-y-5">
                   <div className="border-b border-white/[0.08] pb-3">
