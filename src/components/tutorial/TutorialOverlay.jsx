@@ -249,8 +249,8 @@ export default function TutorialOverlay() {
           <div className="flex items-center space-x-1.5 text-xs font-semibold text-accent">
             <span>{TAB_NAMES[activeTabId] || 'Page'} Tutorial</span>
           </div>
-          <span className="text-[11px] font-medium bg-card-hover text-zinc-300 px-2 py-0.5 rounded-full border border-border">
-            Step {currentStepIndex + 1} of {totalSteps}
+          <span className="font-mono text-[11px] text-zinc-500 tabular-nums">
+            {currentStepIndex + 1} / {totalSteps}
           </span>
         </div>
 
@@ -285,7 +285,7 @@ export default function TutorialOverlay() {
           <button
             type="button"
             onClick={skipTutorial}
-            className="text-xs text-zinc-400 hover:text-zinc-200 hover:underline transition-colors font-medium py-1 px-1"
+            className="text-xs text-zinc-400 hover:text-zinc-200 hover:underline transition-colors font-medium py-1 px-1 cursor-pointer"
           >
             Already did tutorial
           </button>
@@ -295,7 +295,7 @@ export default function TutorialOverlay() {
               <button
                 type="button"
                 onClick={prevStep}
-                className="p-1.5 text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition-colors"
+                className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
                 title="Previous step"
               >
                 <ChevronLeft size={16} />
@@ -305,7 +305,7 @@ export default function TutorialOverlay() {
             <button
               type="button"
               onClick={nextStep}
-              className="flex items-center space-x-1.5 text-xs bg-accent hover:bg-accent-hover text-primary font-bold px-3.5 py-2 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
+              className="flex items-center space-x-1 text-xs bg-[#272724] hover:bg-[#30302b] text-[#c8a24e] font-semibold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
             >
               <span>{isLastStep ? 'Finish' : 'Next'}</span>
               {isLastStep ? <Check size={14} /> : <ChevronRight size={14} />}

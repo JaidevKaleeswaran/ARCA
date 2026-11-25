@@ -102,21 +102,18 @@ function MobileLedgerItem({
   const activeColor = getCategoryColor(formData.categoryId || tx.categoryId);
 
   return (
-    <div
-      data-mobile-tx-id={tx.id}
-      className={`rounded-2xl border transition-colors ${
-        isExpanded
-          ? 'border-[#E7B956]/45 bg-[#151513]'
-          : isSuspicious
-          ? 'border-amber-500/35 bg-amber-500/[0.04]'
-          : 'border-white/[0.08] bg-[#111110]'
-      }`}
-    >
+    <div data-mobile-tx-id={tx.id}>
       <button
         type="button"
         aria-expanded={isExpanded}
         onClick={onToggleExpand}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left cursor-pointer"
+        className={`relative z-10 flex w-full items-center justify-between gap-3 rounded-xl border bg-[#121210] px-4 py-3.5 text-left transition-colors cursor-pointer ${
+          isExpanded
+            ? 'border-white/[0.16] shadow-[0_6px_16px_rgba(0,0,0,0.45)]'
+            : isSuspicious
+            ? 'border-amber-500/30'
+            : 'border-white/[0.07]'
+        }`}
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
@@ -138,12 +135,12 @@ function MobileLedgerItem({
           </div>
         </div>
 
-        <span className="shrink-0 text-lg font-extrabold tracking-tight text-white tabular-nums">
+        <span className="shrink-0 text-lg font-bold tracking-tight text-zinc-100 tabular-nums">
           {formatCurrency(Math.abs(Number(tx.amount) || 0))}
         </span>
       </button>
 
-      {/* Expandable Inline Dropdown Editor */}
+      {/* Distinct Indented Dropdown Editor */}
       <div
         className={`grid transition-[grid-template-rows,opacity] duration-250 ease-out ${
           isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
@@ -153,7 +150,7 @@ function MobileLedgerItem({
           <form
             onSubmit={handleSave}
             onClick={(e) => e.stopPropagation()}
-            className="space-y-3.5 border-t border-white/[0.08] px-4 pt-3.5 pb-4"
+            className="mx-2 -mt-1.5 space-y-3.5 rounded-b-xl border-x border-b border-white/[0.12] bg-[#252520] px-4 pt-5 pb-4 shadow-[0_12px_28px_rgba(0,0,0,0.45)]"
           >
             <div className="space-y-1">
               <label className="block text-[11px] font-medium text-zinc-400">
@@ -165,7 +162,7 @@ function MobileLedgerItem({
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, description: e.target.value }))
                 }
-                className="h-10 w-full rounded-xl border border-white/[0.1] bg-[#090908] px-3 text-base text-zinc-100 placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
+                className="h-9 w-full rounded-lg border border-white/[0.09] bg-[#11110f] px-3 text-base text-zinc-100 placeholder:text-zinc-600 focus:border-[#c8a24e] focus:outline-none"
                 placeholder="Merchant name"
                 required
               />
@@ -182,7 +179,7 @@ function MobileLedgerItem({
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, amount: e.target.value }))
                   }
-                  className="h-10 w-full rounded-xl border border-white/[0.1] bg-[#090908] px-3 text-base text-zinc-100 tabular-nums placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
+                  className="h-9 w-full rounded-lg border border-white/[0.09] bg-[#11110f] px-3 text-base text-zinc-100 tabular-nums placeholder:text-zinc-600 focus:border-[#c8a24e] focus:outline-none"
                   placeholder="0.00"
                   min="0.01"
                   step="0.01"
@@ -200,7 +197,7 @@ function MobileLedgerItem({
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, date: e.target.value }))
                   }
-                  className="h-10 w-full rounded-xl border border-white/[0.1] bg-[#090908] px-3 text-base text-zinc-100 tabular-nums focus:border-[#E7B956] focus:outline-none [color-scheme:dark]"
+                  className="h-9 w-full rounded-lg border border-white/[0.09] bg-[#11110f] px-3 text-base text-zinc-100 tabular-nums focus:border-[#c8a24e] focus:outline-none [color-scheme:dark]"
                   required
                 />
               </div>
@@ -219,7 +216,7 @@ function MobileLedgerItem({
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, categoryId: e.target.value }))
                 }
-                className="h-10 w-full rounded-xl border border-white/[0.1] bg-[#090908] px-3 text-base text-zinc-100 focus:border-[#E7B956] focus:outline-none"
+                className="h-9 w-full rounded-lg border border-white/[0.09] bg-[#11110f] px-3 text-base text-zinc-100 focus:border-[#c8a24e] focus:outline-none"
                 required={categories.length > 0}
               >
                 {categories.length === 0 && (
@@ -249,17 +246,17 @@ function MobileLedgerItem({
                   }
                   className="sr-only peer"
                 />
-                <div className="w-9 h-5 bg-zinc-800 rounded-full peer peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-200 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#E7B956] peer-checked:after:bg-[#090908]" />
+                <div className="w-9 h-5 bg-zinc-800 rounded-full peer peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#c8a24e] peer-checked:after:bg-[#0b0b0a]" />
               </label>
             </div>
 
             {isSuspicious && (
-              <div className="flex items-center gap-2">
+              <div>
                 <button
                   type="button"
                   onClick={() => onAIReview(tx)}
                   disabled={reviewingTxId === tx.id}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-400/10 px-3 text-xs font-medium text-amber-300 disabled:opacity-40 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 py-1 text-xs font-medium text-amber-400 hover:underline disabled:opacity-40 cursor-pointer"
                 >
                   {reviewingTxId === tx.id ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -271,10 +268,10 @@ function MobileLedgerItem({
               </div>
             )}
 
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center justify-between gap-3 pt-1.5">
               <button
                 type="submit"
-                className="h-10 flex-1 rounded-full bg-[#E7B956] text-xs font-semibold text-[#090908] transition-colors hover:bg-[#d8aa45] cursor-pointer"
+                className="h-9 flex-1 rounded-lg bg-[#272724] px-4 text-xs font-semibold text-[#c8a24e] transition-colors hover:bg-[#30302c] cursor-pointer"
               >
                 Save changes
               </button>
@@ -282,10 +279,11 @@ function MobileLedgerItem({
               <button
                 type="button"
                 onClick={handleDelete}
-                className="inline-flex h-10 items-center gap-1.5 rounded-full border border-rose-500/25 bg-rose-500/10 px-4 text-xs font-medium text-rose-400 transition-colors hover:bg-rose-500/20 cursor-pointer"
+                title={`Delete ${tx.description}`}
+                aria-label={`Delete ${tx.description}`}
+                className="p-1.5 text-rose-400 transition-colors hover:text-rose-300 cursor-pointer"
               >
-                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                <span>Delete</span>
+                <Trash2 className="h-4 w-4" strokeWidth={1.75} />
               </button>
             </div>
           </form>
@@ -463,7 +461,7 @@ export default function TransactionsTab({ addExpenseTrigger = 0 }) {
 
   return (
     <div className="space-y-6">
-      {/* Header + Pill Capture Controls */}
+      {/* Header + Plain Text Capture Actions */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-baseline gap-3">
           <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-100">Ledger</h1>
@@ -472,12 +470,12 @@ export default function TransactionsTab({ addExpenseTrigger = 0 }) {
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <button
             type="button"
             data-tutorial="expense-speak-btn"
             onClick={() => setShowVoicePanel(!showVoicePanel)}
-            className="inline-flex h-9 sm:h-8 items-center gap-1.5 rounded-full border border-white/[0.1] px-3 text-xs font-medium text-zinc-200 transition-colors hover:border-[#E7B956]/50 hover:text-[#E7B956] cursor-pointer"
+            className="inline-flex items-center gap-1.5 py-1 text-xs font-medium text-zinc-400 transition-colors hover:text-zinc-200 cursor-pointer"
           >
             <Mic className="h-3.5 w-3.5" strokeWidth={1.5} />
             <span>Speak</span>
@@ -487,7 +485,7 @@ export default function TransactionsTab({ addExpenseTrigger = 0 }) {
             type="button"
             data-tutorial="expense-scan-btn"
             onClick={() => setIsScannerOpen(true)}
-            className="inline-flex h-9 sm:h-8 items-center gap-1.5 rounded-full border border-white/[0.1] px-3 text-xs font-medium text-zinc-200 transition-colors hover:border-white/[0.2] hover:text-zinc-100 cursor-pointer"
+            className="inline-flex items-center gap-1.5 py-1 text-xs font-medium text-zinc-400 transition-colors hover:text-zinc-200 cursor-pointer"
           >
             <Receipt className="h-3.5 w-3.5" strokeWidth={1.5} />
             <span>Scan</span>
@@ -498,7 +496,7 @@ export default function TransactionsTab({ addExpenseTrigger = 0 }) {
             data-tutorial="expense-export-btn"
             onClick={handleExportCSV}
             title="Export CSV"
-            className="inline-flex h-9 sm:h-8 items-center gap-1.5 rounded-full border border-white/[0.1] px-3 text-xs font-medium text-zinc-400 transition-colors hover:border-white/[0.2] hover:text-zinc-100 cursor-pointer"
+            className="inline-flex items-center gap-1.5 py-1 text-xs font-medium text-zinc-400 transition-colors hover:text-zinc-200 cursor-pointer"
           >
             <Download className="h-3.5 w-3.5" strokeWidth={1.5} />
             <span>CSV</span>
@@ -508,7 +506,7 @@ export default function TransactionsTab({ addExpenseTrigger = 0 }) {
             type="button"
             data-tutorial="expense-add-btn"
             onClick={handleAddClick}
-            className="inline-flex h-9 sm:h-8 items-center gap-1.5 rounded-full bg-[#E7B956] px-4 text-xs font-semibold text-[#090908] transition-colors hover:bg-[#d8aa45] cursor-pointer"
+            className="inline-flex items-center gap-1 py-1 text-xs font-semibold text-[#c8a24e] transition-colors hover:text-[#d8b464] cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={2} />
             <span>Add expense</span>
@@ -527,7 +525,7 @@ export default function TransactionsTab({ addExpenseTrigger = 0 }) {
       <section data-tutorial="expense-table" className="border-t border-white/[0.08] pt-4">
         {/* Filter Bar */}
         {transactions.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 pb-4">
+          <div className="flex flex-wrap items-center gap-2.5 pb-4">
             <div className="relative flex-1 sm:flex-none">
               <Search
                 className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500"
@@ -538,7 +536,7 @@ export default function TransactionsTab({ addExpenseTrigger = 0 }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Filter merchant..."
-                className="h-9 sm:h-8 w-full sm:w-52 rounded-full border border-white/[0.1] bg-[#111110] pl-8 pr-3 text-base sm:text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
+                className="h-9 sm:h-8 w-full sm:w-52 rounded-lg border border-white/[0.09] bg-[#121210] pl-8 pr-3 text-base sm:text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-[#c8a24e] focus:outline-none"
               />
             </div>
 
@@ -547,7 +545,7 @@ export default function TransactionsTab({ addExpenseTrigger = 0 }) {
                 value={selectedCatId}
                 onChange={(e) => setSelectedCatId(e.target.value)}
                 aria-label="Filter by category"
-                className="h-9 sm:h-8 rounded-full border border-white/[0.1] bg-[#111110] px-3 text-base sm:text-xs text-zinc-300 focus:border-[#E7B956] focus:outline-none"
+                className="h-9 sm:h-8 rounded-lg border border-white/[0.09] bg-[#121210] px-3 text-base sm:text-xs text-zinc-300 focus:border-[#c8a24e] focus:outline-none"
               >
                 <option value="">All categories</option>
                 {categories.map((c) => (
@@ -565,7 +563,7 @@ export default function TransactionsTab({ addExpenseTrigger = 0 }) {
                   setQuery('');
                   setSelectedCatId('');
                 }}
-                className="inline-flex h-8 items-center gap-1 rounded-full bg-white/[0.08] px-2.5 text-xs text-zinc-300 hover:bg-white/[0.14] cursor-pointer"
+                className="inline-flex items-center gap-1 py-1 text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer"
               >
                 <span>Clear</span>
                 <X className="h-3 w-3" strokeWidth={1.5} />
@@ -575,7 +573,7 @@ export default function TransactionsTab({ addExpenseTrigger = 0 }) {
         )}
 
         {filteredTransactions.length === 0 ? (
-          <div className="py-16 text-center space-y-3">
+          <div className="py-16 text-center space-y-2.5">
             <p className="text-xs text-zinc-500">
               {transactions.length === 0 ? 'No expenses yet' : 'No matching expenses'}
             </p>
@@ -583,7 +581,7 @@ export default function TransactionsTab({ addExpenseTrigger = 0 }) {
               <button
                 type="button"
                 onClick={handleAddClick}
-                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#E7B956] px-4 text-xs font-semibold text-[#090908] hover:bg-[#d8aa45] cursor-pointer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[#c8a24e] hover:underline cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" strokeWidth={2} />
                 <span>Add expense</span>
@@ -666,7 +664,7 @@ export default function TransactionsTab({ addExpenseTrigger = 0 }) {
                         </td>
 
                         <td className="px-3 py-2.5">
-                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white/[0.06] px-2 py-0.5 text-xs text-zinc-300">
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-zinc-400">
                             <span
                               className="h-1.5 w-1.5 rounded-full shrink-0"
                               style={{ backgroundColor: getCategoryColor(tx.categoryId) }}

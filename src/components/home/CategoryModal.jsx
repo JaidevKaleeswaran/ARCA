@@ -5,13 +5,13 @@ import { Trash2, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const COLOR_SWATCHES = [
-  { hex: '#e7b956', label: 'Gold' },
-  { hex: '#e4e4e7', label: 'Chalk' },
-  { hex: '#34d399', label: 'Emerald' },
-  { hex: '#38bdf8', label: 'Sky' },
-  { hex: '#fb923c', label: 'Amber' },
-  { hex: '#fb7185', label: 'Rose' },
-  { hex: '#c084fc', label: 'Violet' },
+  { hex: '#b8934a', label: 'Ochre' },
+  { hex: '#8e9299', label: 'Stone' },
+  { hex: '#4d7c63', label: 'Sage' },
+  { hex: '#4f6d8a', label: 'Slate' },
+  { hex: '#a85d48', label: 'Terracotta' },
+  { hex: '#7a5c75', label: 'Mauve' },
+  { hex: '#8c7d6b', label: 'Taupe' },
 ];
 
 export default function CategoryModal({ isOpen, onClose, category = null }) {
@@ -19,11 +19,10 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
   const [formData, setFormData] = useState({
     name: '',
     limit: '',
-    color: '#e7b956',
+    color: '#b8934a',
     endOfCycleAction: 'none',
   });
 
-  // Only treat as editing when category actually has a persisted id
   const isEditing = Boolean(category && category.id);
 
   useEffect(() => {
@@ -32,11 +31,11 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
         setFormData({
           name: category.name || '',
           limit: category.limit ?? '',
-          color: category.color || '#e7b956',
+          color: category.color || '#b8934a',
           endOfCycleAction: category.endOfCycleAction || 'none',
         });
       } else {
-        setFormData({ name: '', limit: '', color: '#e7b956', endOfCycleAction: 'none' });
+        setFormData({ name: '', limit: '', color: '#b8934a', endOfCycleAction: 'none' });
       }
     }
   }, [isOpen, category]);
@@ -57,7 +56,7 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
     const payload = {
       name: cleanName,
       limit: Number(formData.limit),
-      color: formData.color || '#e7b956',
+      color: formData.color || '#b8934a',
       endOfCycleAction: formData.endOfCycleAction,
     };
 
@@ -110,7 +109,7 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
             name="name"
             value={formData.name}
             onChange={handleChange}
-            className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#090908] px-3 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
+            className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#0b0b0a] px-3 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#c8a24e] focus:outline-none"
             placeholder="e.g. Groceries"
             required
           />
@@ -123,7 +122,7 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
             name="limit"
             value={formData.limit}
             onChange={handleChange}
-            className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#090908] px-3 text-base sm:text-sm text-zinc-100 tabular-nums placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
+            className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#0b0b0a] px-3 text-base sm:text-sm text-zinc-100 tabular-nums placeholder:text-zinc-600 focus:border-[#c8a24e] focus:outline-none"
             placeholder="0.00"
             min="0"
             step="0.01"
@@ -139,7 +138,6 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
             </span>
           </div>
 
-          {/* Curated Swatches + Native Color Picker */}
           <div className="flex flex-wrap items-center gap-2">
             {COLOR_SWATCHES.map((swatch) => {
               const selected = formData.color?.toLowerCase() === swatch.hex.toLowerCase();
@@ -152,13 +150,13 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
                   onClick={() => setFormData((prev) => ({ ...prev, color: swatch.hex }))}
                   className={`flex h-7 w-7 items-center justify-center rounded-full border transition-transform cursor-pointer ${
                     selected
-                      ? 'scale-110 border-white ring-2 ring-white/25'
-                      : 'border-white/15 hover:scale-105'
+                      ? 'scale-110 border-zinc-200 ring-1 ring-zinc-300/30'
+                      : 'border-white/10 hover:scale-105'
                   }`}
                   style={{ backgroundColor: swatch.hex }}
                 >
                   {selected && (
-                    <Check className="h-3.5 w-3.5 text-[#090908]" strokeWidth={2.5} />
+                    <Check className="h-3.5 w-3.5 text-[#0b0b0a]" strokeWidth={2.5} />
                   )}
                 </button>
               );
@@ -166,7 +164,7 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
 
             <label
               title="Custom color"
-              className="relative flex h-7 cursor-pointer items-center gap-1.5 rounded-full border border-white/[0.12] bg-[#090908] px-2.5 text-[11px] text-zinc-400 hover:border-white/25 hover:text-zinc-200"
+              className="relative inline-flex cursor-pointer items-center gap-1.5 pl-1 text-xs text-zinc-400 hover:text-zinc-200"
             >
               <span
                 className="h-3 w-3 rounded-full border border-white/20"
@@ -191,7 +189,7 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
             name="endOfCycleAction"
             value={formData.endOfCycleAction}
             onChange={handleChange}
-            className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#090908] px-3 text-base sm:text-sm text-zinc-100 focus:border-[#E7B956] focus:outline-none"
+            className="h-10 sm:h-9 w-full rounded-lg border border-white/[0.1] bg-[#0b0b0a] px-3 text-base sm:text-sm text-zinc-100 focus:border-[#c8a24e] focus:outline-none"
           >
             <option value="none">Reset</option>
             <option value="rollover">Rollover unspent</option>
@@ -199,10 +197,10 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
           </select>
         </div>
 
-        <div className="pt-3 flex items-center gap-2.5">
+        <div className="pt-3 flex items-center justify-between gap-3">
           <button
             type="submit"
-            className="h-10 sm:h-9 flex-1 rounded-full bg-[#E7B956] text-xs font-semibold text-[#090908] transition-colors hover:bg-[#d8aa45] cursor-pointer"
+            className="h-9 flex-1 rounded-lg bg-[#272724] px-4 text-xs font-semibold text-[#c8a24e] transition-colors hover:bg-[#30302c] cursor-pointer"
           >
             {isEditing ? 'Save changes' : 'Add category'}
           </button>
@@ -211,10 +209,11 @@ export default function CategoryModal({ isOpen, onClose, category = null }) {
             <button
               type="button"
               onClick={handleDelete}
-              className="inline-flex h-10 sm:h-9 items-center gap-1.5 rounded-full border border-rose-500/25 bg-rose-500/10 px-4 text-xs font-medium text-rose-400 transition-colors hover:bg-rose-500/20 cursor-pointer"
+              title="Delete category"
+              aria-label="Delete category"
+              className="p-1.5 text-rose-400 transition-colors hover:text-rose-300 cursor-pointer"
             >
-              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-              <span>Delete</span>
+              <Trash2 className="h-4 w-4" strokeWidth={1.75} />
             </button>
           )}
         </div>

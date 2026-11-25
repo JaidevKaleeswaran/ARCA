@@ -107,9 +107,9 @@ export default function HomeTab({ onNavigateToMarkets, onNavigateToTransactions 
                 <button
                   type="button"
                   onClick={() => setSelectedCategoryId(null)}
-                  className="inline-flex items-center gap-1 rounded-full bg-white/[0.08] px-2 py-0.5 text-[11px] font-medium text-zinc-200 hover:bg-white/[0.14] cursor-pointer"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-300 hover:text-zinc-100 cursor-pointer"
                 >
-                  <span>{categoryMap[selectedCategoryId] || 'Filtered'}</span>
+                  <span>· {categoryMap[selectedCategoryId] || 'Filtered'}</span>
                   <X className="h-3 w-3" strokeWidth={1.5} />
                 </button>
               )}
@@ -126,7 +126,7 @@ export default function HomeTab({ onNavigateToMarkets, onNavigateToTransactions 
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Filter..."
-                  className="h-8 sm:h-7 w-36 sm:w-44 rounded-full border border-white/[0.1] bg-[#090908] pl-8 pr-3 text-base sm:text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none"
+                  className="h-8 sm:h-7 w-36 sm:w-44 rounded-lg border border-white/[0.09] bg-[#0b0b0a] pl-8 pr-3 text-base sm:text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-[#c8a24e] focus:outline-none"
                 />
               </div>
             )}
@@ -135,12 +135,12 @@ export default function HomeTab({ onNavigateToMarkets, onNavigateToTransactions 
           {displayedTransactions.length === 0 ? (
             <div className="px-4 py-12 text-center">
               {transactions.length === 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <p className="text-xs text-zinc-500">No expenses logged</p>
                   <button
                     type="button"
                     onClick={() => onNavigateToTransactions && onNavigateToTransactions()}
-                    className="inline-flex h-9 sm:h-8 items-center gap-1.5 rounded-full bg-[#E7B956] px-4 text-xs font-semibold text-[#090908] hover:bg-[#d8aa45] cursor-pointer"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#c8a24e] hover:underline cursor-pointer"
                   >
                     <Plus className="h-3.5 w-3.5" strokeWidth={2} />
                     <span>Add first expense</span>

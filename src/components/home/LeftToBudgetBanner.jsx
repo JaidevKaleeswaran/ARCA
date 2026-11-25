@@ -34,36 +34,36 @@ export default function LeftToBudgetBanner({ onAddExpense }) {
   return (
     <div data-tutorial="budget-banner" className="mb-6 md:mb-8">
       {/* Mobile Centered & Separate Hero Card */}
-      <div className="md:hidden rounded-3xl border border-white/[0.1] bg-[#131311] px-5 py-6 text-center shadow-[0_12px_32px_rgba(0,0,0,0.45)]">
-        <div className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.05] px-3.5 py-1 text-xs font-medium text-[#E7B956]">
-          <span>{pace.periodLabel}</span>
-        </div>
+      <div className="md:hidden rounded-2xl border border-white/[0.08] bg-[#131311] px-5 py-6 text-center">
+        <p className="text-[11px] font-medium uppercase tracking-widest text-zinc-500">
+          {pace.periodLabel}
+        </p>
 
-        <p className="mt-3.5 text-xs font-medium tracking-wide text-zinc-400">
+        <p className="mt-2.5 text-xs font-medium text-zinc-400">
           Left to Spend
         </p>
 
         <div className="mt-1.5 flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 tabular-nums">
           <span
-            className={`text-3xl font-extrabold tracking-tight ${
-              remainingToSpend < 0 ? 'text-rose-400' : 'text-white'
+            className={`text-3xl font-bold tracking-tight ${
+              remainingToSpend < 0 ? 'text-rose-400' : 'text-zinc-100'
             }`}
           >
             {remainingToSpend < 0
               ? `-${formatCurrency(Math.abs(remainingToSpend))}`
               : formatCurrency(remainingToSpend)}
           </span>
-          <span className="text-2xl font-bold tracking-tight text-zinc-400">
+          <span className="text-xl font-semibold tracking-tight text-zinc-500">
             / {formatCurrency(effectiveBudget)}
           </span>
         </div>
 
-        <div className="mt-5 flex h-3.5 w-full overflow-hidden rounded-xl bg-white/[0.08] gap-[2px]">
+        <div className="mt-5 flex h-3 w-full overflow-hidden rounded-lg bg-white/[0.06] gap-[2px]">
           {spentSegments.length > 0 ? (
             spentSegments.map((seg) => (
               <div
                 key={seg.id}
-                className="h-full first:rounded-l-xl last:rounded-r-xl transition-all duration-300"
+                className="h-full first:rounded-l-lg last:rounded-r-lg transition-all duration-300"
                 style={{
                   width: `${Math.max(2, (seg.spent / barDenom) * 100)}%`,
                   backgroundColor: seg.color,
@@ -72,7 +72,7 @@ export default function LeftToBudgetBanner({ onAddExpense }) {
             ))
           ) : totalSpent > 0 ? (
             <div
-              className="h-full rounded-xl bg-[#E7B956] transition-all duration-300"
+              className="h-full rounded-lg bg-[#c8a24e] transition-all duration-300"
               style={{ width: `${Math.min(100, (totalSpent / barDenom) * 100)}%` }}
             />
           ) : null}
@@ -95,7 +95,7 @@ export default function LeftToBudgetBanner({ onAddExpense }) {
             <button
               type="button"
               onClick={onAddExpense}
-              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[#E7B956] px-4 text-xs font-semibold text-[#090908] transition-colors hover:bg-[#d8aa45] cursor-pointer"
+              className="inline-flex shrink-0 items-center gap-1 py-1 text-xs font-semibold text-[#c8a24e] transition-colors hover:text-[#d8b464] cursor-pointer"
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={2} />
               <span>Add expense</span>
@@ -110,14 +110,15 @@ export default function LeftToBudgetBanner({ onAddExpense }) {
                 <p className="text-xs text-zinc-500">Left to spend</p>
                 {totalIncome > 0 && (
                   <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums ${
+                    className={`text-[11px] font-medium tabular-nums ${
                       leftToBudget === 0
-                        ? 'bg-[#E7B956]/15 text-[#E7B956]'
+                        ? 'text-[#c8a24e]'
                         : leftToBudget > 0
-                        ? 'bg-white/[0.06] text-zinc-400'
-                        : 'bg-rose-500/15 text-rose-400'
+                        ? 'text-zinc-400'
+                        : 'text-rose-400'
                     }`}
                   >
+                    ·{' '}
                     {leftToBudget === 0
                       ? 'Balanced'
                       : leftToBudget > 0

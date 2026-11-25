@@ -149,7 +149,7 @@ export default function StocksWidget({ onNavigateToMarkets }) {
               <button
                 type="button"
                 onClick={onNavigateToMarkets}
-                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/[0.1] px-3.5 text-xs font-medium text-zinc-200 hover:border-[#E7B956]/50 hover:text-[#E7B956] cursor-pointer"
+                className="inline-flex items-center gap-1 py-1 text-xs font-medium text-[#c8a24e] hover:underline cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
                 <span>Browse markets</span>

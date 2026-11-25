@@ -632,11 +632,11 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
           type="button"
           onClick={() => fetchMarketData(true)}
           disabled={isLoading}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/[0.1] bg-[#111110] px-3.5 text-xs font-medium text-zinc-200 transition-colors hover:border-[#E7B956]/50 hover:text-[#E7B956] cursor-pointer"
+          className="inline-flex items-center gap-1.5 py-1 text-xs font-medium text-zinc-400 transition-colors hover:text-zinc-200 cursor-pointer"
           title="Refresh live data"
         >
           <RefreshCw
-            className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin text-[#E7B956]' : 'text-zinc-400'}`}
+            className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin text-[#c8a24e]' : 'text-zinc-500'}`}
             strokeWidth={1.5}
           />
           <span>{isLoading ? 'Refreshing...' : 'Refresh'}</span>
@@ -888,10 +888,9 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
       )}
 
       {/* ── Main Filter & Search Control Bar ── */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* View Switcher Pills (Desktop unified: All/Equities/News/Rates; Mobile Financial: All/Macro & Rates/News; Mobile Markets: search only) */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-white/[0.07] pb-2.5">
         {!isMobileMarketsPage && (
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
+          <div className="flex items-center gap-5 overflow-x-auto no-scrollbar text-xs">
             {(isMobileFinancialPage
               ? [
                   { id: 'all', label: 'All' },
@@ -904,36 +903,42 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
                   { id: 'news', label: 'News' },
                   { id: 'rates', label: 'Rates' },
                 ]
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTabFilter(tab.id)}
-                className={`h-8 px-3.5 rounded-full font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                  effectiveFilter === tab.id
-                    ? 'bg-[#E7B956] text-[#090908] font-semibold'
-                    : 'bg-[#111110] text-zinc-400 hover:text-zinc-100 border border-white/[0.08]'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            ).map((tab) => {
+              const active = effectiveFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTabFilter(tab.id)}
+                  className={`relative py-1.5 font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                    active
+                      ? 'text-zinc-100'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  {tab.label}
+                  {active && (
+                    <span className="absolute inset-x-0 -bottom-[11px] h-[1.5px] bg-[#c8a24e]" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
 
         {/* Live Search Box (Markets section only) */}
         {showMarketsSections && (
-          <div className="relative w-full sm:w-auto sm:min-w-[280px]">
+          <div className="relative w-full sm:w-auto sm:min-w-[260px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search any stock (e.g. AAPL, NVDA, Tesla)..."
-              className="w-full bg-card border border-border rounded-xl pl-9 pr-9 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-accent font-medium"
+              placeholder="Search ticker or company..."
+              className="w-full bg-[#131311] border border-white/[0.08] rounded-lg pl-9 pr-9 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[#c8a24e]"
             />
             {isSearching && (
-              <RefreshCw size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-accent animate-spin" />
+              <RefreshCw size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#c8a24e] animate-spin" />
             )}
           </div>
         )}
@@ -946,27 +951,24 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
           {/* 1. STOCK DIRECTORY (REAL-TIME LIVE PRICES) — Markets section */}
           {showMarketsSections && (effectiveFilter === 'all' || effectiveFilter === 'stocks') && (
             <Reveal delay={0.1} y={20}>
-              <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 space-y-4 shadow-md">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Building2 size={18} className="text-accent" />
-                    <div>
-                      <h2 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
-                        <span>Live Stock Catalog</span>
-                        {searchResults && (
-                          <span className="text-[10px] bg-accent/20 text-accent font-semibold px-2 py-0.5 rounded-full">
-                            Live Search: "{searchQuery}"
-                          </span>
-                        )}
-                      </h2>
-                      <p className="text-[11px] text-zinc-400">
-                        Star ★ any stock to pin it at the top, or click to inspect live price history.
-                      </p>
-                    </div>
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/[0.08] pb-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-zinc-100 tracking-tight flex items-center gap-2">
+                      <span>Equities</span>
+                      {searchResults && (
+                        <span className="text-xs font-normal text-zinc-400">
+                          · &ldquo;{searchQuery}&rdquo;
+                        </span>
+                      )}
+                    </h2>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Select any ticker to inspect price history, or star ★ to pin above.
+                    </p>
                   </div>
 
-                  {/* Sector Filter Chips */}
-                  <div className="flex items-center gap-1 overflow-x-auto no-scrollbar text-[11px]">
+                  {/* Clean Plain-Text Sector Tabs */}
+                  <div className="flex items-center gap-3.5 overflow-x-auto no-scrollbar text-xs">
                     {sectors.map((sec) => {
                       const shouldGlowMobile =
                         sectorGlow.sector === sec && sectorGlow.nonce > 0;
@@ -975,15 +977,15 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
                           key={`${sec}-${isMobile && shouldGlowMobile ? sectorGlow.nonce : 0}`}
                           type="button"
                           onClick={() => handleSelectSector(sec)}
-                          className={`px-2.5 py-1 rounded-md font-medium whitespace-nowrap shrink-0 transition-colors cursor-pointer bg-card text-zinc-400 border border-border/60 ${
+                          className={`px-1.5 py-1 rounded font-medium whitespace-nowrap shrink-0 transition-colors cursor-pointer text-zinc-500 ${
                             shouldGlowMobile ? 'arca-sector-glow-once' : ''
                           } ${
                             selectedSector === sec
-                              ? 'md:bg-accent/20 md:text-accent md:border-accent/40 md:font-bold'
-                              : 'md:hover:text-zinc-200'
+                              ? 'md:text-zinc-100 md:underline md:underline-offset-8 md:decoration-[#c8a24e]'
+                              : 'md:hover:text-zinc-300'
                           }`}
                         >
-                          {sec === 'all' ? 'All Sectors' : sec}
+                          {sec === 'all' ? 'All' : sec}
                         </button>
                       );
                     })}
@@ -996,20 +998,19 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
                     {Array.from({ length: 9 }).map((_, idx) => (
                       <div
                         key={`stock-skel-${idx}`}
-                        className="rounded-lg border border-white/[0.08] bg-[#111110] p-3.5 space-y-3 animate-pulse"
+                        className="rounded-lg border border-white/[0.07] bg-[#131311] p-3.5 space-y-3 animate-pulse"
                       >
                         <div className="flex items-start justify-between">
                           <div className="space-y-1.5">
-                            <div className="h-4 w-12 rounded bg-white/[0.09]" />
-                            <div className="h-3 w-24 rounded bg-white/[0.05]" />
+                            <div className="h-4 w-12 rounded bg-white/[0.07]" />
+                            <div className="h-3 w-24 rounded bg-white/[0.04]" />
                           </div>
-                          <div className="h-3.5 w-12 rounded bg-white/[0.07]" />
+                          <div className="h-3.5 w-12 rounded bg-white/[0.05]" />
                         </div>
                         <div className="flex items-baseline justify-between pt-1">
-                          <div className="h-5 w-16 rounded bg-white/[0.09]" />
-                          <div className="h-3 w-14 rounded bg-white/[0.05]" />
+                          <div className="h-5 w-16 rounded bg-white/[0.07]" />
+                          <div className="h-3 w-14 rounded bg-white/[0.04]" />
                         </div>
-                        <div className="h-7 w-full rounded-lg bg-white/[0.05]" />
                       </div>
                     ))}
                   </div>
@@ -1038,35 +1039,35 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
                           }}
                           className={`p-3.5 space-y-2.5 flex flex-col justify-between cursor-pointer transition-colors group ${
                             isSelected
-                              ? 'border-[#E7B956]/60 bg-[#151513]'
-                              : 'hover:border-white/[0.2]'
+                              ? 'border-white/[0.22] bg-[#181815]'
+                              : 'hover:border-white/[0.15]'
                           }`}
                         >
                           <div>
                             <div className="flex items-start justify-between">
                               <div>
                                 <div className="flex items-center gap-1.5">
-                                  <span className="font-extrabold text-white text-sm group-hover:text-[#E7B956] transition-colors">
+                                  <span className="font-bold text-zinc-100 text-sm group-hover:text-[#c8a24e] transition-colors">
                                     {stock.symbol}
                                   </span>
                                   {isOwned && (
-                                    <span className="text-[9px] bg-accent/20 text-accent font-semibold px-1.5 py-0.2 rounded">
-                                      Owned
+                                    <span className="text-[10px] text-zinc-400">
+                                      · Held
                                     </span>
                                   )}
                                 </div>
-                                <span className="text-zinc-400 text-xs block truncate max-w-[130px]">
+                                <span className="text-zinc-500 text-xs block truncate max-w-[135px]">
                                   {stock.name}
                                 </span>
                               </div>
 
-                              <span className={`text-base md:text-xs font-bold font-mono tabular-nums ${isPos ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              <span className={`text-base md:text-xs font-semibold font-mono tabular-nums ${isPos ? 'text-emerald-400' : 'text-rose-400'}`}>
                                 {isPos ? '+' : ''}{Number(stock.changePercent || 0).toFixed(2)}%
                               </span>
                             </div>
 
                             <div className="flex items-baseline justify-between pt-2">
-                              <span className="text-base font-extrabold text-white font-mono tabular-nums">
+                              <span className="text-base font-bold text-zinc-100 font-mono tabular-nums">
                                 ${Number(stock.price).toFixed(2)}
                               </span>
                               <span className="hidden md:inline text-[10px] text-zinc-500 font-mono tabular-nums">
@@ -1075,8 +1076,8 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
                             </div>
                           </div>
 
-                          {/* Bottom Actions: Star Favorite (bottom-left) + Invest */}
-                          <div className="flex items-center gap-2 mt-1">
+                          {/* Quiet Plain-Text Bottom Row: Star + Invest */}
+                          <div className="flex items-center justify-between border-t border-white/[0.06] pt-2">
                             <button
                               type="button"
                               data-favorite-toggle={stock.symbol}
@@ -1095,16 +1096,16 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
                                 e.stopPropagation();
                                 handleToggleFavorite(stock);
                               }}
-                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors cursor-pointer ${
+                              className={`p-1 transition-colors cursor-pointer ${
                                 isFavorited
-                                  ? 'border-[#E7B956]/60 bg-[#E7B956]/15 text-[#E7B956]'
-                                  : 'border-white/[0.1] bg-[#171715] text-zinc-500 hover:border-[#E7B956]/40 hover:text-[#E7B956]'
+                                  ? 'text-[#c8a24e]'
+                                  : 'text-zinc-500 hover:text-zinc-300'
                               }`}
                             >
                               <Star
                                 size={14}
-                                strokeWidth={1.75}
-                                className={isFavorited ? 'fill-[#E7B956] text-[#E7B956]' : ''}
+                                strokeWidth={1.6}
+                                className={isFavorited ? 'fill-[#c8a24e] text-[#c8a24e]' : ''}
                               />
                             </button>
 
@@ -1114,10 +1115,10 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
                                 e.stopPropagation();
                                 setSelectedStockToInvest(stock);
                               }}
-                              className="flex-1 flex items-center justify-center gap-1.5 bg-card-hover hover:bg-accent hover:text-primary text-zinc-300 border border-border hover:border-accent text-xs font-semibold h-8 rounded-lg transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1 py-0.5 text-xs font-medium text-zinc-400 transition-colors hover:text-[#c8a24e] cursor-pointer"
                             >
-                              <Plus size={13} />
-                              <span>Invest in {stock.symbol}</span>
+                              <Plus size={12} strokeWidth={1.75} />
+                              <span>Invest</span>
                             </button>
                           </div>
                         </SpotlightCard>
@@ -1132,10 +1133,12 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
                       type="button"
                       onClick={handleShowMoreStocks}
                       disabled={isLoadingMoreStocks}
-                      className="px-5 py-2 bg-card hover:bg-card-hover text-accent border border-accent/40 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-2"
+                      className="inline-flex items-center gap-1.5 py-1 text-xs font-medium text-zinc-400 hover:text-[#c8a24e] transition-colors cursor-pointer"
                     >
-                      <RefreshCw size={13} className={isLoadingMoreStocks ? 'animate-spin text-accent' : 'text-accent'} />
-                      <span>{isLoadingMoreStocks ? 'Fetching More Live Stocks...' : 'Show More Stocks'}</span>
+                      {isLoadingMoreStocks && (
+                        <RefreshCw size={12} className="animate-spin text-[#c8a24e]" />
+                      )}
+                      <span>{isLoadingMoreStocks ? 'Loading more stocks...' : 'Load more stocks'}</span>
                     </button>
                   </div>
                 )}
@@ -1143,294 +1146,255 @@ export default function MarketTrackerTab({ mobileView = 'markets' }) {
             </Reveal>
           )}
 
-          {/* 2. AUTHENTIC REAL FINANCIAL NEWS FEED (NO AI SLOP) — Financial section */}
+          {/* 2. AUTHENTIC FINANCIAL NEWS FEED — Calm Editorial Layout */}
           {showFinancialSections && (effectiveFilter === 'all' || effectiveFilter === 'news') && (
             <div className={isMobileFinancialPage ? 'order-2' : ''}>
-            <Reveal delay={0.15} y={20}>
-              <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 space-y-4 shadow-md">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Newspaper size={18} className="text-accent" />
+              <Reveal delay={0.15} y={20}>
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/[0.08] pb-3">
                     <div>
-                      <h2 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
-                        <span>Live Financial News</span>
-                        <span className="text-[10px] bg-accent/15 text-accent font-semibold px-2 py-0.5 rounded-full">
-                          Authentic Sourcing
-                        </span>
+                      <h2 className="text-sm font-semibold text-zinc-100 tracking-tight">
+                        Financial News
                       </h2>
-                      <p className="text-[11px] text-zinc-400">
-                        Live reporting from primary publishers. Click to open the actual article directly.
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        Primary reporting from Bloomberg, Reuters, WSJ, CNBC, and Financial Times.
                       </p>
                     </div>
+                    <span className="text-[11px] text-zinc-500 tabular-nums">
+                      {articles.length} stories
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] bg-zinc-800 text-zinc-300 px-2.5 py-1 rounded-lg font-mono">
-                      {articles.length} Live Stories
+                  {/* Plain-Text Topic Filters */}
+                  <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-1 text-xs">
+                    {[
+                      { id: 'all', label: 'All' },
+                      { id: 'tech', label: 'Tech & AI' },
+                      { id: 'investing', label: 'Equities' },
+                      { id: 'economy', label: 'Fed & Macro' },
+                      { id: 'retail', label: 'Consumer' },
+                      { id: 'crypto', label: 'Digital Assets' },
+                    ].map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => handleSelectNewsTopic(t.id)}
+                        className={`py-1 font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                          selectedNewsTopic === t.id
+                            ? 'text-zinc-100 underline underline-offset-8 decoration-[#c8a24e]'
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Editorial Articles List */}
+                  <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
+                    {articles.map((art, artIdx) => (
+                      <article
+                        key={`${art.id || art.link || 'news'}_${artIdx}`}
+                        className="py-4 flex flex-col justify-between gap-2.5"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                            <span className="font-medium text-zinc-400">
+                              {art.source}
+                            </span>
+                            <span>·</span>
+                            <span>{art.timeAgo}</span>
+                          </div>
+
+                          <a
+                            href={art.link || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold text-zinc-100 text-sm leading-snug hover:text-[#c8a24e] transition-colors block cursor-pointer"
+                          >
+                            {art.title}
+                          </a>
+                        </div>
+
+                        <div className="flex items-center gap-4 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedArticleToRead(art)}
+                            className="text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                          >
+                            Read in app
+                          </button>
+
+                          {art.link && (
+                            <a
+                              href={art.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-zinc-500 hover:text-zinc-300 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <span>{art.source}</span>
+                              <ExternalLink size={11} />
+                            </a>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+
+                  {/* Single Clean Plain-Text Load More Trigger (Zero Double Plus or Neon Box) */}
+                  <div className="pt-1 flex items-center justify-between gap-3">
+                    <span className="text-[11px] text-zinc-500">
+                      Showing {articles.length} verified reports
                     </span>
 
-                    {/* Quick Generate More Button in Header */}
                     <button
                       type="button"
                       onClick={handleGenerateMoreArticles}
                       disabled={isLoadingMoreNews}
-                      className="flex items-center gap-1.5 px-3 py-1 bg-accent/15 hover:bg-accent text-accent hover:text-primary border border-accent/30 text-xs font-bold rounded-lg transition-all active:scale-95 cursor-pointer"
-                      title="Fetch more authentic articles from primary financial publishers"
+                      className="inline-flex items-center gap-1.5 py-1 text-xs font-medium text-[#c8a24e] hover:underline disabled:opacity-50 cursor-pointer"
                     >
-                      <Plus size={13} className={isLoadingMoreNews ? 'animate-spin' : ''} />
-                      <span>{isLoadingMoreNews ? 'Generating...' : 'Generate More +'}</span>
+                      {isLoadingMoreNews && (
+                        <RefreshCw size={12} className="animate-spin" />
+                      )}
+                      <span>{isLoadingMoreNews ? 'Loading stories...' : 'Load more stories'}</span>
                     </button>
                   </div>
                 </div>
-
-                {/* News Topic Filters */}
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
-                  {[
-                    { id: 'all', label: 'All Top News' },
-                    { id: 'tech', label: 'Tech & AI Markets' },
-                    { id: 'investing', label: 'Wall St & Equities' },
-                    { id: 'economy', label: 'Fed & Macro Rates' },
-                    { id: 'retail', label: 'Consumer & Retail' },
-                    { id: 'crypto', label: 'Digital Assets' },
-                  ].map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => handleSelectNewsTopic(t.id)}
-                      className={`px-2.5 py-1 rounded-md font-medium whitespace-nowrap transition-all cursor-pointer text-[11px] ${
-                        selectedNewsTopic === t.id
-                          ? 'bg-accent/20 text-accent border border-accent/40 font-bold'
-                          : 'bg-card text-zinc-400 hover:text-zinc-200 border border-border/60'
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Articles Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {articles.map((art, artIdx) => (
-                    <div
-                      key={`${art.id || art.link || 'news'}_${artIdx}`}
-                      className="bg-card border border-border hover:border-accent/40 rounded-xl p-4 flex flex-col justify-between space-y-3 transition-colors group"
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-extrabold text-accent">
-                            {art.source}
-                          </span>
-                          <span className="text-zinc-500 flex items-center gap-1">
-                            <Clock size={11} />
-                            {art.timeAgo}
-                          </span>
-                        </div>
-
-                        <a
-                          href={art.link || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-bold text-white text-sm leading-snug group-hover:text-accent transition-colors block cursor-pointer"
-                        >
-                          {art.title}
-                        </a>
-                      </div>
-
-                      <div className="pt-2 border-t border-border/40 flex items-center justify-between text-[11px]">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedArticleToRead(art)}
-                          className="text-zinc-400 hover:text-white transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          <Globe size={12} className="text-accent" />
-                          <span>View in App</span>
-                        </button>
-
-                        {art.link && (
-                          <a
-                            href={art.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-accent font-semibold flex items-center gap-1 hover:underline cursor-pointer"
-                          >
-                            <span>Open on {art.source}</span>
-                            <ExternalLink size={12} />
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Prominent Generate More Articles Button & Status */}
-                <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <div className="text-center sm:text-left">
-                    <span className="text-xs text-zinc-300 font-semibold block">
-                      Looking for more real-time market stories?
-                    </span>
-                    <span className="text-[11px] text-zinc-500">
-                      Showing {articles.length} authentic reports from Bloomberg, WSJ, Reuters, CNBC & Financial Times.
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleGenerateMoreArticles}
-                    disabled={isLoadingMoreNews}
-                    className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-accent/20 via-accent/30 to-accent/20 hover:from-accent hover:to-accent text-accent hover:text-primary border border-accent/40 font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Newspaper size={14} className={isLoadingMoreNews ? 'animate-spin text-accent' : 'text-accent'} />
-                    <span>{isLoadingMoreNews ? 'Generating More Articles...' : 'Generate More Articles'}</span>
-                  </button>
-                </div>
-              </div>
-            </Reveal>
+              </Reveal>
             </div>
           )}
 
-          {/* 3. BORROWING, INTEREST RATES & MACROECONOMIC INDICATORS — Financial section */}
+          {/* 3. BORROWING, INTEREST RATES & MACROECONOMIC INDICATORS — Calm Hairline Grid */}
           {showFinancialSections && (effectiveFilter === 'all' || effectiveFilter === 'rates') && (
             <div className={isMobileFinancialPage ? 'order-1' : ''}>
-            <Reveal delay={0.2} y={20}>
-              <div data-tutorial="market-rates-panel" className="bg-card border border-border rounded-2xl p-5 sm:p-6 space-y-5 shadow-md">
-                <div className="flex items-center justify-between border-b border-border/80 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Percent size={18} className="text-accent" />
-                    <div>
-                      <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                        Interest Rates & Treasury Benchmarks
-                      </h2>
-                      <p className="text-[11px] text-zinc-400">
-                        Official Federal Reserve FRED series & live US Treasury sovereign debt market yields.
-                      </p>
-                    </div>
+              <Reveal delay={0.2} y={20}>
+                <div data-tutorial="market-rates-panel" className="space-y-5">
+                  <div className="border-b border-white/[0.08] pb-3">
+                    <h2 className="text-sm font-semibold text-zinc-100 tracking-tight">
+                      Interest Rates &amp; Treasury Benchmarks
+                    </h2>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Federal Reserve FRED series &amp; US Treasury market yields.
+                    </p>
                   </div>
-                </div>
 
-                {/* Macroeconomic Indicators */}
-                {overview?.economicIndicators && overview.economicIndicators.length > 0 && (
-                  <div className="space-y-2">
-                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
-                      Macroeconomic Anchors
-                    </span>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {/* Macroeconomic Indicators */}
+                  {overview?.economicIndicators && overview.economicIndicators.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.07] border-y border-white/[0.07]">
                       {overview.economicIndicators.map((ind, i) => (
-                        <div key={ind.name || i} className="bg-card border border-border rounded-xl p-3 space-y-1">
-                          <span className="text-[10px] text-zinc-400 block truncate">{ind.name}</span>
-                          <span className="text-base font-extrabold text-white font-mono block">{ind.value}</span>
+                        <div key={ind.name || i} className="py-3 pr-3 sm:px-4 first:pl-0">
+                          <span className="text-[11px] text-zinc-500 block truncate">{ind.name}</span>
+                          <span className="mt-0.5 text-base font-semibold text-zinc-100 font-mono tabular-nums block">
+                            {ind.value}
+                          </span>
                           <span className="text-[10px] text-zinc-500 block truncate">{ind.period}</span>
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* 10 Rate Cards */}
-                <div className="space-y-2">
-                  <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
-                    Benchmark Borrowing & Yields
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Benchmark Borrowing & Yields */}
+                  <div className="divide-y divide-white/[0.06] border-t border-white/[0.07]">
                     {(overview?.rates || DEFAULT_MARKET_DATA.rates).map((r, i) => (
-                      <div key={r.id || i} className="bg-card border border-border rounded-xl p-3.5 space-y-1">
-                        <div className="text-[11px] text-zinc-400 font-medium">{r.name}</div>
-                        <div className="text-lg font-extrabold text-accent font-mono">
+                      <div
+                        key={r.id || i}
+                        className="flex items-baseline justify-between gap-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium text-zinc-200">{r.name}</div>
+                          <p className="text-[11px] text-zinc-500 truncate">
+                            {r.desc || r.description}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-sm font-semibold text-zinc-100 font-mono tabular-nums">
                           {typeof r.rate === 'number' ? `${r.rate.toFixed(2)}%` : r.rate}
                         </div>
-                        <p className="text-[10px] text-zinc-500">{r.desc || r.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Reveal>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column (1 Col): Calm Editorial Macro Digest Sidebar */}
+        {showFinancialSections && (!isMobile || effectiveFilter === 'all' || effectiveFilter === 'rates') && (
+          <div className="space-y-6">
+            <Reveal delay={0.12} y={20}>
+              <div
+                data-tutorial="market-ai-digest"
+                className="rounded-xl border border-white/[0.08] bg-[#131311] p-5 space-y-4 lg:sticky lg:top-20"
+              >
+                <div className="flex items-center justify-between border-b border-white/[0.07] pb-3">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                    Macroeconomic Outlook
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={handleGenerateAiBriefing}
+                    disabled={isGeneratingAi}
+                    title="Refresh Market Outlook"
+                    className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw size={13} className={isGeneratingAi ? 'animate-spin text-[#c8a24e]' : ''} />
+                  </button>
+                </div>
+
+                <div className="space-y-2.5 pt-0.5">
+                  {(aiBriefing ? (
+                    aiBriefing.split(/(?<=[.!?])\s+|\n+/).map(s => s.trim()).filter(s => s.length > 20).slice(0, 4)
+                  ) : [
+                    'Liquid cash yields near 4.23% APY preserve steady real returns in high-yield savings.',
+                    'Credit card borrowing costs average 21.19% APR; prioritize paying down variable balances.',
+                    'Conforming 30-year fixed mortgages average 7.11%, rewarding larger down payment reserves.',
+                    'Steady GDP expansion favors consistent dollar-cost averaging into broad index funds.',
+                  ]).map((bullet, idx) => (
+                    <div key={idx} className="flex items-start gap-2.5 text-xs text-zinc-300">
+                      <span className="w-1 h-1 rounded-full bg-zinc-500 mt-2 shrink-0" />
+                      <span className="leading-relaxed">{bullet}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Actionable Personal Finance Takeaways */}
+                <div
+                  data-tutorial="market-budget-impact"
+                  className="pt-3 border-t border-white/[0.07] space-y-3"
+                >
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 block">
+                    Budget Implications
+                  </span>
+
+                  <div className="divide-y divide-white/[0.06]">
+                    {(overview?.budgetAdviceHighlights || [
+                      {
+                        title: 'Keep Emergency Cash in HYSA',
+                        description: 'With the Effective Fed Funds Rate at 3.88%, competitive savings accounts yield ~4.23% APY.',
+                      },
+                      {
+                        title: 'Eliminate Variable Card Debt',
+                        description: 'Average credit card APRs sit near 21.19%. Direct unassigned income here before discretionary envelopes.',
+                      },
+                      {
+                        title: 'Plan Larger Down Payments',
+                        description: 'With 30-year fixed mortgages near 7.11%, building a dedicated down-payment envelope lowers monthly carry.',
+                      },
+                    ]).map((item, idx) => (
+                      <div key={item.title || idx} className="py-2.5 first:pt-1 last:pb-0 space-y-0.5">
+                        <div className="font-medium text-zinc-200 text-xs">
+                          {item.title}
+                        </div>
+                        <p className="text-zinc-400 text-[11px] leading-relaxed">
+                          {item.description}
+                        </p>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
             </Reveal>
-            </div>
-          )}
-        </div>
-
-        {/* Right Column (1 Col): Dedicated AI Macro Digest & Takeaways Sidebar — Financial section */}
-        {showFinancialSections && (!isMobile || effectiveFilter === 'all' || effectiveFilter === 'rates') && (
-          <div className="space-y-6">
-            {/* MACROECONOMIC OUTLOOK CARD */}
-            <Reveal delay={0.12} y={20}>
-              <div
-                data-tutorial="market-ai-digest"
-                className="bg-card border border-border rounded-2xl p-5 space-y-4 shadow-xl lg:sticky lg:top-20"
-              >
-              <div className="flex items-center justify-between border-b border-border/80 pb-3">
-                <div className="flex items-center gap-2 text-accent">
-                  <Activity size={18} />
-                  <h2 className="text-sm font-bold text-white tracking-tight">
-                    <span>Macroeconomic Outlook</span>
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleGenerateAiBriefing}
-                  disabled={isGeneratingAi}
-                  title="Refresh Market Outlook"
-                  className="p-1.5 text-accent hover:bg-accent/15 rounded-lg border border-accent/30 transition-all cursor-pointer"
-                >
-                  <RefreshCw size={13} className={isGeneratingAi ? 'animate-spin' : ''} />
-                </button>
-              </div>
-
-              {/* Concise bullet points instead of dense paragraph */}
-              <div className="space-y-2.5 pt-1">
-                {(aiBriefing ? (
-                  aiBriefing.split(/(?<=[.!?])\s+|\n+/).map(s => s.trim()).filter(s => s.length > 20).slice(0, 4)
-                ) : [
-                  'Liquid cash yields near 4.23% APY preserve strong real returns in high-yield savings.',
-                  'Credit card borrowing costs average 21.19% APR; prioritize eliminating variable card debt.',
-                  'Conforming 30-year fixed mortgages average 7.11%, rewarding larger down payment allocations.',
-                  'Steady GDP expansion and 3.7% inflation favor disciplined dollar-cost averaging into core index funds.',
-                ]).map((bullet, idx) => (
-                  <div key={idx} className="flex items-start gap-2.5 text-xs text-zinc-300">
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
-                    <span className="leading-relaxed">{bullet}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Actionable Personal Finance Takeaways */}
-              <div
-                data-tutorial="market-budget-impact"
-                className="pt-2 border-t border-border/60 space-y-2.5"
-              >
-                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
-                  Actionable Budget Implications
-                </span>
-
-                {(overview?.budgetAdviceHighlights || [
-                  {
-                    title: 'Optimize Liquid Cash in HYSA',
-                    description: 'With the Effective Fed Funds Rate at 3.88%, top high-yield accounts yield ~4.23% APY risk-free. Keep your Emergency Fund actively earning yield.',
-                    tag: 'Savings Strategy',
-                  },
-                  {
-                    title: 'Credit Card & Debt Elimination',
-                    description: 'Average credit card APRs stand near 21.19%. Allocate unassigned budget dollars aggressively toward variable debt before funding discretionary envelopes.',
-                    tag: 'Debt Payoff',
-                  },
-                  {
-                    title: 'Planning Big Purchases',
-                    description: 'Conforming 30-year fixed mortgages average 7.11%. When planning a vehicle or home purchase, prioritize a larger down payment envelope.',
-                    tag: 'Purchase Budgeting',
-                  },
-                ]).map((item, idx) => (
-                  <div key={item.title || idx} className="bg-card border border-border rounded-xl p-3 space-y-1">
-                    <div className="flex items-center gap-1.5 text-accent font-semibold text-xs">
-                      <CheckCircle2 size={13} />
-                      <span>{item.title}</span>
-                    </div>
-                    <p className="text-zinc-400 text-[11px] leading-snug">
-                      {item.description}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Reveal>
-        </div>
+          </div>
         )}
       </div>
     </div>

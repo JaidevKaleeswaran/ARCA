@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { useBudget } from '../../contexts/BudgetContext';
+import { Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function IncomeSourceModal({ isOpen, onClose, source = null }) {
@@ -130,10 +131,10 @@ export default function IncomeSourceModal({ isOpen, onClose, source = null }) {
           <span>Borrowed funds (debt)</span>
         </label>
 
-        <div className="pt-2 flex items-center gap-2.5">
+        <div className="pt-2 flex items-center justify-between gap-3">
           <button
             type="submit"
-            className="h-10 sm:h-9 flex-1 rounded-full bg-[#E7B956] text-xs font-semibold text-[#090908] hover:bg-[#d8aa45] cursor-pointer"
+            className="h-9 flex-1 rounded-lg bg-[#272724] px-4 text-xs font-semibold text-[#c8a24e] transition-colors hover:bg-[#30302c] cursor-pointer"
           >
             {isEditing ? 'Save changes' : 'Add source'}
           </button>
@@ -142,9 +143,11 @@ export default function IncomeSourceModal({ isOpen, onClose, source = null }) {
             <button
               type="button"
               onClick={handleDelete}
-              className="h-10 sm:h-9 rounded-full border border-rose-500/25 bg-rose-500/10 px-4 text-xs font-medium text-rose-400 hover:bg-rose-500/20 cursor-pointer"
+              title="Delete income source"
+              aria-label="Delete income source"
+              className="p-1.5 text-rose-400 transition-colors hover:text-rose-300 cursor-pointer"
             >
-              Delete
+              <Trash2 className="h-4 w-4" strokeWidth={1.75} />
             </button>
           )}
         </div>

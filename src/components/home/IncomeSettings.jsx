@@ -67,7 +67,7 @@ export default function IncomeSettings() {
           type="button"
           data-tutorial="income-source-add"
           onClick={handleAddClick}
-          className="inline-flex h-8 sm:h-7 items-center gap-1 rounded-full border border-white/[0.1] px-3 text-xs font-medium text-zinc-300 transition-colors hover:border-[#E7B956]/50 hover:text-[#E7B956] cursor-pointer"
+          className="inline-flex items-center gap-1 py-1 text-xs font-medium text-zinc-400 transition-colors hover:text-[#c8a24e] cursor-pointer"
         >
           <Plus className="h-3 w-3" strokeWidth={1.75} />
           <span>Add source</span>
@@ -86,8 +86,8 @@ export default function IncomeSettings() {
                   <span className="truncate text-sm font-medium text-zinc-100">
                     {primarySalary.name}
                   </span>
-                  <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-zinc-400">
-                    Base
+                  <span className="text-[11px] text-zinc-500">
+                    · Base
                   </span>
                 </div>
                 <p className="mt-0.5 text-xs text-zinc-500 tabular-nums">
@@ -98,7 +98,7 @@ export default function IncomeSettings() {
                 type="button"
                 onClick={() => setIsSalaryModalOpen(true)}
                 title="Edit Base Salary"
-                className="rounded p-1.5 text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-100 cursor-pointer"
+                className="p-1.5 text-zinc-500 transition-colors hover:text-zinc-200 cursor-pointer"
               >
                 <Edit2 className="h-3.5 w-3.5" strokeWidth={1.5} />
               </button>
@@ -109,7 +109,7 @@ export default function IncomeSettings() {
               <button
                 type="button"
                 onClick={() => setIsSalaryModalOpen(true)}
-                className="inline-flex h-8 sm:h-7 items-center rounded-full bg-[#E7B956] px-3.5 text-xs font-semibold text-[#090908] hover:bg-[#d8aa45] cursor-pointer"
+                className="py-1 text-xs font-semibold text-[#c8a24e] transition-colors hover:text-[#d8b464] cursor-pointer"
               >
                 Set Base Salary
               </button>

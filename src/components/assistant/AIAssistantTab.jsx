@@ -474,7 +474,7 @@ export default function AIAssistantTab() {
       >
         <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-100">Assistant</h1>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-4">
           <button
             type="button"
             onClick={() =>
@@ -486,7 +486,7 @@ export default function AIAssistantTab() {
                 resetCountdown: getNextMondayCountdown(),
               })
             }
-            className="h-8 sm:h-7 rounded-full border border-white/[0.1] bg-[#111110] px-3 text-[11px] font-medium text-[#E7B956] tabular-nums transition-colors hover:border-[#E7B956]/50 cursor-pointer"
+            className="py-1 text-xs font-medium text-zinc-400 tabular-nums transition-colors hover:text-[#c8a24e] cursor-pointer"
             title="Weekly AI Assistant Quota"
           >
             {remainingQueries}/{QUOTA_LIMITS.assistant} left
@@ -495,10 +495,10 @@ export default function AIAssistantTab() {
           <button
             type="button"
             onClick={() => setShowVoiceAuditLog(true)}
-            className="inline-flex h-8 sm:h-7 items-center gap-1.5 rounded-full border border-white/[0.1] px-3 text-xs text-zinc-300 transition-colors hover:border-white/[0.2] hover:text-zinc-100 cursor-pointer"
+            className="inline-flex items-center gap-1 py-1 text-xs text-zinc-400 transition-colors hover:text-zinc-200 cursor-pointer"
             title="Inspect voice logs"
           >
-            <ShieldCheck className="h-3.5 w-3.5 text-zinc-400 shrink-0" strokeWidth={1.5} />
+            <ShieldCheck className="h-3.5 w-3.5 text-zinc-500 shrink-0" strokeWidth={1.5} />
             <span>Logs</span>
           </button>
 
@@ -506,7 +506,7 @@ export default function AIAssistantTab() {
             type="button"
             onClick={() => dispatch({ type: 'CLEAR_CHAT_MESSAGES' })}
             title="Clear chat"
-            className="h-8 sm:h-7 rounded-full border border-white/[0.1] px-3 text-xs text-zinc-400 transition-colors hover:border-white/[0.2] hover:text-zinc-100 cursor-pointer"
+            className="py-1 text-xs text-zinc-500 transition-colors hover:text-zinc-200 cursor-pointer"
           >
             Clear
           </button>
@@ -579,19 +579,19 @@ export default function AIAssistantTab() {
         {/* Input Bar */}
         <div
           data-tutorial="ai-input-bar"
-          className="mt-4 flex items-center gap-2 border-t border-white/[0.08] pt-3.5"
+          className="mt-4 flex items-center gap-2.5 border-t border-white/[0.08] pt-3.5"
         >
           <button
             type="button"
             data-tutorial="ai-voice-mic"
             onClick={isVoicePrompting ? handleStopPromptVoice : handleStartPromptVoice}
             disabled={isProcessing || isTranscribingPrompt}
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors cursor-pointer ${
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors cursor-pointer ${
               isVoicePrompting
-                ? 'border-rose-500/50 bg-rose-500/15 text-rose-400'
+                ? 'bg-rose-500/15 text-rose-400'
                 : isTranscribingPrompt
-                ? 'border-[#E7B956]/40 bg-[#E7B956]/10 text-[#E7B956]'
-                : 'border-white/[0.1] bg-[#111110] text-zinc-400 hover:border-[#E7B956]/50 hover:text-[#E7B956]'
+                ? 'text-[#c8a24e]'
+                : 'text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200'
             }`}
             title={isVoicePrompting ? 'Stop recording & send prompt' : 'Speak prompt'}
           >
@@ -617,7 +617,7 @@ export default function AIAssistantTab() {
                 : 'Ask about your budget...'
             }
             disabled={isTranscribingPrompt}
-            className="h-10 flex-1 rounded-full border border-white/[0.1] bg-[#111110] px-4 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#E7B956] focus:outline-none transition-colors"
+            className="h-10 flex-1 rounded-lg border border-white/[0.09] bg-[#131311] px-3.5 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#c8a24e] focus:outline-none transition-colors"
           />
 
           <button
@@ -629,10 +629,10 @@ export default function AIAssistantTab() {
             disabled={
               (!inputQuery.trim() && !isVoicePrompting) || isProcessing || isTranscribingPrompt
             }
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#E7B956] text-[#090908] transition-colors hover:bg-[#d8aa45] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            className="flex h-9 items-center gap-1.5 rounded-lg bg-[#272724] px-3.5 text-xs font-semibold text-[#c8a24e] transition-colors hover:bg-[#30302c] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             title="Send message"
           >
-            <Send className="h-4 w-4" strokeWidth={1.75} />
+            <Send className="h-3.5 w-3.5" strokeWidth={1.75} />
           </button>
         </div>
       </div>

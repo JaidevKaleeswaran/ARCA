@@ -131,17 +131,17 @@ export default function SalaryModal({ isOpen, onClose }) {
           </div>
         )}
 
-        <div className="pt-2 flex items-center gap-2.5">
+        <div className="pt-2 flex items-center justify-between gap-4">
           <button
             type="button"
             onClick={onClose}
-            className="h-10 sm:h-9 rounded-full border border-white/[0.1] px-4 text-xs font-medium text-zinc-400 hover:text-zinc-100 cursor-pointer"
+            className="py-1 text-xs font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="h-10 sm:h-9 flex-1 rounded-full bg-[#E7B956] text-xs font-semibold text-[#090908] hover:bg-[#d8aa45] cursor-pointer"
+            className="h-9 flex-1 rounded-lg bg-[#272724] px-4 text-xs font-semibold text-[#c8a24e] transition-colors hover:bg-[#30302c] cursor-pointer"
           >
             Save salary
           </button>

@@ -1,26 +1,40 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #090908;
-  --color-primary-light: #111110;
-  --color-card: #111110;
-  --color-card-hover: #171715;
+  --color-primary: #0b0b0a;
+  --color-primary-light: #131311;
+  --color-card: #131311;
+  --color-card-hover: #1a1a17;
 
-  --color-gold: #e7b956;
-  --color-gold-hover: #d8aa45;
+  /* Muted, grounded solid pigments — zero neon glare */
+  --color-gold: #c8a24e;
+  --color-gold-hover: #b69140;
 
-  --color-forest: #2e5b45;
-  --color-forest-light: #3a7056;
+  --color-forest: #4d7c63;
+  --color-forest-light: #5d8d73;
 
-  --color-cream: #f4f4f0;
-  --color-cream-muted: #8e8d86;
+  --color-cream: #d4d4ce;
+  --color-cream-muted: #8b8a84;
 
-  --color-accent: #e7b956;
-  --color-accent-hover: #d8aa45;
-  --color-text: #f4f4f0;
-  --color-text-muted: #8e8d86;
-  --color-border: #20201d;
-  --color-border-subtle: #171715;
+  --color-accent: #c8a24e;
+  --color-accent-hover: #b69140;
+  --color-text: #d4d4ce;
+  --color-text-muted: #8b8a84;
+  --color-border: #22221f;
+  --color-border-subtle: #191917;
+
+  /* Tone down pure white and zinc-100 across the entire app so whites feel softer and grayer */
+  --color-white: #d8d8d2;
+  --color-zinc-50: #d8d8d2;
+  --color-zinc-100: #d0d0ca;
+  --color-zinc-200: #c2c2bc;
+
+  /* Replace Tailwind neon emerald/rose 400-500 with solid, muted earthy equivalents */
+  --color-emerald-400: #5d9475;
+  --color-emerald-500: #4d7c63;
+  --color-rose-400: #c26662;
+  --color-rose-500: #a85450;
+  --color-amber-400: #c49a47;
 
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -32,7 +46,7 @@
     font-variant-numeric: tabular-nums lining-nums;
   }
 
-  /* Subtle architectural chamfered corner to break repetitive box silhouettes */
+  /* Subtle architectural chamfered corner */
   .arca-chamfer {
     clip-path: polygon(
       0 0,
@@ -48,34 +62,29 @@
   }
 }
 
+/* Subtle, non-shining tap feedback on mobile stock sector text tabs */
 @media (max-width: 767px) {
   @keyframes arcaSectorGlowFade {
     0% {
-      background-color: rgba(231, 185, 86, 0.1);
-      border-color: rgba(231, 185, 86, 0.4);
-      box-shadow: 0 0 0 rgba(231, 185, 86, 0);
-      color: #f4f4f0;
+      background-color: rgba(216, 216, 210, 0.04);
+      color: #c2c2bc;
     }
-    24% {
-      background-color: rgba(231, 185, 86, 0.28);
-      border-color: rgba(231, 185, 86, 0.85);
-      box-shadow: 0 0 16px rgba(231, 185, 86, 0.45);
-      color: #ffffff;
+    25% {
+      background-color: rgba(216, 216, 210, 0.1);
+      color: #d8d8d2;
     }
     100% {
-      background-color: #111110;
-      border-color: rgba(32, 32, 29, 0.6);
-      box-shadow: 0 0 0 rgba(231, 185, 86, 0);
-      color: #a1a1aa;
+      background-color: transparent;
+      color: #8b8a84;
     }
   }
 
   .arca-sector-glow-once {
-    animation: arcaSectorGlowFade 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation: arcaSectorGlowFade 520ms ease-out forwards;
   }
 }
 
-/* Keep floating Tutorial / Transaction buttons clear of right-side drawers on desktop and mobile */
+/* Keep floating Tutorial / Transaction controls clear of right-side drawers on desktop and mobile */
 @media (min-width: 768px) {
   body[data-stock-drawer-open="true"] [data-tutorial="corner-tutorial-launcher"],
   body[data-settings-drawer-open="true"] [data-tutorial="corner-tutorial-launcher"] {
@@ -109,7 +118,7 @@
   body {
     margin: 0;
     min-height: 100vh;
-    background-color: #090908;
+    background-color: #0b0b0a;
     color: var(--color-text);
     font-family: var(--font-sans);
     overflow-x: hidden;
@@ -143,10 +152,10 @@
     height: 7px;
   }
   ::-webkit-scrollbar-track {
-    background: #090908;
+    background: #0b0b0a;
   }
   ::-webkit-scrollbar-thumb {
-    background: #232320;
+    background: #242421;
     border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {

@@ -228,7 +228,7 @@ function MainApp() {
               </div>
             </main>
 
-            {/* Mobile floating Log Transaction pill right above the bottom tab bar */}
+            {/* Mobile floating Log Transaction trigger right above the bottom tab bar */}
             <button
               type="button"
               data-mobile-fab="log-transaction"
@@ -239,9 +239,9 @@ function MainApp() {
               }}
               title="Log a new expense"
               aria-label="Log transaction"
-              className="md:hidden fixed right-3.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.3rem)] z-30 inline-flex h-10 items-center gap-1.5 rounded-full border border-white/[0.12] bg-[#161614] px-4 text-xs font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-transform active:scale-95 cursor-pointer"
+              className="md:hidden fixed right-3.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.25rem)] z-30 inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/[0.09] bg-[#181815] px-3.5 text-xs font-semibold text-[#c8a24e] shadow-[0_6px_20px_rgba(0,0,0,0.6)] transition-colors hover:bg-[#20201c] cursor-pointer"
             >
-              <Plus className="h-4 w-4 text-[#E7B956] shrink-0" strokeWidth={2.25} />
+              <Plus className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
               <span>Transaction</span>
             </button>
 
@@ -251,9 +251,9 @@ function MainApp() {
               data-tutorial="corner-tutorial-launcher"
               onClick={() => startTutorial(activeTab, true)}
               title="Start interactive tutorial for this page"
-              className="hidden md:inline-flex fixed bottom-5 right-5 z-40 h-8 items-center gap-1.5 rounded-full border border-[#E7B956]/40 bg-[#111110]/95 px-3 text-xs font-medium text-[#E7B956] backdrop-blur-md transition-colors hover:border-[#E7B956] hover:bg-[#171715] cursor-pointer"
+              className="hidden md:inline-flex fixed bottom-5 right-5 z-40 h-8 items-center gap-1.5 rounded-lg border border-white/[0.09] bg-[#161614]/95 px-3 text-xs font-medium text-[#c8a24e] backdrop-blur-md transition-colors hover:bg-[#1e1e1b] hover:text-[#d8b464] cursor-pointer"
             >
-              <HelpCircle className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+              <HelpCircle className="h-3.5 w-3.5 shrink-0" strokeWidth={1.6} />
               <span>Tutorial ?</span>
             </button>
           </>

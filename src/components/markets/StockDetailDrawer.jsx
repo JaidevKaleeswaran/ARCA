@@ -344,7 +344,7 @@ export default function StockDetailDrawer({
     : (activeData?.periodChangePercent ?? fallbackChangePct);
 
   const isPositive = displayChange >= 0;
-  const strokeColor = isPositive ? '#4ade80' : '#fb7185';
+  const strokeColor = isPositive ? '#5d9475' : '#c26662';
   const safeGradId = `arcaStockGrad_${symbol.replace(/[^a-zA-Z0-9]/g, '_')}`;
   const { whole, cents } = splitPriceParts(headlinePrice);
 
@@ -402,15 +402,9 @@ export default function StockDetailDrawer({
             <h2 className="text-base font-semibold tracking-tight text-zinc-100">
               {symbol}
             </h2>
-            <span className="rounded-full border border-white/[0.1] bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-zinc-400">
-              {displaySector}
+            <span className="text-[11px] text-zinc-500">
+              · {displaySector}
             </span>
-            {activeData?.isLive && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                Live
-              </span>
-            )}
           </div>
           <p className="mt-0.5 truncate text-xs text-zinc-500">{displayName}</p>
         </div>
@@ -526,11 +520,11 @@ export default function StockDetailDrawer({
           )}
         </div>
 
-        {/* Timeframe Switcher Pills */}
+        {/* Clean Underline Timeframe Tabs */}
         <div
           role="tablist"
           aria-label="Chart timeframe"
-          className="grid grid-cols-6 gap-1 rounded-full border border-white/[0.08] bg-[#111110] p-1"
+          className="flex items-center justify-between border-b border-white/[0.08]"
         >
           {RANGES.map((r) => {
             const isSelected = range === r.id;
@@ -541,13 +535,16 @@ export default function StockDetailDrawer({
                 role="tab"
                 aria-selected={isSelected}
                 onClick={() => setRange(r.id)}
-                className={`rounded-full py-1 text-[11px] font-medium transition-colors cursor-pointer ${
+                className={`relative px-2 py-2 text-xs font-medium transition-colors cursor-pointer ${
                   isSelected
-                    ? 'bg-[#E7B956] text-[#090908] font-semibold'
-                    : 'text-zinc-400 hover:text-zinc-100'
+                    ? 'text-zinc-100'
+                    : 'text-zinc-500 hover:text-zinc-200'
                 }`}
               >
                 {r.label}
+                {isSelected && (
+                  <span className="absolute inset-x-0 bottom-0 h-[1.5px] bg-[#c8a24e]" />
+                )}
               </button>
             );
           })}
@@ -711,7 +708,7 @@ export default function StockDetailDrawer({
         <button
           type="button"
           onClick={() => onInvest?.(investStockPayload)}
-          className="flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-[#E7B956] text-xs font-semibold text-[#090908] transition-colors hover:bg-[#d8aa45] cursor-pointer"
+          className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[#272724] text-xs font-semibold text-[#c8a24e] transition-colors hover:bg-[#30302c] cursor-pointer"
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={2} />
           <span>{holding ? `Add to ${symbol} position` : `Invest in ${symbol}`}</span>
