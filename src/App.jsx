@@ -228,7 +228,7 @@ function MainApp() {
               </div>
             </main>
 
-            {/* Mobile floating Log Transaction pill right above the iOS Liquid Glass tab bar */}
+            {/* Mobile floating Log Transaction pill right above the bottom tab bar */}
             <button
               type="button"
               data-mobile-fab="log-transaction"
@@ -239,7 +239,7 @@ function MainApp() {
               }}
               title="Log a new expense"
               aria-label="Log transaction"
-              className="ios-liquid-glass-bar md:hidden fixed right-3.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.3rem)] z-30 inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-xs font-semibold text-white transition-transform active:scale-95 cursor-pointer"
+              className="md:hidden fixed right-3.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.3rem)] z-30 inline-flex h-10 items-center gap-1.5 rounded-full border border-white/[0.12] bg-[#161614] px-4 text-xs font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-transform active:scale-95 cursor-pointer"
             >
               <Plus className="h-4 w-4 text-[#E7B956] shrink-0" strokeWidth={2.25} />
               <span>Transaction</span>

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React from 'react';
 import { Wallet, ReceiptText, BarChart3, TrendingUp, Landmark, MessageSquare } from 'lucide-react';
 
 const TABS = [
@@ -12,74 +12,14 @@ const TABS = [
 
 /**
  * Adaptive navigation:
- * - Mobile (< md): iOS Liquid Glass floating tab bar with spring-sliding optical glass selection capsule
+ * - Mobile (< md): Clean solid floating bottom pill navigator splitting Markets & Financial
  * - Desktop (>= md): Clean sticky top hairline tab bar (unified Markets tab)
  */
 export default function TabNavigation({ activeTab, setActiveTab }) {
-  const trackRef = useRef(null);
-  const dragOriginRef = useRef(null);
-  const [dragIndex, setDragIndex] = useState(null);
-
   const activeIdx = Math.max(
     0,
     TABS.findIndex((t) => t.id === activeTab)
   );
-  const isDragging = dragIndex !== null;
-  const pillIndex = isDragging ? dragIndex : activeIdx;
-
-  const getIndexFromClientX = (clientX) => {
-    const el = trackRef.current;
-    if (!el) return activeIdx;
-    const rect = el.getBoundingClientRect();
-    if (rect.width <= 0) return activeIdx;
-    const ratio = (clientX - rect.left) / rect.width;
-    const clamped = Math.max(0, Math.min(TABS.length - 1, ratio * TABS.length - 0.5));
-    return clamped;
-  };
-
-  const handlePointerDown = (e) => {
-    if (typeof window !== 'undefined' && window.innerWidth >= 768) return;
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    dragOriginRef.current = { x: e.clientX, pointerId: e.pointerId, moved: false };
-  };
-
-  const handlePointerMove = (e) => {
-    const origin = dragOriginRef.current;
-    if (!origin || origin.pointerId !== e.pointerId) return;
-    if (!origin.moved && Math.abs(e.clientX - origin.x) < 8) return;
-
-    if (!origin.moved) {
-      origin.moved = true;
-      try {
-        trackRef.current?.setPointerCapture?.(e.pointerId);
-      } catch {
-        // ignore pointer capture failures
-      }
-    }
-
-    const nextFloat = getIndexFromClientX(e.clientX);
-    setDragIndex(nextFloat);
-
-    const snappedIdx = Math.max(0, Math.min(TABS.length - 1, Math.round(nextFloat)));
-    const targetTab = TABS[snappedIdx];
-    if (targetTab && targetTab.id !== activeTab) {
-      setActiveTab(targetTab.id);
-    }
-  };
-
-  const handlePointerEnd = (e) => {
-    const origin = dragOriginRef.current;
-    if (!origin || origin.pointerId !== e.pointerId) return;
-    if (origin.moved) {
-      try {
-        trackRef.current?.releasePointerCapture?.(e.pointerId);
-      } catch {
-        // ignore
-      }
-    }
-    dragOriginRef.current = null;
-    setDragIndex(null);
-  };
 
   return (
     <nav
@@ -87,29 +27,15 @@ export default function TabNavigation({ activeTab, setActiveTab }) {
       aria-label="Workspace navigation"
       className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] inset-x-3 z-30 md:sticky md:top-0 md:bottom-auto md:inset-x-0 md:z-20 md:border-b md:border-white/[0.08] md:bg-[#090908]/95 md:backdrop-blur-md"
     >
-      <div className="relative ios-liquid-glass-bar rounded-full p-1 mx-auto max-w-6xl md:rounded-none md:p-0 md:px-6">
-        <div
-          ref={trackRef}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerEnd}
-          onPointerCancel={handlePointerEnd}
-          className="relative grid grid-cols-6 touch-pan-y select-none md:flex md:items-center md:gap-7"
-        >
-          {/* iOS Liquid Glass Spring-Sliding Selection Capsule (Mobile Only) */}
+      <div className="rounded-full border border-white/[0.1] bg-[#111110] p-1 shadow-[0_10px_28px_rgba(0,0,0,0.65)] mx-auto max-w-6xl md:rounded-none md:border-0 md:bg-transparent md:p-0 md:px-6 md:shadow-none">
+        <div className="relative grid grid-cols-6 select-none md:flex md:items-center md:gap-7">
+          {/* Clean sliding active indicator pill (Mobile Only) */}
           <div
             aria-hidden="true"
-            className={`md:hidden pointer-events-none absolute inset-y-0 left-0 z-0 rounded-full ${
-              isDragging ? 'ios-liquid-glass-pill-dragging' : 'ios-liquid-glass-pill'
-            }`}
+            className="md:hidden pointer-events-none absolute inset-y-0 left-0 z-0 rounded-full bg-white/[0.09] transition-transform duration-300 ease-out"
             style={{
               width: `${100 / TABS.length}%`,
-              transform: `translate3d(${pillIndex * 100}%, 0, 0) scale(${
-                isDragging ? '1.06, 1.08' : '1, 1'
-              })`,
-              transition: isDragging
-                ? 'background 140ms ease, box-shadow 140ms ease, transform 60ms linear'
-                : 'transform 380ms cubic-bezier(0.32, 1.12, 0.42, 1), background 200ms ease, box-shadow 200ms ease',
+              transform: `translate3d(${activeIdx * 100}%, 0, 0)`,
             }}
           />
 
@@ -127,7 +53,7 @@ export default function TabNavigation({ activeTab, setActiveTab }) {
                 } ${
                   isActive
                     ? 'font-semibold text-[#E7B956] md:font-medium md:text-zinc-100'
-                    : 'text-white/80 hover:text-white md:text-zinc-500 md:hover:text-zinc-200'
+                    : 'text-zinc-400 hover:text-zinc-100 md:text-zinc-500 md:hover:text-zinc-200'
                 }`}
               >
                 <Icon
