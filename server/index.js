@@ -31,6 +31,8 @@ app.use('/api', globalLimiter);
 
 // CORS configuration: Allow localhost in dev and Vercel / custom domain in production
 const allowedOrigins = [
+  'https://arcabudgeting.com',
+  'https://www.arcabudgeting.com',
   'http://localhost:5173',
   'http://localhost:5000',
   'http://localhost:3000',

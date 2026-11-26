@@ -22,7 +22,7 @@ export default function App() {
   const appUrl =
     typeof window !== 'undefined' && window.location.hostname === 'localhost'
       ? 'http://localhost:5173'
-      : import.meta.env.VITE_APP_URL || 'https://arca-budgeting.vercel.app';
+      : import.meta.env.VITE_APP_URL || 'https://arcabudgeting.com';
 
   const navigate = (path) => {
     setCurrentPath(path);

@@ -9,6 +9,8 @@
         "oAuthBrandDisplayName": "ARCA Budgeting",
         "supportEmail": "kaleeswaranjaidev@gmail.com",
         "authorizedRedirectUris": [
+          "https://arcabudgeting.com/__/auth/handler",
+          "https://www.arcabudgeting.com/__/auth/handler",
           "https://arca-budgeting.firebaseapp.com/__/auth/handler",
           "https://arca-budgeting.web.app/__/auth/handler",
           "https://stacked-budgeting.firebaseapp.com/__/auth/handler",
